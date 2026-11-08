@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>FKC-VR – Virtuelle Festkörperchemie</title>
+
+  <link rel="stylesheet" href="./styles.css">
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+  <!-- Reihenfolge beibehalten. -->
+  <script defer src="./js/vr-controls.js"></script>
+  <script defer src="./js/room-builder.js"></script>
+  <script defer src="./js/rooms.js"></script>
+  <script defer src="./js/app.js"></script>
+</head>
+
+<body>
+  <section id="panel">
+    <h1>FKC-VR</h1>
+
+    <p id="current-room">Begrüßungsraum</p>
+
+    <div class="room-selection">
+      <label for="room-select">Raum auswählen</label>
+
+      <select id="room-select">
+        <option value="welcome">Begrüßungsraum</option>
+      </select>
+
+      <button id="enter-room" type="button">Betreten</button>
+    </div>
+
+    <div class="buttons">
+      <button id="home" type="button">Zum Begrüßungsraum</button>
+      <button id="reset-last" type="button">Letztes Modell zurücksetzen</button>
+      <button id="reset-all" type="button">Alle Modelle zurücksetzen</button>
+      <button id="clear-markers" type="button">Marker löschen</button>
+    </div>
+
+    <details>
+      <summary>Bedienung</summary>
+
+      <p>
+        <strong>VR:</strong>
+        Linker Stick läuft.
+        Rechter Stick links/rechts dreht in 45°-Schritten.
+        Danach den Stick wieder in die Mitte lassen.
+      </p>
+
+      <p>
+        <strong>Teleport:</strong>
+        Rechten Stick nach vorne halten, Controller zum Boden richten
+        und Stick wieder in die Mitte lassen.
+      </p>
+
+      <p>
+        <strong>Modelle:</strong>
+        Grip in Modellnähe halten.
+        Eine Hand bewegt und dreht, zwei Hände skalieren.
+        Trigger setzt einen Oberflächenmarker.
+      </p>
+
+      <p>
+        <strong>Raumwahl:</strong>
+        Mit Laser auf eine Raumtafel zeigen und Trigger drücken.
+      </p>
+
+      <p>
+        <strong>Reset:</strong>
+        A/X setzt das letzte ausgewählte Modell zurück.
+        B/Y setzt alle Modelle zurück.
+      </p>
+
+      <p>
+        <strong>Desktop:</strong>
+        WASD/Pfeiltasten laufen, Q/E drehen.
+        Mit der Maus ziehen, um sich umzuschauen.
+        Raumtafeln anklicken oder die Auswahlliste verwenden.
+      </p>
+    </details>
+
+    <p id="status" role="status">Anwendung wird geladen …</p>
+  </section>
+
+  <a-scene
+    id="scene"
+    background="color: #edf0ed"
+    renderer="antialias: true; colorManagement: true"
+    vr-mode-ui="enabled: true"
+    webxr="referenceSpaceType: local-floor; optionalFeatures: bounded-floor"
+    fkc-xr-rays
+    fkc-session
+  >
+    <!-- Nur dieser Teil wird bei einem Raumwechsel ausgetauscht. -->
+    <a-entity id="room-root"></a-entity>
+
+    <!-- Rig, Kamera und Controller bleiben in allen Räumen bestehen. -->
+    <a-entity
+      id="rig"
+      position="0 0 5"
+      fkc-navigation="speed: 3; desktopSpeed: 4; snapAngle: 45; deadzone: 0.18"
+    >
+      <a-entity
+        id="camera"
+        camera="near: 0.02; far: 120"
+        position="0 1.6 0"
+        look-controls="pointerLockEnabled: false"
+      ></a-entity>
+
+      <a-entity
+        id="leftHand"
+        hand-controls="hand: left; handModelStyle: lowPoly; color: #d6e5df"
+        fkc-grabber
+        fkc-controller="hand: left"
+      ></a-entity>
+
+      <a-entity
+        id="rightHand"
+        hand-controls="hand: right; handModelStyle: lowPoly; color: #d6e5df"
+        fkc-grabber
+        fkc-controller="hand: right"
+      ></a-entity>
+    </a-entity>
+  </a-scene>
+</body>
+</html>
