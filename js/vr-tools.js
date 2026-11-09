@@ -4,23 +4,17 @@
   const V = THREE.Vector3;
 
   /*
-   * ============================================================
-   * EINSTELLUNGEN
+   * Eine Farbe pro Hand:
+   * Laserfarbe = Zeichenfarbe.
    *
-   * Laserfarben und Zeichenfarben sind unabhängig.
-   * strokeRadius ist der halbe Strichdurchmesser in Metern.
-   * ============================================================
+   * Strichradius in Metern.
+   * Standard: Radius 0.004 m = Durchmesser 8 mm.
    */
   F.Settings = {
     lasers: {
       left: "#32d8df",
       right: "#ff9d38"
     },
-    inks: {
-      left: "#32d8df",
-      right: "#ff3f92"
-    },
-    ink: "#ff3f92",
     strokeRadius: 0.004
   };
 
@@ -34,11 +28,11 @@
   ];
 
   const strokeSizes = [
-    ["Fein · 4 mm", 0.002],
-    ["Normal · 8 mm", 0.004],
-    ["Mittel · 12 mm", 0.006],
-    ["Breit · 20 mm", 0.010],
-    ["Sehr breit · 32 mm", 0.016]
+    ["Fein: 4 mm", 0.002],
+    ["Normal: 8 mm", 0.004],
+    ["Mittel: 12 mm", 0.006],
+    ["Breit: 20 mm", 0.010],
+    ["Sehr breit: 32 mm", 0.016]
   ];
 
   function colorName(color) {
@@ -46,7 +40,7 @@
     return entry ? entry[0] : color;
   }
 
-  function strokeDiameterMm() {
+  function diameterMm() {
     return Math.round(F.Settings.strokeRadius * 2000);
   }
 
@@ -71,23 +65,20 @@
 
   function isDrawingObject(object) {
     for (let current = object; current; current = current.parent) {
-      if (current.userData && current.userData.fkcDrawing) return true;
+      if (current.userData && current.userData.fkcDrawing) {
+        return true;
+      }
     }
     return false;
   }
 
   function rebuildHits() {
     hitTargets = [];
-
     const scene = F.getScene();
     if (!scene) return;
 
     const used = new Set();
 
-    /*
-     * Die Reihenfolge verhindert doppelte Registrierung.
-     * Räumlich zählt anschließend der nächstgelegene Treffer.
-     */
     [
       [".vr-action", "action"],
       [".model-visual", "model"],
@@ -108,7 +99,6 @@
           ) return;
 
           used.add(object);
-
           hitTargets.push({
             mesh: object,
             type,
@@ -280,10 +270,7 @@
         side: THREE.DoubleSide
       });
 
-      /*
-       * Startpunkte bleiben wie bisher etwas größer
-       * als der eigentliche Strich.
-       */
+      // Einzelpunkte bleiben etwas größer als die Linie.
       const dotGeometry = new THREE.SphereGeometry(
         radius * 2, 8, 6
       );
@@ -381,9 +368,7 @@
             v, Math.sin(angle) * stroke.radius
           );
 
-        const offset = (
-          stroke.count * SIDES + side
-        ) * 3;
+        const offset = (stroke.count * SIDES + side) * 3;
 
         stroke.positions[offset] = vertex.x;
         stroke.positions[offset + 1] = vertex.y;
@@ -406,7 +391,13 @@
 
       if (!body) return null;
 
-      const color = F.Settings.inks[hand] || F.Settings.ink;
+      /*
+       * Hier wird direkt die Laserfarbe verwendet.
+       * Es existiert keine getrennte Zeichenfarbe mehr.
+       */
+      const color =
+        F.Settings.lasers[hand] || F.Settings.lasers.right;
+
       const worldRadius = F.Settings.strokeRadius;
       const parent = body.object3D;
 
@@ -414,12 +405,6 @@
 
       const scale = parent.getWorldScale(new V());
       const factor = Math.max(0.0001, Math.abs(scale.x));
-
-      /*
-       * Breitere Striche erhalten mehr Oberflächenabstand,
-       * damit sie nicht zur Hälfte in der Wand verschwinden.
-       * Für die Standardstärke bleibt der bisherige Abstand.
-       */
       const surfaceOffset = Math.max(0.004, worldRadius);
 
       const worldPoint = hit.point.clone()
@@ -481,8 +466,7 @@
   };
 
   /*
-   * Die vorhandene vr-controls.js bleibt unverändert.
-   * Die Hand wird an die Zeichenfunktion weitergereicht.
+   * Handzuordnung ergänzen, ohne vr-controls.js zu ersetzen.
    */
   function connectHandDrawing(el) {
     const tools = el.components &&
@@ -531,11 +515,7 @@
     if (!variant) return;
 
     if (root.fkcVariantId === variantId) {
-      if (F.Menu) {
-        F.Menu.notify(
-          "Diese Darstellung ist bereits ausgewählt."
-        );
-      }
+      F.Menu.notify("Diese Darstellung ist bereits ausgewählt.");
       return;
     }
 
@@ -566,10 +546,7 @@
     root.fkcPendingVisual = pending;
 
     F.setStatus("Darstellung wird geladen: " + variant.title);
-
-    if (F.Menu) {
-      F.Menu.notify("Wird geladen: " + variant.title);
-    }
+    F.Menu.notify("Wird geladen: " + variant.title);
 
     const isCurrent = () => (
       root.isConnected &&
@@ -617,10 +594,7 @@
         F.applyModelBounds(pending);
 
         const hitbox = root.querySelector(".hitbox");
-
-        hitbox.object3D.position.copy(
-          normalize.result.center
-        );
+        hitbox.object3D.position.copy(normalize.result.center);
 
         root.fkcVariantId = variantId;
         root.fkcPendingVisual = null;
@@ -695,10 +669,7 @@
         depthTest: false
       });
 
-      const mesh = new THREE.Mesh(
-        this.geometry, this.material
-      );
-
+      const mesh = new THREE.Mesh(this.geometry, this.material);
       mesh.renderOrder = 100;
       mesh.frustumCulled = false;
 
@@ -808,9 +779,7 @@
       this.cancelClick();
       this.opened = false;
 
-      if (this.root) {
-        this.root.object3D.visible = false;
-      }
+      if (this.root) this.root.object3D.visible = false;
 
       this.blockDrawing();
 
@@ -843,18 +812,14 @@
 
       if (index < 0) return;
 
-      /*
-       * Kurze Verzögerung für sichtbare Druckrückmeldung,
-       * auch wenn die Aktion anschließend die Seite wechselt.
-       */
       const clicked = this.buttons[index];
 
       this.busy = true;
       this.pressedIndex = index;
       this.message = "Ausgewählt: " + clicked.label;
-
       this.render();
 
+      // Druckrückmeldung vor Ausführung sichtbar machen.
       this.clickTimer = setTimeout(() => {
         this.clickTimer = null;
         this.busy = false;
@@ -885,9 +850,7 @@
         let line = "";
 
         paragraph.split(/\s+/).forEach(word => {
-          const candidate = line
-            ? line + " " + word
-            : word;
+          const candidate = line ? line + " " + word : word;
 
           if (
             line &&
@@ -972,10 +935,7 @@
           w - 44
         );
 
-        this.buttons.push({
-          x, y, w, h, label, action
-        });
-
+        this.buttons.push({x, y, w, h, label, action});
         y += 86;
       };
 
@@ -1002,15 +962,16 @@
       };
 
       if (this.page === "home") {
+        // Absichtlich ganz oben, direkt nach dem Öffnen.
         button(
-          "Farben einstellen",
-          () => this.navigate("colors")
+          "Strichstärke: " + diameterMm() + " mm – ändern",
+          () => this.navigate("stroke-size"),
+          "#cddff3"
         );
 
         button(
-          "Strichstärke einstellen · " +
-            strokeDiameterMm() + " mm",
-          () => this.navigate("stroke-size")
+          "Laser- und Malfarben einstellen",
+          () => this.navigate("colors")
         );
 
         button(
@@ -1052,85 +1013,52 @@
       }
 
       if (this.page === "colors") {
-        /*
-         * Alle vier Buttons verwenden die Laserfarbe
-         * der entsprechenden Hand als Hintergrund.
-         *
-         * Der Text nennt die tatsächliche Einstellung.
-         */
-        button(
-          "Laserfarbe links: " +
-            colorName(F.Settings.lasers.left),
-          () => this.navigate("laser-left"),
-          F.Settings.lasers.left
-        );
-
-        button(
-          "Laserfarbe rechts: " +
-            colorName(F.Settings.lasers.right),
-          () => this.navigate("laser-right"),
-          F.Settings.lasers.right
-        );
-
-        button(
-          "Zeichenfarbe links: " +
-            colorName(F.Settings.inks.left),
-          () => this.navigate("ink-left"),
-          F.Settings.lasers.left
-        );
-
-        button(
-          "Zeichenfarbe rechts: " +
-            colorName(F.Settings.inks.right),
-          () => this.navigate("ink-right"),
-          F.Settings.lasers.right
-        );
-
         text(
-          "Buttonhintergrund = Laserfarbe der jeweiligen Hand.\n" +
-          "Die eingestellte Zeichenfarbe steht im Buttontext.\n" +
-          "Laser- und Zeichenfarben bleiben unabhängig."
+          "Eine Farbe pro Hand:\n" +
+          "Der Laser zeichnet immer in seiner eigenen Farbe."
+        );
+
+        button(
+          "Linke Farbe: " + colorName(F.Settings.lasers.left),
+          () => this.navigate("color-left"),
+          F.Settings.lasers.left
+        );
+
+        button(
+          "Rechte Farbe: " + colorName(F.Settings.lasers.right),
+          () => this.navigate("color-right"),
+          F.Settings.lasers.right
         );
 
         button("Zurück", () => this.navigate("home"));
       }
 
-      const colorPages = [
-        "laser-left",
-        "laser-right",
-        "ink-left",
-        "ink-right"
-      ];
+      if (
+        this.page === "color-left" ||
+        this.page === "color-right"
+      ) {
+        const hand = this.page === "color-left" ? "left" : "right";
+        const description = hand === "left"
+          ? "Links"
+          : "Rechts";
 
-      if (colorPages.includes(this.page)) {
-        const page = this.page;
-        const laser = page.startsWith("laser-");
-        const hand = page.endsWith("-left") ? "left" : "right";
-
-        const settings = laser
-          ? F.Settings.lasers
-          : F.Settings.inks;
-
-        const description =
-          (laser ? "Laser " : "Zeichnen ") +
-          (hand === "left" ? "links" : "rechts");
-
-        text(description + ": Farbe wählen");
+        text(description + ": Laser- und Malfarbe wählen");
 
         palette.forEach(([name, color]) => {
           button(
             name,
             () => {
-              settings[hand] = color;
-
+              F.Settings.lasers[hand] = color;
               this.blockDrawing();
 
-              const message = description + ": " + name;
+              const message =
+                description + ": " + name + " – Laser und Zeichnen";
+
               F.setStatus(message);
               this.notify(message);
             },
             color,
-            settings[hand] === color
+            F.Settings.lasers[hand] === color
           );
         });
 
@@ -1140,7 +1068,7 @@
       if (this.page === "stroke-size") {
         text(
           "Strichdurchmesser für beide Hände wählen.\n" +
-          "Die Einstellung gilt nur für neue Zeichnungen."
+          "Bereits gezeichnete Linien bleiben unverändert."
         );
 
         strokeSizes.forEach(([label, radius]) => {
@@ -1151,8 +1079,7 @@
               this.blockDrawing();
 
               const message =
-                "Strichstärke: " + strokeDiameterMm() +
-                " mm · beide Hände";
+                "Strichstärke: " + diameterMm() + " mm – beide Hände";
 
               F.setStatus(message);
               this.notify(message);
@@ -1173,8 +1100,8 @@
           "Eine Hand bewegt und dreht, zwei Hände skalieren.",
           "Trigger kurz: Punkt oder Auswahl.",
           "Trigger halten + bewegen: Oberflächenstrich.",
-          "Jede Hand hat ihre eigene Zeichenfarbe.",
-          "Strichstärke im Hauptmenü einstellen.",
+          "Laserfarbe ist immer auch die Malfarbe.",
+          "Strichstärke: erster Button im Hauptmenü.",
           "Wände, Poster, Boden und Modelle sind bemalbar.",
           "A/X: gehaltenes oder anvisiertes Objekt zurücksetzen.",
           "B/Y: Menü öffnen oder schließen.",
@@ -1261,10 +1188,7 @@
           "Position bleiben erhalten."
         );
 
-        button(
-          "Abbrechen",
-          () => this.navigate("home")
-        );
+        button("Abbrechen", () => this.navigate("home"));
 
         button("Ja, Raum zurücksetzen", () => {
           F.resetRoomNow();
@@ -1287,9 +1211,10 @@
       ctx.fillStyle = "#607668";
       ctx.font = "23px Arial";
 
+      // Versionshinweis hilft beim Erkennen einer alten Cachefassung.
       ctx.fillText(
-        "Laser + Trigger · B/Y schließt das Menü",
-        55, 1160
+        "B/Y schließt · Eine Farbe pro Hand · Version Farben-1",
+        55, 1160, 914
       );
 
       this.texture.needsUpdate = true;
@@ -1309,7 +1234,6 @@
     canvas.height = 576;
 
     const ctx = canvas.getContext("2d");
-
     ctx.fillStyle = "#f8faf8";
     ctx.fillRect(0, 0, 1024, 576);
 
@@ -1321,9 +1245,7 @@
         ? "bold 56px Arial"
         : "30px Arial";
 
-      ctx.fillText(
-        line, 512, 95 + index * 72, 940
-      );
+      ctx.fillText(line, 512, 95 + index * 72, 940);
     });
 
     return canvas.toDataURL("image/png");
@@ -1337,15 +1259,10 @@
         const copy = Object.assign({}, station);
 
         const variants = Array.isArray(station.variants)
-          ? station.variants.filter(
-              item => item && item.model
-            )
+          ? station.variants.filter(item => item && item.model)
           : [];
 
-        if (variants.length) {
-          copy.model = variants[0].model;
-        }
-
+        if (variants.length) copy.model = variants[0].model;
         return copy;
       });
     }
@@ -1371,16 +1288,13 @@
           station.variantAlignment || "shared";
 
         const variants = Array.isArray(station.variants)
-          ? station.variants.filter(
-              item => item && item.model
-            )
+          ? station.variants.filter(item => item && item.model)
           : [];
 
         if (variants.length) {
           root.fkcVariants = variants.map((variant, number) => ({
             id: variant.id || "variant-" + (number + 1),
-            title: variant.title ||
-              "Darstellung " + (number + 1),
+            title: variant.title || "Darstellung " + (number + 1),
             model: variant.model
           }));
 
@@ -1390,8 +1304,8 @@
     }
 
     /*
-     * Beim übermittelten Builder ist die erste nicht bedienbare
-     * a-plane im Begrüßungsraum die Bedienungstafel.
+     * Entspricht der Reihenfolge im übermittelten Builder:
+     * erste nicht bedienbare a-plane = Bedienungstafel.
      */
     if (config.kind === "welcome") {
       const help = Array.from(
@@ -1404,8 +1318,8 @@
           "Links: laufen · Rechts: weich drehen",
           "Grip: greifen · 2 Hände: skalieren",
           "Trigger: Oberflächen bemalen",
-          "Farben und Strichstärke im Menü",
-          "A/X: Reset · B/Y: Menü"
+          "Laserfarbe = Malfarbe",
+          "B/Y: Menü · Strichstärke ganz oben"
         ]));
       }
     }
