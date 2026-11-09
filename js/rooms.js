@@ -3,11 +3,17 @@
 (function (F) {
   /*
    * ============================================================
-   * ZENTRALE RAUMDATEN
+   * ZENTRALE RAUMDATEN — GALERIE-2
    * ============================================================
    *
    * Modell- und Folienpfade beziehen sich auf index.html.
    * Groß-/Kleinschreibung der Dateinamen beachten.
+   *
+   * title:
+   *   Kurzer Raumname für die bisherige Oberfläche.
+   *
+   * posterTitle:
+   *   Vollständiger Titel auf der Raumtafel im Begrüßungsraum.
    */
 
   const museumColors = {
@@ -51,10 +57,11 @@
     }));
   }
 
-  function museumRoom(id, title) {
+  function museumRoom(id, title, posterTitle) {
     return {
       id,
       title,
+      posterTitle,
       kind: "museum",
 
       width: 32,
@@ -83,12 +90,11 @@
    *
    * exhibits:
    *   roomId = Ziel der Raumtafel
-   *   title  = Beschriftung von Sockel und Modell
+   *   title  = Beschriftung am Podest und Name im Modellmenü
    *   model  = späterer GLB-Pfad
    *
    * Ein leerer Modellpfad erzeugt eine neutrale Platzhalterkugel.
-   * Die Vorschau-Modelle sind unabhängig von den Modellen
-   * innerhalb der Vorlesungsräume.
+   * Vorschau-Modelle und Vorlesungsmodelle sind unabhängig.
    */
 
   F.welcomeRoom = {
@@ -174,23 +180,63 @@
   };
 
   F.rooms = [
-    museumRoom("vorlesung-1", "Vorlesung 1"),
-    museumRoom("vorlesung-2", "Vorlesung 2"),
-    museumRoom("vorlesung-3", "Vorlesung 3"),
-    museumRoom("vorlesung-4", "Vorlesung 4"),
-    museumRoom("vorlesung-5", "Vorlesung 5"),
-    museumRoom("vorlesung-6", "Vorlesung 6"),
-    museumRoom("vorlesung-7", "Vorlesung 7"),
-    museumRoom("vorlesung-8", "Vorlesung 8"),
-    museumRoom("team-a", "Team A"),
-    museumRoom("team-b", "Team B")
+    museumRoom(
+      "vorlesung-1",
+      "Vorlesung 1",
+      "1. Vorlesung - Allgemeines zur Festkörperchemie"
+    ),
+    museumRoom(
+      "vorlesung-2",
+      "Vorlesung 2",
+      "2. Vorlesung - Bindungsarten im Festkörper"
+    ),
+    museumRoom(
+      "vorlesung-3",
+      "Vorlesung 3",
+      "3. Vorlesung - Synthese von Festkörper-Verbindungen"
+    ),
+    museumRoom(
+      "vorlesung-4",
+      "Vorlesung 4",
+      "4. Vorlesung - Kristallographie und Symmetrie in Kristallen"
+    ),
+    museumRoom(
+      "vorlesung-5",
+      "Vorlesung 5",
+      "5. Vorlesung - Röntgenstrukturanalyse"
+    ),
+    museumRoom(
+      "vorlesung-6",
+      "Vorlesung 6",
+      "6. Vorlesung - Metallstrukturen"
+    ),
+    museumRoom(
+      "vorlesung-7",
+      "Vorlesung 7",
+      "7. Vorlesung - Ionengitter"
+    ),
+    museumRoom(
+      "vorlesung-8",
+      "Vorlesung 8",
+      "8. Vorlesung - Molekülstrukturen"
+    ),
+    museumRoom(
+      "team-a",
+      "Team A",
+      "Praktikumsraum Team A"
+    ),
+    museumRoom(
+      "team-b",
+      "Team B",
+      "Praktikumsraum Team B"
+    )
   ];
 
   const room = id => F.rooms.find(item => item.id === id);
 
   /*
    * ============================================================
-   * VORLESUNG 1: BISHERIGE MODELLE
+   * VORLESUNG 1: BISHERIGE MODELLE — UNVERÄNDERT
    * ============================================================
    */
 
