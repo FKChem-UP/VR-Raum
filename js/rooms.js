@@ -6,10 +6,8 @@
    * ZENTRALE RAUMDATEN
    * ============================================================
    *
-   * title: sichtbarer Name, frei änderbar
-   * id: interne Kennung, möglichst unverändert lassen
-   *
-   * Modellpfade und Folienpfade beziehen sich auf index.html.
+   * Modell- und Folienpfade beziehen sich auf index.html.
+   * Groß-/Kleinschreibung der Dateinamen beachten.
    */
 
   const museumColors = {
@@ -78,6 +76,21 @@
     };
   }
 
+  /*
+   * ============================================================
+   * BEGRÜSSUNGSRAUM: WEISS-GOLDENE GALERIE
+   * ============================================================
+   *
+   * exhibits:
+   *   roomId = Ziel der Raumtafel
+   *   title  = Beschriftung von Sockel und Modell
+   *   model  = späterer GLB-Pfad
+   *
+   * Ein leerer Modellpfad erzeugt eine neutrale Platzhalterkugel.
+   * Die Vorschau-Modelle sind unabhängig von den Modellen
+   * innerhalb der Vorlesungsräume.
+   */
+
   F.welcomeRoom = {
     id: "welcome",
     title: "Begrüßungsraum",
@@ -87,7 +100,77 @@
     depth: 16,
     height: 5.2,
 
-    spawn: {x: 0, z: 5}
+    spawn: {x: 0, z: 5},
+
+    posterWidth: 3,
+    posterHeight: 1.6875,
+    posterY: 2.95,
+
+    modelY: 1.48,
+    modelSize: 0.65,
+    modelDistance: 1.85,
+
+    colors: {
+      wall: "#fffdf8",
+      cream: "#fffdf9",
+      creamDark: "#eee9de",
+      gold: "#c5a052",
+      goldLight: "#e4ca83",
+      goldDark: "#8d6c2e"
+    },
+
+    exhibits: [
+      {
+        roomId: "vorlesung-1",
+        title: "Fulleren",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-2",
+        title: "Eis",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-3",
+        title: "YBa2Cu3O7-x",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-4",
+        title: "tetragonal innenzentriertes Bravaisgitter",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-5",
+        title: "Platzhalter",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-6",
+        title: "Kubisch dichte Packung",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-7",
+        title: "Zinkblende ZnS",
+        model: ""
+      },
+      {
+        roomId: "vorlesung-8",
+        title: "Schwefel S8",
+        model: ""
+      },
+      {
+        roomId: "team-a",
+        title: "HKUST-1",
+        model: ""
+      },
+      {
+        roomId: "team-b",
+        title: "Co-Komplex",
+        model: ""
+      }
+    ]
   };
 
   F.rooms = [
@@ -109,10 +192,6 @@
    * ============================================================
    * VORLESUNG 1: BISHERIGE MODELLE
    * ============================================================
-   *
-   * Die Stationsnummer im Array beginnt bei 0:
-   * stations[0] = erste Station
-   * stations[4] = fünfte Station
    */
 
   const v1 = room("vorlesung-1");
@@ -154,31 +233,12 @@
   });
 
   /*
-   * ============================================================
-   * HIER SPÄTER WEITERE RÄUME ANPASSEN
-   * ============================================================
+   * Später ein Vorschau-Modell ergänzen:
    *
-   * Beispiele – zunächst auskommentiert.
+   * F.welcomeRoom.exhibits[0].model =
+   *   "assets/models/Fulleren.glb";
    *
-   * Namen ändern:
-   *
-   * room("vorlesung-2").title = "Kristallstrukturen";
-   *
-   * Wandfarbe ändern:
-   *
-   * room("team-a").colors.wall = "#b9cadc";
-   *
-   * Modell und Folie einer Station ändern:
-   *
-   * Object.assign(room("vorlesung-2").stations[0], {
-   *   title: "Natriumchlorid",
-   *   model: "assets/models/NaCl.glb",
-   *   slide: "assets/slides/vorlesung-2/NaCl.jpg"
-   * });
-   *
-   * Nur eine Folie für Diamant ergänzen:
-   *
-   * v1.stations[0].slide =
-   *   "assets/slides/vorlesung-1/Diamant_Folie.jpg";
+   * Dies ist nur ein Beispielpfad.
+   * Die Datei muss tatsächlich vorhanden sein.
    */
 })(window.FKCVR);
