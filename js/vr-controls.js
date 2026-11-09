@@ -32,29 +32,19 @@ window.FKCVR = window.FKCVR || {};
 
     if (!session) return null;
 
-    for (const source of session.inputSources) {
-      if (
-        source.handedness === handedness &&
-        source.targetRayMode === "tracked-pointer"
-      ) {
-        return source;
-      }
-    }
-
-    return null;
+    return Array.from(session.inputSources).find(source =>
+      source.handedness === handedness &&
+      source.targetRayMode === "tracked-pointer"
+    ) || null;
   };
 
   F.readStick = function (source) {
     const gp = source && source.gamepad;
+    if (!gp || gp.axes.length < 2) return {x: 0, y: 0};
 
-    if (!gp || gp.axes.length < 2) {
-      return {x: 0, y: 0};
-    }
-
-    const index =
-      gp.mapping === "xr-standard" && gp.axes.length >= 4
-        ? 2
-        : gp.axes.length - 2;
+    const index = gp.mapping === "xr-standard" && gp.axes.length >= 4
+      ? 2
+      : gp.axes.length - 2;
 
     return {
       x: Number(gp.axes[index]) || 0,
@@ -62,15 +52,27 @@ window.FKCVR = window.FKCVR || {};
     };
   };
 
-  F.buttonPressed = function (gamepad, index) {
-    const button = gamepad && gamepad.buttons[index];
-
-    return !!button &&
-      (button.pressed || button.value > 0.65);
+  F.buttonPressed = function (gp, index) {
+    const button = gp && gp.buttons[index];
+    return !!button && (button.pressed || button.value > 0.65);
   };
 
   F.selectModel = function (root) {
-    if (root) root.sceneEl.lastSelectedModel = root;
+    if (!root) return;
+
+    const scene = F.getScene();
+    scene.lastSelectedModel = root;
+    scene.lastSelectedTarget = root;
+  };
+
+  F.releaseModel = function (root) {
+    const scene = F.getScene();
+    if (!scene) return;
+
+    scene.querySelectorAll("[fkc-grabber]").forEach(hand => {
+      const grabber = hand.components["fkc-grabber"];
+      if (grabber && grabber.grabbed === root) grabber.end();
+    });
   };
 
   F.releaseHands = function () {
@@ -83,73 +85,78 @@ window.FKCVR = window.FKCVR || {};
     });
   };
 
-  F.anyGrabbing = function () {
-    const scene = F.getScene();
-    if (!scene) return false;
-
-    return Array.from(
-      scene.querySelectorAll("[fkc-grabber]")
-    ).some(hand => {
-      const grabber = hand.components["fkc-grabber"];
-      return grabber && !!grabber.grabbed;
-    });
-  };
-
   F.resetModel = function (root) {
     if (!root || !root.isConnected) return;
 
-    const manip = root.components["fkc-manipulable"];
-
-    if (manip && manip.hands.length) {
-      F.releaseHands();
-    }
+    F.releaseModel(root);
 
     if (root.homePosition) {
       root.object3D.position.copy(root.homePosition);
     }
 
-    const body = root.querySelector(".manip-body");
+    root.object3D.quaternion.identity();
+    root.object3D.scale.setScalar(1);
 
+    const body = root.querySelector(".manip-body");
     if (body) {
       body.object3D.position.set(0, 0, 0);
       body.object3D.quaternion.identity();
       body.object3D.scale.setScalar(1);
     }
 
+    if (F.Draw) F.Draw.clear(root);
+
     root.querySelectorAll(".atom-marker").forEach(el => el.remove());
     root.object3D.updateWorldMatrix(true, true);
   };
 
-  F.resetLast = function () {
-    const scene = F.getScene();
-    if (scene) F.resetModel(scene.lastSelectedModel);
-  };
+  F.resetTarget = function (target) {
+    if (!target || !target.isConnected) return;
 
-  F.resetAll = function () {
-    const scene = F.getScene();
-    if (!scene) return;
-
-    F.releaseHands();
-
-    scene.querySelectorAll(".interactable").forEach(F.resetModel);
-  };
-
-  F.clearMarkers = function () {
-    const scene = F.getScene();
-
-    if (scene) {
-      scene.querySelectorAll(".atom-marker").forEach(el => el.remove());
+    if (target.classList.contains("interactable")) {
+      F.resetModel(target);
+      F.setStatus("Modell zurückgesetzt: " + (target.dataset.title || ""));
+    } else if (target.classList.contains("paintable")) {
+      if (F.Draw) F.Draw.clear(target);
+      F.setStatus("Zeichnungen auf dieser Fläche entfernt.");
     }
   };
 
+  F.resetLast = function () {
+    const scene = F.getScene();
+    if (scene) F.resetTarget(scene.lastSelectedTarget);
+  };
+
+  F.clearMarkers = function () {
+    if (F.Draw) F.Draw.clear();
+
+    const scene = F.getScene();
+    if (scene) {
+      scene.querySelectorAll(".atom-marker").forEach(el => el.remove());
+    }
+
+    F.setStatus("Zeichnungen im Raum entfernt.");
+  };
+
   /*
-   * Der Raum liefert diese Prüfung.
-   * Die Steuerung kennt weder Wandfarben noch Podestkonstruktionen.
+   * Diese Funktion wird nur nach einer Bestätigung im Menü aufgerufen.
+   * Sie ist nicht an B/Y oder eine andere direkte Reset-Taste gebunden.
    */
+  F.resetRoomNow = function () {
+    F.releaseHands();
+    const room = document.getElementById("room-root");
+
+    if (room) {
+      room.querySelectorAll(".interactable").forEach(F.resetModel);
+    }
+
+    F.clearMarkers();
+    F.setStatus("Modelle und Zeichnungen im Raum zurückgesetzt.");
+  };
+
   F.validFloor = function (x, z) {
     return !!(
-      F.app &&
-      F.app.activeRoom &&
+      F.app && F.app.activeRoom &&
       F.app.activeRoom.isWalkable(x, z)
     );
   };
@@ -159,64 +166,28 @@ window.FKCVR = window.FKCVR || {};
     return rig && rig.components["fkc-navigation"];
   };
 
-  /*
-   * Gemeinsame Trefferprüfung für:
-   * - Raumtafeln / Rückkehrtafeln
-   * - Modelloberflächen
-   */
-  F.findHit = function (raycaster, includeModels) {
-    const scene = F.getScene();
-    if (!scene) return null;
+  F.resolveTarget = function (hand) {
+    if (!hand) return null;
 
-    const targets = [];
+    const ownGrabber = hand.components["fkc-grabber"];
+    if (ownGrabber && ownGrabber.grabbed) return ownGrabber.grabbed;
 
-    scene.querySelectorAll(".vr-action").forEach(el => {
-      if (!el.object3D.visible) return;
+    const held = Array.from(
+      F.getScene().querySelectorAll("[fkc-grabber]")
+    ).map(el => el.components["fkc-grabber"])
+      .find(grabber => grabber && grabber.grabbed);
 
-      el.object3D.updateWorldMatrix(true, true);
+    if (held) return held.grabbed;
 
-      el.object3D.traverse(object => {
-        if (object.isMesh && object.visible) {
-          targets.push({mesh: object, type: "action", el});
-        }
-      });
-    });
+    const tools = hand.components["fkc-controller"];
+    if (!tools) return null;
 
-    if (includeModels) {
-      scene.querySelectorAll(".model-visual").forEach(el => {
-        const root = el.closest(".interactable");
+    tools.updateRay();
 
-        if (!root || !root.modelReady || !el.object3D.visible) return;
+    const hit = F.findHit(tools.raycaster, true);
+    if (!hit || hit.type === "action") return null;
 
-        el.object3D.updateWorldMatrix(true, true);
-
-        el.object3D.traverse(object => {
-          if (object.isMesh && object.visible) {
-            targets.push({mesh: object, type: "model", el: root});
-          }
-        });
-      });
-    }
-
-    const lookup = new Map(
-      targets.map(target => [target.mesh, target])
-    );
-
-    const hits = raycaster.intersectObjects(
-      targets.map(target => target.mesh),
-      false
-    );
-
-    if (!hits.length) return null;
-
-    const hit = hits[0];
-    const target = lookup.get(hit.object);
-
-    return {
-      type: target.type,
-      el: target.el,
-      point: hit.point.clone()
-    };
+    return hit.el;
   };
 
   F.beforeRoomChange = function () {
@@ -224,7 +195,12 @@ window.FKCVR = window.FKCVR || {};
     if (!scene) return;
 
     F.releaseHands();
+
+    if (F.Menu) F.Menu.close();
+    if (F.Draw) F.Draw.clear();
+
     scene.lastSelectedModel = null;
+    scene.lastSelectedTarget = null;
 
     const navigation = F.getNavigation();
     if (navigation) navigation.cancel();
@@ -233,29 +209,25 @@ window.FKCVR = window.FKCVR || {};
       const tools = hand.components["fkc-controller"];
       if (tools) tools.clearForRoomChange();
     });
+
+    if (F.invalidateHits) F.invalidateHits();
   };
 
   /*
-   * ============================================================
-   * WEBXR-ZIELSTRAHLPOSE
-   * ============================================================
+   * WebXR targetRaySpace bleibt der bevorzugte Ursprung der Laser.
    */
-
   AFRAME.registerComponent("fkc-xr-rays", {
     init: function () {
       this.entries = [];
       this.manager = null;
       this.setup = this.setup.bind(this);
-
       this.el.addEventListener("renderstart", this.setup);
       this.setup();
     },
 
     setup: function () {
       const renderer = this.el.renderer;
-
-      if (!renderer || !renderer.xr) return;
-      if (this.manager === renderer.xr) return;
+      if (!renderer || !renderer.xr || this.manager === renderer.xr) return;
 
       this.disposeEntries();
       this.manager = renderer.xr;
@@ -264,17 +236,11 @@ window.FKCVR = window.FKCVR || {};
         const group = this.manager.getController(index);
         const entry = {group, source: null};
 
-        entry.connected = event => {
-          entry.source = event.data;
-        };
-
-        entry.disconnected = () => {
-          entry.source = null;
-        };
+        entry.connected = event => { entry.source = event.data; };
+        entry.disconnected = () => { entry.source = null; };
 
         group.addEventListener("connected", entry.connected);
         group.addEventListener("disconnected", entry.disconnected);
-
         this.entries.push(entry);
       }
     },
@@ -290,17 +256,13 @@ window.FKCVR = window.FKCVR || {};
           : null;
       }
 
-      const referenceSpace =
-        typeof this.manager.getReferenceSpace === "function"
-          ? this.manager.getReferenceSpace()
-          : null;
+      const referenceSpace = this.manager.getReferenceSpace
+        ? this.manager.getReferenceSpace()
+        : null;
 
       if (frame && referenceSpace) {
         try {
-          const pose = frame.getPose(
-            source.targetRaySpace,
-            referenceSpace
-          );
+          const pose = frame.getPose(source.targetRaySpace, referenceSpace);
 
           if (pose) {
             const p = pose.transform.position;
@@ -308,11 +270,10 @@ window.FKCVR = window.FKCVR || {};
 
             position.set(p.x, p.y, p.z);
             quaternion.set(q.x, q.y, q.z, q.w);
-
             return true;
           }
         } catch (error) {
-          // Fallback auf die aktualisierte Three.js-Gruppe.
+          // Fallback auf die aktualisierte Three.js-Controllergruppe.
         }
       }
 
@@ -336,7 +297,6 @@ window.FKCVR = window.FKCVR || {};
         entry.group.removeEventListener("connected", entry.connected);
         entry.group.removeEventListener("disconnected", entry.disconnected);
       });
-
       this.entries = [];
     },
 
@@ -346,11 +306,24 @@ window.FKCVR = window.FKCVR || {};
     }
   });
 
-  /*
-   * ============================================================
-   * AUTOMATISCHE MODELLGRÖSSE UND HITBOX
-   * ============================================================
-   */
+  F.applyModelBounds = function (visualEl) {
+    const component = visualEl.components["fkc-normalize"];
+    if (!component || !component.result) return false;
+
+    const root = visualEl.closest(".interactable");
+    const hitbox = root.querySelector(".hitbox");
+
+    hitbox.setAttribute("geometry", Object.assign(
+      {primitive: "box"},
+      component.result.hitbox
+    ));
+
+    root.modelReady = true;
+    root.object3D.updateWorldMatrix(true, true);
+
+    if (F.invalidateHits) F.invalidateHits();
+    return true;
+  };
 
   AFRAME.registerComponent("fkc-normalize", {
     schema: {
@@ -361,7 +334,6 @@ window.FKCVR = window.FKCVR || {};
     init: function () {
       this.loaded = this.normalize.bind(this);
       this.failed = this.fallback.bind(this);
-
       this.el.addEventListener("model-loaded", this.loaded);
       this.el.addEventListener("model-error", this.failed);
     },
@@ -371,10 +343,9 @@ window.FKCVR = window.FKCVR || {};
 
       const visual = this.el.object3D;
       const mesh = this.el.getObject3D("mesh");
-      if (!mesh) return;
+      const root = this.el.closest(".interactable");
 
-      const body = this.el.parentElement;
-      const root = body.parentElement;
+      if (!mesh || !root) return;
 
       visual.position.set(0, 0, 0);
       visual.scale.setScalar(1);
@@ -387,15 +358,15 @@ window.FKCVR = window.FKCVR || {};
       mesh.traverse(object => {
         if (!object.isMesh || !object.geometry) return;
 
-        const geometry = object.geometry;
+        if (!object.geometry.boundingBox) {
+          object.geometry.computeBoundingBox();
+        }
 
-        if (!geometry.boundingBox) geometry.computeBoundingBox();
-        if (!geometry.boundingBox) return;
+        if (!object.geometry.boundingBox) return;
 
         matrix.multiplyMatrices(inverse, object.matrixWorld);
-
         bounds.union(
-          geometry.boundingBox.clone().applyMatrix4(matrix)
+          object.geometry.boundingBox.clone().applyMatrix4(matrix)
         );
       });
 
@@ -413,30 +384,65 @@ window.FKCVR = window.FKCVR || {};
         return;
       }
 
-      const factor = this.data.targetSize / longest;
+      let factor = this.data.targetSize / longest;
+      let commonCenter = center;
+
+      /*
+       * Bei Varianten ist "shared" der Standard:
+       * erster Export legt einen gemeinsamen Koordinatenrahmen fest.
+       * Alle Varianten sollten deshalb in denselben Einheiten,
+       * mit demselben Ursprung und derselben Orientierung exportiert sein.
+       */
+      if (root.fkcVariants && root.fkcVariantAlignment !== "individual") {
+        if (!root.fkcVariantFrame) {
+          root.fkcVariantFrame = {
+            factor,
+            center: center.clone()
+          };
+        }
+
+        factor = root.fkcVariantFrame.factor;
+        commonCenter = root.fkcVariantFrame.center;
+      }
 
       visual.scale.setScalar(factor);
-      visual.position.copy(center).multiplyScalar(-factor);
+      visual.position.copy(commonCenter).multiplyScalar(-factor);
 
-      const hitbox = body.querySelector(".hitbox");
+      /*
+       * Hitboxzentrum kann bei gemeinsamen Koordinatenrahmen
+       * von null abweichen. Für den Griff wird es mit gespeichert.
+       */
+      const boxCenter = center.clone().sub(commonCenter).multiplyScalar(factor);
 
-      hitbox.setAttribute("geometry", {
-        primitive: "box",
-        width: Math.max(0.08, size.x * factor + this.data.padding),
-        height: Math.max(0.08, size.y * factor + this.data.padding),
-        depth: Math.max(0.08, size.z * factor + this.data.padding)
-      });
+      this.result = {
+        hitbox: {
+          width: Math.max(0.08, size.x * factor + this.data.padding),
+          height: Math.max(0.08, size.y * factor + this.data.padding),
+          depth: Math.max(0.08, size.z * factor + this.data.padding)
+        },
+        center: boxCenter
+      };
 
-      root.modelReady = true;
-      root.object3D.updateWorldMatrix(true, true);
+      if (this.el.dataset.pendingVariant !== "true") {
+        F.applyModelBounds(this.el);
+
+        const hitbox = root.querySelector(".hitbox");
+        hitbox.object3D.position.copy(boxCenter);
+      }
     },
 
     fallback: function () {
       if (!this.el.isConnected || this.hasFallback) return;
       this.hasFallback = true;
 
-      const body = this.el.parentElement;
-      const root = body.parentElement;
+      const root = this.el.closest(".interactable");
+      if (!root) return;
+
+      /*
+       * Beim Variantenwechsel bleibt bei einem Fehler die alte Variante.
+       * Deshalb wird hier keine Ersatzkugel erzeugt.
+       */
+      if (this.el.dataset.pendingVariant === "true") return;
 
       this.el.object3D.visible = false;
 
@@ -448,15 +454,12 @@ window.FKCVR = window.FKCVR || {};
           color: "#d6b76b",
           wireframe: true
         }
-      }, body);
+      }, root.querySelector(".manip-body"));
 
       root.modelReady = true;
+      if (F.invalidateHits) F.invalidateHits();
 
-      F.setStatus(
-        "Modell nicht geladen: " + root.dataset.title +
-        ". Dateipfad prüfen."
-      );
-
+      F.setStatus("Modell nicht geladen: " + root.dataset.title);
       console.warn("Modellfehler:", root.dataset.title);
     },
 
@@ -465,12 +468,6 @@ window.FKCVR = window.FKCVR || {};
       this.el.removeEventListener("model-error", this.failed);
     }
   });
-
-  /*
-   * ============================================================
-   * EINHAND-MANIPULATION / ZWEIHAND-SKALIERUNG
-   * ============================================================
-   */
 
   AFRAME.registerComponent("fkc-manipulable", {
     init: function () {
@@ -481,14 +478,11 @@ window.FKCVR = window.FKCVR || {};
       this.handQuaternion = new Q();
       this.relativeQuaternion = new Q();
       this.localGrab = new V();
-
       this.parentQuaternion = new Q();
       this.desiredQuaternion = new Q();
-
       this.point = new V();
       this.rootPosition = new V();
       this.desiredPosition = new V();
-
       this.p1 = new V();
       this.p2 = new V();
       this.midpoint = new V();
@@ -514,7 +508,6 @@ window.FKCVR = window.FKCVR || {};
       if (index < 0) return;
 
       this.hands.splice(index, 1);
-
       if (this.hands.length === 1) this.setupSingle();
     },
 
@@ -528,10 +521,8 @@ window.FKCVR = window.FKCVR || {};
       hand.getWorldQuaternion(this.handQuaternion);
       this.body.getWorldQuaternion(this.desiredQuaternion);
 
-      this.relativeQuaternion
-        .copy(this.handQuaternion)
-        .invert()
-        .multiply(this.desiredQuaternion);
+      this.relativeQuaternion.copy(this.handQuaternion)
+        .invert().multiply(this.desiredQuaternion);
 
       this.localGrab.copy(this.handPosition);
       this.body.worldToLocal(this.localGrab);
@@ -542,12 +533,7 @@ window.FKCVR = window.FKCVR || {};
       this.hands[1].object3D.getWorldPosition(this.p2);
 
       this.midpoint.copy(this.p1).add(this.p2).multiplyScalar(0.5);
-
-      this.startDistance = Math.max(
-        0.02,
-        this.p1.distanceTo(this.p2)
-      );
-
+      this.startDistance = Math.max(0.02, this.p1.distanceTo(this.p2));
       this.startScale = this.body.scale.x;
 
       this.el.object3D.getWorldPosition(this.rootPosition);
@@ -556,13 +542,11 @@ window.FKCVR = window.FKCVR || {};
 
     setPosition: function (worldPosition) {
       const root = this.el.object3D;
-      const parent = root.parent;
-
       root.position.copy(worldPosition);
 
-      if (parent) {
-        parent.updateWorldMatrix(true, false);
-        parent.worldToLocal(root.position);
+      if (root.parent) {
+        root.parent.updateWorldMatrix(true, false);
+        root.parent.worldToLocal(root.position);
       }
 
       root.updateWorldMatrix(true, true);
@@ -604,15 +588,13 @@ window.FKCVR = window.FKCVR || {};
 
         const scale = Math.max(
           0.02,
-          this.startScale *
-          this.p1.distanceTo(this.p2) / this.startDistance
+          this.startScale * this.p1.distanceTo(this.p2) / this.startDistance
         );
 
         this.body.scale.setScalar(scale);
 
         this.desiredPosition.copy(this.offset)
-          .multiplyScalar(scale / this.startScale)
-          .add(this.midpoint);
+          .multiplyScalar(scale / this.startScale).add(this.midpoint);
 
         this.setPosition(this.desiredPosition);
       }
@@ -635,10 +617,7 @@ window.FKCVR = window.FKCVR || {};
     },
 
     start: function () {
-      if (this.grabbed) return;
-
-      const navigation = F.getNavigation();
-      if (navigation && navigation.teleporting) return;
+      if (this.grabbed || (F.Menu && F.Menu.opened)) return;
 
       this.el.object3D.getWorldPosition(this.position);
 
@@ -647,18 +626,15 @@ window.FKCVR = window.FKCVR || {};
 
       this.el.sceneEl.querySelectorAll(".interactable").forEach(root => {
         const manip = root.components["fkc-manipulable"];
-
         if (!root.modelReady || !manip || manip.hands.length >= 2) return;
 
         const hitbox = root.querySelector(".hitbox");
-
         hitbox.object3D.updateWorldMatrix(true, true);
         this.bounds.setFromObject(hitbox.object3D);
 
         if (this.bounds.isEmpty()) return;
 
         this.bounds.clampPoint(this.position, this.closest);
-
         const distance = this.position.distanceTo(this.closest);
 
         if (distance < 0.12 && distance < bestDistance) {
@@ -683,18 +659,11 @@ window.FKCVR = window.FKCVR || {};
 
     remove: function () {
       this.end();
-
       this.el.removeEventListener("gripdown", this.start);
       this.el.removeEventListener("gripup", this.end);
       this.el.removeEventListener("controllerdisconnected", this.end);
     }
   });
-
-  /*
-   * ============================================================
-   * CONTROLLER, LASER, TELEPORTZIEL UND MARKIERUNGEN
-   * ============================================================
-   */
 
   AFRAME.registerComponent("fkc-controller", {
     schema: {
@@ -704,19 +673,15 @@ window.FKCVR = window.FKCVR || {};
     init: function () {
       this.source = null;
       this.hit = null;
-      this.teleportValid = false;
+      this.stroke = null;
+      this.drawingAllowed = false;
 
       this.origin = new V();
       this.direction = new V();
-
       this.referencePosition = new V();
       this.referenceQuaternion = new Q();
       this.worldQuaternion = new Q();
-
       this.endpoint = new V();
-      this.target = new V();
-      this.localPoint = new V();
-      this.worldScale = new V();
 
       this.raycaster = new THREE.Raycaster();
       this.raycaster.far = 25;
@@ -724,31 +689,27 @@ window.FKCVR = window.FKCVR || {};
       this.states = {
         trigger: false,
         grip: false,
-        last: false,
-        all: false
+        reset: false,
+        menu: false
       };
 
       this.lineEntity = F.create("a-entity", {}, this.el.sceneEl);
       this.positions = new Float32Array(6);
-
       this.geometry = new THREE.BufferGeometry();
-
       this.geometry.setAttribute(
         "position",
         new THREE.BufferAttribute(this.positions, 3)
       );
 
       this.material = new THREE.LineBasicMaterial({
-        color: "#78d9ef",
+        color: this.data.hand === "left" ? "#32d8df" : "#ff9d38",
         transparent: true,
-        opacity: 0.95,
-        depthTest: true
+        opacity: 0.95
       });
 
       this.line = new THREE.Line(this.geometry, this.material);
       this.line.frustumCulled = false;
       this.line.visible = false;
-
       this.lineEntity.setObject3D("laser", this.line);
 
       this.pointer = F.create("a-sphere", {
@@ -756,67 +717,58 @@ window.FKCVR = window.FKCVR || {};
         visible: false,
         material: {
           shader: "flat",
-          color: "#ffe6a0",
-          depthTest: false
-        }
-      }, this.el.sceneEl);
-
-      this.ring = F.create("a-ring", {
-        "radius-inner": 0.22,
-        "radius-outer": 0.30,
-        rotation: "-90 0 0",
-        visible: false,
-        material: {
-          shader: "flat",
-          color: "#65e3a1",
-          side: "double"
+          color: "#ffffff"
         }
       }, this.el.sceneEl);
 
       this.triggerDown = () => {
         if (this.states.trigger) return;
-
         this.states.trigger = true;
         this.activate();
       };
 
       this.triggerUp = () => {
         this.states.trigger = false;
+        this.drawingAllowed = false;
+        this.stroke = null;
       };
 
-      this.resetLastEvent = () => {
-        const source = F.getSource(this.el.sceneEl, this.data.hand);
+      this.resetAction = () => {
+        if (F.Menu && F.Menu.opened) return;
 
-        if (
-          source && source.gamepad &&
-          source.gamepad.mapping === "xr-standard"
-        ) return;
-
-        F.resetLast();
+        const target = F.resolveTarget(this.el);
+        if (target) {
+          this.el.sceneEl.lastSelectedTarget = target;
+          F.resetTarget(target);
+        }
       };
 
-      this.resetAllEvent = () => {
+      this.menuAction = () => {
+        if (F.Menu) F.Menu.toggle(this.el);
+      };
+
+      this.resetEvent = () => {
         const source = F.getSource(this.el.sceneEl, this.data.hand);
+        if (source && source.gamepad &&
+            source.gamepad.mapping === "xr-standard") return;
+        this.resetAction();
+      };
 
-        if (
-          source && source.gamepad &&
-          source.gamepad.mapping === "xr-standard"
-        ) return;
-
-        F.resetAll();
+      this.menuEvent = () => {
+        const source = F.getSource(this.el.sceneEl, this.data.hand);
+        if (source && source.gamepad &&
+            source.gamepad.mapping === "xr-standard") return;
+        this.menuAction();
       };
 
       this.disconnect = this.disconnect.bind(this);
 
       this.el.addEventListener("triggerdown", this.triggerDown);
       this.el.addEventListener("triggerup", this.triggerUp);
-
-      this.el.addEventListener("abuttondown", this.resetLastEvent);
-      this.el.addEventListener("xbuttondown", this.resetLastEvent);
-
-      this.el.addEventListener("bbuttondown", this.resetAllEvent);
-      this.el.addEventListener("ybuttondown", this.resetAllEvent);
-
+      this.el.addEventListener("abuttondown", this.resetEvent);
+      this.el.addEventListener("xbuttondown", this.resetEvent);
+      this.el.addEventListener("bbuttondown", this.menuEvent);
+      this.el.addEventListener("ybuttondown", this.menuEvent);
       this.el.addEventListener("controllerdisconnected", this.disconnect);
     },
 
@@ -859,12 +811,12 @@ window.FKCVR = window.FKCVR || {};
       this.pointer.object3D.visible = !!this.hit;
 
       if (this.hit) {
-        this.pointer.object3D.position.copy(this.hit.point);
         this.endpoint.copy(this.hit.point);
+        this.pointer.object3D.position.copy(this.hit.point);
 
         this.pointer.setAttribute(
           "material", "color",
-          this.hit.type === "action" ? "#7af2b1" : "#ffe6a0"
+          this.hit.type === "action" ? "#70efac" : "#ffffff"
         );
       } else {
         this.endpoint.copy(this.direction)
@@ -875,11 +827,8 @@ window.FKCVR = window.FKCVR || {};
     activate: function () {
       if (!this.el.sceneEl.is("vr-mode")) return;
 
-      const navigation = F.getNavigation();
-      const grabber = this.el.components["fkc-grabber"];
-
-      if (navigation && navigation.teleporting) return;
-      if (grabber && grabber.grabbed) return;
+      this.drawingAllowed = false;
+      this.stroke = null;
 
       this.updateRay();
       this.updateHit();
@@ -887,41 +836,36 @@ window.FKCVR = window.FKCVR || {};
       if (!this.hit) return;
 
       if (this.hit.type === "action") {
-        const roomId = this.hit.el.dataset.roomId;
-
-        if (roomId && F.app) {
-          F.app.changeRoom(roomId);
+        if (this.hit.el.dataset.fkcMenu === "true") {
+          F.Menu.click(this.hit);
+        } else if (!(F.Menu && F.Menu.opened)) {
+          const roomId = this.hit.el.dataset.roomId;
+          if (roomId && F.app) F.app.changeRoom(roomId);
         }
-
         return;
       }
 
-      const root = this.hit.el;
-      const body = root.querySelector(".manip-body");
+      if (F.Menu && F.Menu.opened) return;
 
-      F.selectModel(root);
+      const grabber = this.el.components["fkc-grabber"];
+      if (grabber && grabber.grabbed) return;
 
-      body.object3D.updateWorldMatrix(true, true);
+      this.drawingAllowed = true;
+      this.el.sceneEl.lastSelectedTarget = this.hit.el;
 
-      this.localPoint.copy(this.hit.point);
-      body.object3D.worldToLocal(this.localPoint);
-      body.object3D.getWorldScale(this.worldScale);
+      if (this.hit.type === "model") F.selectModel(this.hit.el);
+      this.sampleDrawing();
+    },
 
-      F.create("a-sphere", {
-        class: "atom-marker",
-        position: {
-          x: this.localPoint.x,
-          y: this.localPoint.y,
-          z: this.localPoint.z
-        },
-        radius: 0.012 /
-          Math.max(0.0001, Math.abs(this.worldScale.x)),
-        material: {
-          shader: "flat",
-          color: "#ff3f92",
-          depthTest: false
-        }
-      }, body);
+    sampleDrawing: function () {
+      if (!this.drawingAllowed || !F.Draw) return;
+
+      if (!this.hit || this.hit.type === "action") {
+        this.stroke = null;
+        return;
+      }
+
+      this.stroke = F.Draw.sample(this.stroke, this.hit);
     },
 
     pollButtons: function () {
@@ -937,89 +881,31 @@ window.FKCVR = window.FKCVR || {};
 
       if (grip && !this.states.grip && grabber) grabber.start();
       if (!grip && this.states.grip && grabber) grabber.end();
-
       this.states.grip = grip;
 
       if (gp.mapping === "xr-standard") {
-        const last = F.buttonPressed(gp, 4);
-        const all = F.buttonPressed(gp, 5);
+        const reset = F.buttonPressed(gp, 4);
+        const menu = F.buttonPressed(gp, 5);
 
-        if (last && !this.states.last) F.resetLast();
-        if (all && !this.states.all) F.resetAll();
+        if (reset && !this.states.reset) this.resetAction();
+        if (menu && !this.states.menu) this.menuAction();
 
-        this.states.last = last;
-        this.states.all = all;
+        this.states.reset = reset;
+        this.states.menu = menu;
       }
-    },
-
-    updateTeleport: function () {
-      this.teleportValid = false;
-      this.pointer.object3D.visible = false;
-      this.ring.object3D.visible = false;
-
-      this.endpoint.copy(this.direction)
-        .multiplyScalar(25).add(this.origin);
-
-      if (this.direction.y >= -0.03) return;
-
-      const distance = -this.origin.y / this.direction.y;
-
-      if (distance <= 0 || distance > 25) return;
-
-      this.target.copy(this.direction)
-        .multiplyScalar(distance).add(this.origin);
-
-      this.target.y = 0;
-      this.endpoint.copy(this.target);
-
-      this.teleportValid = F.validFloor(
-        this.target.x,
-        this.target.z
-      );
-
-      this.ring.object3D.position.set(
-        this.target.x, 0.025, this.target.z
-      );
-
-      this.ring.object3D.visible = true;
-
-      this.ring.setAttribute(
-        "material", "color",
-        this.teleportValid ? "#65e3a1" : "#ff6767"
-      );
-    },
-
-    teleport: function () {
-      if (!this.teleportValid) return;
-
-      const scene = this.el.sceneEl;
-      const rig = F.getRig();
-      const position = new V();
-
-      F.releaseHands();
-      scene.camera.getWorldPosition(position);
-
-      rig.object3D.position.x += this.target.x - position.x;
-      rig.object3D.position.z += this.target.z - position.z;
-
-      rig.object3D.updateWorldMatrix(true, true);
     },
 
     hide: function () {
       this.line.visible = false;
       this.pointer.object3D.visible = false;
-      this.ring.object3D.visible = false;
     },
 
     clearForRoomChange: function () {
-      /*
-       * Buttonzustände bleiben erhalten.
-       * Ein noch gehaltener Trigger darf im neuen Raum nicht
-       * sofort eine zweite Aktion auslösen.
-       */
       this.hit = null;
-      this.teleportValid = false;
+      this.stroke = null;
+      this.drawingAllowed = false;
       this.hide();
+      // Triggerzustand bleibt erhalten: kein Durchklicken in neue Räume.
     },
 
     disconnect: function () {
@@ -1051,36 +937,29 @@ window.FKCVR = window.FKCVR || {};
 
       this.pollButtons();
 
-      // Eine Triggeraktion kann gerade den Raum gewechselt haben.
+      // Eine Aktion kann den Raum oder das Menü verändert haben.
       this.updateRay();
+      this.updateHit();
 
       const grabber = this.el.components["fkc-grabber"];
 
       if (grabber && grabber.grabbed) {
+        this.stroke = null;
+        this.drawingAllowed = false;
         this.hide();
         return;
       }
 
-      const navigation = F.getNavigation();
-
-      const teleporting =
-        this.data.hand === "right" &&
-        navigation && navigation.teleporting;
-
-      this.line.visible = true;
-
-      if (teleporting) {
-        this.updateTeleport();
-      } else {
-        this.ring.object3D.visible = false;
-        this.updateHit();
+      if (this.states.trigger && !(F.Menu && F.Menu.opened)) {
+        this.sampleDrawing();
       }
 
-      this.material.color.set(
-        teleporting
-          ? (this.teleportValid ? "#65e3a1" : "#ff6767")
-          : "#78d9ef"
-      );
+      const color = F.Settings
+        ? F.Settings.lasers[this.data.hand]
+        : (this.data.hand === "left" ? "#32d8df" : "#ff9d38");
+
+      this.material.color.set(color);
+      this.line.visible = true;
 
       this.positions.set([
         this.origin.x, this.origin.y, this.origin.z,
@@ -1093,47 +972,32 @@ window.FKCVR = window.FKCVR || {};
     remove: function () {
       this.el.removeEventListener("triggerdown", this.triggerDown);
       this.el.removeEventListener("triggerup", this.triggerUp);
-
-      this.el.removeEventListener("abuttondown", this.resetLastEvent);
-      this.el.removeEventListener("xbuttondown", this.resetLastEvent);
-
-      this.el.removeEventListener("bbuttondown", this.resetAllEvent);
-      this.el.removeEventListener("ybuttondown", this.resetAllEvent);
-
+      this.el.removeEventListener("abuttondown", this.resetEvent);
+      this.el.removeEventListener("xbuttondown", this.resetEvent);
+      this.el.removeEventListener("bbuttondown", this.menuEvent);
+      this.el.removeEventListener("ybuttondown", this.menuEvent);
       this.el.removeEventListener("controllerdisconnected", this.disconnect);
 
       this.geometry.dispose();
       this.material.dispose();
-
       this.lineEntity.remove();
       this.pointer.remove();
-      this.ring.remove();
     }
   });
-
-  /*
-   * ============================================================
-   * NAVIGATION
-   * ============================================================
-   */
 
   AFRAME.registerComponent("fkc-navigation", {
     schema: {
       speed: {default: 3},
       desktopSpeed: {default: 4},
-      snapAngle: {default: 45},
+      turnSpeed: {default: 60},
       deadzone: {default: 0.18}
     },
 
     init: function () {
       this.keys = new Set();
-      this.teleporting = false;
-      this.rightReady = false;
-
       this.forward = new V();
       this.right = new V();
       this.movement = new V();
-
       this.cameraPosition = new V();
       this.pivot = new V();
       this.axis = new V(0, 1, 0);
@@ -1142,9 +1006,7 @@ window.FKCVR = window.FKCVR || {};
         const target = event.target;
 
         if (target && (
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
+          ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName) ||
           target.isContentEditable
         )) return;
 
@@ -1168,43 +1030,27 @@ window.FKCVR = window.FKCVR || {};
       this.el.sceneEl.addEventListener("exit-vr", this.cancel);
     },
 
-    rightTools: function () {
-      const hand = document.getElementById("rightHand");
-      return hand && hand.components["fkc-controller"];
-    },
-
     cancel: function () {
       this.keys.clear();
-      this.teleporting = false;
-      this.rightReady = false;
-
-      const tools = this.rightTools();
-
-      if (tools) {
-        tools.teleportValid = false;
-        tools.ring.object3D.visible = false;
-      }
     },
 
     applyDeadzone: function (value) {
       const absolute = Math.abs(value);
-
       if (absolute <= this.data.deadzone) return 0;
 
       return Math.sign(value) *
-        (absolute - this.data.deadzone) /
-        (1 - this.data.deadzone);
+        (absolute - this.data.deadzone) / (1 - this.data.deadzone);
     },
 
     rotateAroundHead: function (angle) {
       const camera = this.el.sceneEl.camera;
       if (!camera) return;
 
+      this.el.object3D.updateWorldMatrix(true, true);
       camera.getWorldPosition(this.pivot);
 
       this.el.object3D.position.sub(this.pivot)
-        .applyAxisAngle(this.axis, angle)
-        .add(this.pivot);
+        .applyAxisAngle(this.axis, angle).add(this.pivot);
 
       this.el.object3D.rotation.y += angle;
       this.el.object3D.updateWorldMatrix(true, true);
@@ -1212,7 +1058,6 @@ window.FKCVR = window.FKCVR || {};
 
     move: function (x, y, speed, delta) {
       const scene = this.el.sceneEl;
-
       if (!scene.camera || (x === 0 && y === 0)) return;
 
       scene.camera.getWorldDirection(this.forward);
@@ -1227,12 +1072,9 @@ window.FKCVR = window.FKCVR || {};
       this.right.set(-this.forward.z, 0, this.forward.x);
 
       this.movement.copy(this.forward)
-        .multiplyScalar(-y)
-        .addScaledVector(this.right, x);
+        .multiplyScalar(-y).addScaledVector(this.right, x);
 
-      if (this.movement.lengthSq() > 1) {
-        this.movement.normalize();
-      }
+      if (this.movement.lengthSq() > 1) this.movement.normalize();
 
       const seconds = Math.min((delta || 0) / 1000, 0.05);
       this.movement.multiplyScalar(speed * seconds);
@@ -1258,7 +1100,10 @@ window.FKCVR = window.FKCVR || {};
     },
 
     tick: function (time, delta) {
+      if (F.Menu && F.Menu.opened) return;
+
       const scene = this.el.sceneEl;
+      const seconds = Math.min((delta || 0) / 1000, 0.05);
 
       if (!scene.is("vr-mode")) {
         let x = 0;
@@ -1269,89 +1114,38 @@ window.FKCVR = window.FKCVR || {};
         if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) y--;
         if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) y++;
 
-        const turn =
-          (this.keys.has("KeyQ") ? 1 : 0) -
+        const turn = (this.keys.has("KeyQ") ? 1 : 0) -
           (this.keys.has("KeyE") ? 1 : 0);
 
-        if (turn) {
-          this.rotateAroundHead(
-            turn * 1.5 * Math.min((delta || 0) / 1000, 0.05)
-          );
-        }
+        if (turn) this.rotateAroundHead(turn * 1.5 * seconds);
 
         this.move(x, y, this.data.desktopSpeed, delta);
         return;
       }
 
-      const leftSource = F.getSource(scene, "left");
-      const rightSource = F.getSource(scene, "right");
+      const left = F.readStick(F.getSource(scene, "left"));
+      const right = F.readStick(F.getSource(scene, "right"));
 
-      const left = F.readStick(leftSource);
-      const right = F.readStick(rightSource);
-      const tools = this.rightTools();
+      const turn = this.applyDeadzone(right.x);
 
-      const neutral =
-        Math.abs(right.x) < 0.2 &&
-        Math.abs(right.y) < 0.2;
-
-      if (!rightSource) {
-        this.teleporting = false;
-        this.rightReady = false;
-      } else if (this.teleporting) {
-        if (F.anyGrabbing()) {
-          this.teleporting = false;
-          this.rightReady = false;
-        } else if (tools) {
-          tools.updateRay();
-          tools.updateTeleport();
-
-          if (neutral) {
-            tools.teleport();
-            this.teleporting = false;
-            this.rightReady = true;
-          }
-        }
-      } else if (neutral) {
-        this.rightReady = true;
-      } else if (this.rightReady) {
-        if (
-          Math.abs(right.x) > 0.65 &&
-          Math.abs(right.x) > Math.abs(right.y)
-        ) {
-          F.releaseHands();
-
-          this.rotateAroundHead(
-            -Math.sign(right.x) *
-            THREE.MathUtils.degToRad(this.data.snapAngle)
-          );
-
-          this.rightReady = false;
-        } else if (right.y < -0.65 && !F.anyGrabbing()) {
-          this.teleporting = true;
-          this.rightReady = false;
-
-          if (tools) {
-            tools.updateRay();
-            tools.updateTeleport();
-          }
-        }
-      }
-
-      if (!this.teleporting) {
-        this.move(
-          this.applyDeadzone(left.x),
-          this.applyDeadzone(left.y),
-          this.data.speed,
-          delta
+      if (turn) {
+        this.rotateAroundHead(
+          -turn * THREE.MathUtils.degToRad(this.data.turnSpeed) * seconds
         );
       }
+
+      this.move(
+        this.applyDeadzone(left.x),
+        this.applyDeadzone(left.y),
+        this.data.speed,
+        delta
+      );
     },
 
     remove: function () {
       window.removeEventListener("keydown", this.keyDown);
       window.removeEventListener("keyup", this.keyUp);
       window.removeEventListener("blur", this.cancel);
-
       this.el.sceneEl.removeEventListener("enter-vr", this.cancel);
       this.el.sceneEl.removeEventListener("exit-vr", this.cancel);
     }
@@ -1362,10 +1156,12 @@ window.FKCVR = window.FKCVR || {};
       this.enter = () => {
         const panel = document.getElementById("panel");
         if (panel) panel.classList.add("in-vr");
+        if (F.Menu) F.Menu.close();
       };
 
       this.exit = () => {
         F.releaseHands();
+        if (F.Menu) F.Menu.close();
 
         this.el.querySelectorAll("[fkc-controller]").forEach(hand => {
           const tools = hand.components["fkc-controller"];
@@ -1394,27 +1190,24 @@ window.FKCVR = window.FKCVR || {};
     console.log("A-Frame:", AFRAME.version);
     console.log("Three.js:", THREE.REVISION);
     console.log("Sicherer Kontext:", window.isSecureContext);
-    console.log("Aktueller Raum:", F.app && F.app.currentId);
+    console.log("Raum:", F.app && F.app.currentId);
     console.log("XR-Sitzung:", session);
+    console.log("Menü offen:", F.Menu && F.Menu.opened);
+    console.log("Zeichenstriche:", F.Draw && F.Draw.strokes.length);
 
     if (!session) return;
 
-    console.table(
-      Array.from(session.inputSources).map(source => ({
-        hand: source.handedness,
-        profiles: Array.from(source.profiles).join(", "),
-        mapping: source.gamepad ? source.gamepad.mapping : "",
-        axes: source.gamepad
-          ? Array.from(source.gamepad.axes)
-            .map(value => value.toFixed(3)).join(", ")
-          : "",
-        buttons: source.gamepad
-          ? Array.from(source.gamepad.buttons)
-            .map((button, index) =>
-              index + ":" + button.value.toFixed(2)
-            ).join(" ")
-          : ""
-      }))
-    );
+    console.table(Array.from(session.inputSources).map(source => ({
+      hand: source.handedness,
+      profiles: Array.from(source.profiles).join(", "),
+      mapping: source.gamepad ? source.gamepad.mapping : "",
+      axes: source.gamepad
+        ? Array.from(source.gamepad.axes).map(v => v.toFixed(3)).join(", ")
+        : "",
+      buttons: source.gamepad
+        ? Array.from(source.gamepad.buttons)
+          .map((b, i) => i + ":" + b.value.toFixed(2)).join(" ")
+        : ""
+    })));
   };
 })(window.FKCVR);
