@@ -13,7 +13,6 @@
 
       this.bindInterface();
       this.bindDesktopPicking();
-
       this.changeRoom("welcome");
     },
 
@@ -41,8 +40,16 @@
       };
 
       document.getElementById("reset-last").onclick = F.resetLast;
-      document.getElementById("reset-all").onclick = F.resetAll;
-      document.getElementById("clear-markers").onclick = F.clearMarkers;
+
+      document.getElementById("open-menu").onclick = () => {
+        F.Menu.toggle(null);
+      };
+
+      document.getElementById("clear-markers").onclick = () => {
+        if (window.confirm("Alle Zeichnungen in diesem Raum löschen?")) {
+          F.clearMarkers();
+        }
+      };
     },
 
     bindDesktopPicking: function () {
@@ -53,27 +60,22 @@
       let pointerStart = null;
 
       canvas.addEventListener("pointerdown", event => {
-        if (event.button !== 0) return;
-
-        pointerStart = {
-          x: event.clientX,
-          y: event.clientY
-        };
+        if (event.button !== 0 || this.scene.is("vr-mode")) return;
+        pointerStart = {x: event.clientX, y: event.clientY};
       });
 
       canvas.addEventListener("pointerup", event => {
         if (!pointerStart || event.button !== 0) return;
-        if (this.scene.is("vr-mode")) return;
 
-        const distance = Math.hypot(
-          event.clientX - pointerStart.x,
-          event.clientY - pointerStart.y
-        );
-
+        const start = pointerStart;
         pointerStart = null;
 
-        // Ziehen zum Umschauen soll keine Raumwahl auslösen.
-        if (distance > 6) return;
+        if (this.scene.is("vr-mode")) return;
+
+        if (Math.hypot(
+          event.clientX - start.x,
+          event.clientY - start.y
+        ) > 6) return;
 
         const rect = canvas.getBoundingClientRect();
 
@@ -83,15 +85,30 @@
         );
 
         this.scene.camera.updateWorldMatrix(true, false);
-
         raycaster.setFromCamera(mouse, this.scene.camera);
         raycaster.far = 30;
 
-        const hit = F.findHit(raycaster, false);
+        const hit = F.findHit(raycaster, true);
+        if (!hit) return;
 
-        if (hit && hit.el.dataset.roomId) {
-          this.changeRoom(hit.el.dataset.roomId);
+        if (hit.type === "action") {
+          if (hit.el.dataset.fkcMenu === "true") {
+            F.Menu.click(hit);
+          } else if (hit.el.dataset.roomId) {
+            this.changeRoom(hit.el.dataset.roomId);
+          }
+          return;
         }
+
+        this.scene.lastSelectedTarget = hit.el;
+
+        if (hit.type === "model") F.selectModel(hit.el);
+
+        F.setStatus(
+          hit.type === "model"
+            ? "Ausgewählt: " + hit.el.dataset.title
+            : "Zeichenfläche ausgewählt."
+        );
       });
 
       canvas.addEventListener("pointercancel", () => {
@@ -114,16 +131,11 @@
       try {
         F.beforeRoomChange();
 
-        /*
-         * Entfernt den bisherigen Raum.
-         * Kamera, Controller und VR-Sitzung bleiben bestehen.
-         */
         while (this.roomRoot.firstChild) {
           this.roomRoot.firstChild.remove();
         }
 
         this.activeRoom = null;
-
         this.activeRoom = F.RoomBuilder.build(
           this.roomRoot,
           config,
@@ -133,29 +145,19 @@
         this.currentId = id;
         this.positionAtSpawn(this.activeRoom.spawn);
 
-        document.getElementById("current-room").textContent =
-          config.title;
-
+        document.getElementById("current-room").textContent = config.title;
         document.getElementById("room-select").value = id;
 
-        if (!window.isSecureContext) {
-          F.setStatus(
-            config.title + " geöffnet. WebXR benötigt HTTPS oder localhost."
-          );
-        } else {
-          F.setStatus(
-            config.title +
-            " geöffnet. Raumwahl per Laser + Trigger oder Auswahlliste."
-          );
-        }
+        F.setStatus(
+          window.isSecureContext
+            ? config.title + " geöffnet. B/Y öffnet das VR-Menü."
+            : config.title + " geöffnet. WebXR benötigt HTTPS oder localhost."
+        );
 
         document.title = "FKC-VR – " + config.title;
       } catch (error) {
         console.error("Raumwechsel fehlgeschlagen:", error);
-
-        F.setStatus(
-          "Raum konnte nicht aufgebaut werden. Browserkonsole prüfen."
-        );
+        F.setStatus("Raum konnte nicht aufgebaut werden. Browserkonsole prüfen.");
       } finally {
         this.changing = false;
       }
@@ -166,11 +168,6 @@
       const camera = this.scene.camera;
       const localHead = new THREE.Vector3();
 
-      /*
-       * Reale Kopfverschiebung relativ zum Rig erhalten.
-       * Nach dem Raumwechsel liegt die Kopfposition in X/Z
-       * am vorgesehenen Startpunkt.
-       */
       if (camera) {
         rig.updateWorldMatrix(true, true);
         camera.getWorldPosition(localHead);
@@ -178,7 +175,6 @@
       }
 
       rig.rotation.set(0, 0, 0);
-
       rig.position.set(
         spawn.x - localHead.x,
         0,
@@ -187,10 +183,6 @@
 
       rig.updateWorldMatrix(true, true);
 
-      /*
-       * Desktopblick zurücksetzen.
-       * In VR bleibt die reale Kopfhaltung maßgeblich.
-       */
       if (!this.scene.is("vr-mode")) {
         const cameraEl = document.getElementById("camera");
         const look = cameraEl.components["look-controls"];
@@ -209,9 +201,6 @@
 
   const scene = F.getScene();
 
-  if (scene.hasLoaded) {
-    app.init();
-  } else {
-    scene.addEventListener("loaded", () => app.init(), {once: true});
-  }
+  if (scene.hasLoaded) app.init();
+  else scene.addEventListener("loaded", () => app.init(), {once: true});
 })(window.FKCVR);
