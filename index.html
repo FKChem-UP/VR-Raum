@@ -8,6 +8,9 @@
 
   <link rel="stylesheet" href="./styles.css">
 
+  <!-- Diagnose früh laden, damit auch spätere Scriptfehler erfasst werden. -->
+  <script src="./js/xr-debug.js"></script>
+
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
   <!-- Reihenfolge beibehalten. -->
@@ -36,9 +39,15 @@
 
     <div class="buttons">
       <button id="home" type="button">Zum Begrüßungsraum</button>
-      <button id="reset-last" type="button">Ausgewähltes Objekt zurücksetzen</button>
-      <button id="open-menu" type="button">Menü öffnen / schließen</button>
-      <button id="clear-markers" type="button">Zeichnungen löschen</button>
+      <button id="reset-last" type="button">
+        Ausgewähltes Objekt zurücksetzen
+      </button>
+      <button id="open-menu" type="button">
+        Menü öffnen / schließen
+      </button>
+      <button id="clear-markers" type="button">
+        Zeichnungen löschen
+      </button>
     </div>
 
     <details>
@@ -60,7 +69,6 @@
         <strong>Zeichnen:</strong>
         Trigger kurz drücken für einen Punkt.
         Trigger halten und den Laser bewegen für einen Strich.
-        Gezeichnet wird auf getroffenen Oberflächen.
       </p>
 
       <p>
@@ -74,13 +82,11 @@
         <strong>Menü:</strong>
         B/Y öffnet oder schließt das Menü.
         Menü mit Laser und Trigger bedienen.
-        Währenddessen pausiert die Joystickbewegung.
       </p>
 
       <p>
         <strong>Raumwahl:</strong>
         Mit Laser auf eine Raumtafel zeigen und Trigger drücken.
-        Raumwahltafeln werden nicht bemalt.
       </p>
 
       <p>
@@ -88,8 +94,34 @@
         WASD/Pfeiltasten laufen, Q/E drehen.
         Mit der Maus ziehen, um sich umzuschauen.
         Objekte anklicken, um sie auszuwählen.
-        Das Zeichnen ist in dieser Fassung für VR-Controller vorgesehen.
       </p>
+    </details>
+
+    <details open style="margin-top: 16px;">
+      <summary><strong>XR-Fehlerdiagnose</strong></summary>
+
+      <p id="xr-debug-support">XR-Unterstützung wird geprüft …</p>
+
+      <button id="xr-debug-enter" type="button">
+        VR ausdrücklich starten
+      </button>
+
+      <button id="xr-debug-refresh" type="button">
+        Diagnose aktualisieren
+      </button>
+
+      <p>
+        Während einer immersiven Sitzung werden Diagnosewerte gespeichert.
+        Nach dem Verlassen erscheinen sie hier im Bericht.
+      </p>
+
+      <textarea
+        id="xr-debug-output"
+        readonly
+        rows="16"
+        aria-label="XR-Diagnosebericht"
+        style="width: 100%; box-sizing: border-box; font-size: 12px;"
+      ></textarea>
     </details>
 
     <p id="status" role="status">Anwendung wird geladen …</p>
