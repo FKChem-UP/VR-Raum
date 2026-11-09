@@ -8,7 +8,7 @@
    * EINSTELLUNGEN
    *
    * Laserfarben und Zeichenfarben sind unabhängig.
-   * Jede Hand besitzt ihre eigene Zeichenfarbe.
+   * strokeRadius ist der halbe Strichdurchmesser in Metern.
    * ============================================================
    */
   F.Settings = {
@@ -20,9 +20,35 @@
       left: "#32d8df",
       right: "#ff3f92"
     },
-    // Für Aufrufe ohne Angabe einer Hand.
-    ink: "#ff3f92"
+    ink: "#ff3f92",
+    strokeRadius: 0.004
   };
+
+  const palette = [
+    ["Türkis", "#32d8df"],
+    ["Orange", "#ff9d38"],
+    ["Pink", "#ff3f92"],
+    ["Blau", "#507dff"],
+    ["Grün", "#45d77e"],
+    ["Rot", "#ee5151"]
+  ];
+
+  const strokeSizes = [
+    ["Fein · 4 mm", 0.002],
+    ["Normal · 8 mm", 0.004],
+    ["Mittel · 12 mm", 0.006],
+    ["Breit · 20 mm", 0.010],
+    ["Sehr breit · 32 mm", 0.016]
+  ];
+
+  function colorName(color) {
+    const entry = palette.find(item => item[1] === color);
+    return entry ? entry[0] : color;
+  }
+
+  function strokeDiameterMm() {
+    return Math.round(F.Settings.strokeRadius * 2000);
+  }
 
   /*
    * ============================================================
@@ -82,6 +108,7 @@
           ) return;
 
           used.add(object);
+
           hitTargets.push({
             mesh: object,
             type,
@@ -120,10 +147,6 @@
       return includeSurfaces || target.type === "action";
     });
 
-    /*
-     * Raycaster benötigt aktuelle Weltmatrizen.
-     * Das ist insbesondere nach Raumaufbau und Manipulation wichtig.
-     */
     targets.forEach(target => {
       target.mesh.updateWorldMatrix(true, false);
     });
@@ -167,9 +190,6 @@
   /*
    * ============================================================
    * ZEICHENFLÄCHEN
-   *
-   * Primitive werden auch vor ihrer Geometrieinitialisierung erfasst.
-   * Raumwahltafeln und Modell-Hitboxen bleiben ausgeschlossen.
    * ============================================================
    */
   const PAINT_SELECTOR = [
@@ -244,7 +264,9 @@
       });
     },
 
-    createStroke: function (hit, parent, point, radius, color) {
+    createStroke: function (
+      hit, parent, point, radius, color, worldRadius
+    ) {
       while (this.strokes.length >= MAX_STROKES) {
         this.remove(this.strokes[0]);
       }
@@ -258,6 +280,10 @@
         side: THREE.DoubleSide
       });
 
+      /*
+       * Startpunkte bleiben wie bisher etwas größer
+       * als der eigentliche Strich.
+       */
       const dotGeometry = new THREE.SphereGeometry(
         radius * 2, 8, 6
       );
@@ -320,6 +346,7 @@
         dotGeometry,
         positions,
         radius,
+        worldRadius,
         color,
         count: 0,
         lastLocal: point.clone(),
@@ -380,6 +407,7 @@
       if (!body) return null;
 
       const color = F.Settings.inks[hand] || F.Settings.ink;
+      const worldRadius = F.Settings.strokeRadius;
       const parent = body.object3D;
 
       parent.updateWorldMatrix(true, true);
@@ -387,8 +415,15 @@
       const scale = parent.getWorldScale(new V());
       const factor = Math.max(0.0001, Math.abs(scale.x));
 
+      /*
+       * Breitere Striche erhalten mehr Oberflächenabstand,
+       * damit sie nicht zur Hälfte in der Wand verschwinden.
+       * Für die Standardstärke bleibt der bisherige Abstand.
+       */
+      const surfaceOffset = Math.max(0.004, worldRadius);
+
       const worldPoint = hit.point.clone()
-        .addScaledVector(hit.normal, 0.004);
+        .addScaledVector(hit.normal, surfaceOffset);
 
       const localPoint = parent.worldToLocal(
         worldPoint.clone()
@@ -401,6 +436,7 @@
         stroke.surfaceMesh === hit.mesh &&
         stroke.parent === parent &&
         stroke.color === color &&
+        stroke.worldRadius === worldRadius &&
         stroke.count < CAPACITY
       );
 
@@ -426,8 +462,9 @@
           hit,
           parent,
           localPoint,
-          0.004 / factor,
-          color
+          worldRadius / factor,
+          color,
+          worldRadius
         );
       }
 
@@ -444,8 +481,8 @@
   };
 
   /*
-   * Die vorhandene vr-controls.js kann unverändert bleiben.
-   * Hier wird lediglich die Hand an die Zeichenfunktion weitergereicht.
+   * Die vorhandene vr-controls.js bleibt unverändert.
+   * Die Hand wird an die Zeichenfunktion weitergereicht.
    */
   function connectHandDrawing(el) {
     const tools = el.components &&
@@ -494,9 +531,11 @@
     if (!variant) return;
 
     if (root.fkcVariantId === variantId) {
-      if (F.Menu) F.Menu.notify(
-        "Diese Darstellung ist bereits ausgewählt."
-      );
+      if (F.Menu) {
+        F.Menu.notify(
+          "Diese Darstellung ist bereits ausgewählt."
+        );
+      }
       return;
     }
 
@@ -578,6 +617,7 @@
         F.applyModelBounds(pending);
 
         const hitbox = root.querySelector(".hitbox");
+
         hitbox.object3D.position.copy(
           normalize.result.center
         );
@@ -607,15 +647,6 @@
   const WIDTH = 1024;
   const HEIGHT = 1200;
 
-  const palette = [
-    ["Türkis", "#32d8df"],
-    ["Orange", "#ff9d38"],
-    ["Pink", "#ff3f92"],
-    ["Blau", "#507dff"],
-    ["Grün", "#45d77e"],
-    ["Rot", "#ee5151"]
-  ];
-
   function darken(color) {
     const c = new THREE.Color(color);
     c.multiplyScalar(0.72);
@@ -624,6 +655,7 @@
 
   function readableText(color) {
     const c = new THREE.Color(color);
+
     const brightness =
       c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722;
 
@@ -812,8 +844,8 @@
       if (index < 0) return;
 
       /*
-       * Aktion kurz verzögern, damit auch bei Seitenwechseln
-       * der gedrückte Button sichtbar wird.
+       * Kurze Verzögerung für sichtbare Druckrückmeldung,
+       * auch wenn die Aktion anschließend die Seite wechselt.
        */
       const clicked = this.buttons[index];
 
@@ -976,6 +1008,12 @@
         );
 
         button(
+          "Strichstärke einstellen · " +
+            strokeDiameterMm() + " mm",
+          () => this.navigate("stroke-size")
+        );
+
+        button(
           "Bedienhilfe anzeigen",
           () => this.navigate("help")
         );
@@ -1014,33 +1052,44 @@
       }
 
       if (this.page === "colors") {
+        /*
+         * Alle vier Buttons verwenden die Laserfarbe
+         * der entsprechenden Hand als Hintergrund.
+         *
+         * Der Text nennt die tatsächliche Einstellung.
+         */
         button(
-          "Laserfarbe links",
+          "Laserfarbe links: " +
+            colorName(F.Settings.lasers.left),
           () => this.navigate("laser-left"),
           F.Settings.lasers.left
         );
 
         button(
-          "Laserfarbe rechts",
+          "Laserfarbe rechts: " +
+            colorName(F.Settings.lasers.right),
           () => this.navigate("laser-right"),
           F.Settings.lasers.right
         );
 
         button(
-          "Zeichenfarbe links",
+          "Zeichenfarbe links: " +
+            colorName(F.Settings.inks.left),
           () => this.navigate("ink-left"),
-          F.Settings.inks.left
+          F.Settings.lasers.left
         );
 
         button(
-          "Zeichenfarbe rechts",
+          "Zeichenfarbe rechts: " +
+            colorName(F.Settings.inks.right),
           () => this.navigate("ink-right"),
-          F.Settings.inks.right
+          F.Settings.lasers.right
         );
 
         text(
-          "Laser- und Zeichenfarben sind unabhängig.\n" +
-          "Die Buttonfarben zeigen die aktuellen Einstellungen."
+          "Buttonhintergrund = Laserfarbe der jeweiligen Hand.\n" +
+          "Die eingestellte Zeichenfarbe steht im Buttontext.\n" +
+          "Laser- und Zeichenfarben bleiben unabhängig."
         );
 
         button("Zurück", () => this.navigate("home"));
@@ -1057,6 +1106,7 @@
         const page = this.page;
         const laser = page.startsWith("laser-");
         const hand = page.endsWith("-left") ? "left" : "right";
+
         const settings = laser
           ? F.Settings.lasers
           : F.Settings.inks;
@@ -1087,16 +1137,44 @@
         button("Zurück", () => this.navigate("colors"));
       }
 
+      if (this.page === "stroke-size") {
+        text(
+          "Strichdurchmesser für beide Hände wählen.\n" +
+          "Die Einstellung gilt nur für neue Zeichnungen."
+        );
+
+        strokeSizes.forEach(([label, radius]) => {
+          button(
+            label,
+            () => {
+              F.Settings.strokeRadius = radius;
+              this.blockDrawing();
+
+              const message =
+                "Strichstärke: " + strokeDiameterMm() +
+                " mm · beide Hände";
+
+              F.setStatus(message);
+              this.notify(message);
+            },
+            null,
+            F.Settings.strokeRadius === radius
+          );
+        });
+
+        button("Zurück", () => this.navigate("home"));
+      }
+
       if (this.page === "help") {
         text([
           "Linker Joystick: laufen.",
           "Rechter Joystick: kontinuierlich drehen.",
           "Grip: Modell in unmittelbarer Nähe greifen.",
-          "Eine Hand bewegt und dreht.",
-          "Zwei Hände skalieren.",
+          "Eine Hand bewegt und dreht, zwei Hände skalieren.",
           "Trigger kurz: Punkt oder Auswahl.",
           "Trigger halten + bewegen: Oberflächenstrich.",
           "Jede Hand hat ihre eigene Zeichenfarbe.",
+          "Strichstärke im Hauptmenü einstellen.",
           "Wände, Poster, Boden und Modelle sind bemalbar.",
           "A/X: gehaltenes oder anvisiertes Objekt zurücksetzen.",
           "B/Y: Menü öffnen oder schließen.",
@@ -1195,10 +1273,6 @@
         }, "#f1c7c7");
       }
 
-      /*
-       * Rückmeldung bleibt stehen, bis eine weitere Aktion
-       * ausgeführt oder die Menüseite gewechselt wird.
-       */
       ctx.fillStyle = this.message ? "#dcefe2" : "#edf2ee";
       ctx.fillRect(35, 1078, 954, 53);
 
@@ -1330,7 +1404,7 @@
           "Links: laufen · Rechts: weich drehen",
           "Grip: greifen · 2 Hände: skalieren",
           "Trigger: Oberflächen bemalen",
-          "Zeichenfarbe für jede Hand im Menü",
+          "Farben und Strichstärke im Menü",
           "A/X: Reset · B/Y: Menü"
         ]));
       }
