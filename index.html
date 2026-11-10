@@ -8,9 +8,10 @@
 
   <link rel="stylesheet" href="./styles.css">
 
-  <!-- Diagnose früh laden, damit auch spätere Scriptfehler erfasst werden. -->
+  <!-- Diagnose früh laden. -->
   <script src="./js/xr-debug.js"></script>
 
+  <!-- Bestehende A-Frame-Version beibehalten. -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
   <!-- Reihenfolge beibehalten. -->
@@ -18,6 +19,10 @@
   <script defer src="./js/room-builder.js"></script>
   <script defer src="./js/rooms.js"></script>
   <script defer src="./js/vr-tools.js"></script>
+
+  <!-- Demonstration ergänzt Builder und Menü vor dem App-Start. -->
+  <script defer src="./js/xray-demo.js"></script>
+
   <script defer src="./js/app.js"></script>
 </head>
 
@@ -39,12 +44,15 @@
 
     <div class="buttons">
       <button id="home" type="button">Zum Begrüßungsraum</button>
+
       <button id="reset-last" type="button">
         Ausgewähltes Objekt zurücksetzen
       </button>
+
       <button id="open-menu" type="button">
         Menü öffnen / schließen
       </button>
+
       <button id="clear-markers" type="button">
         Zeichnungen löschen
       </button>
@@ -55,8 +63,8 @@
 
       <p>
         <strong>VR:</strong>
-        Linker Joystick läuft. Rechter Joystick dreht kontinuierlich.
-        Teleport ist deaktiviert.
+        Linker Joystick läuft. Rechter Joystick dreht entsprechend
+        der gewählten Komforteinstellung. Teleport ist deaktiviert.
       </p>
 
       <p>
@@ -85,6 +93,14 @@
       </p>
 
       <p>
+        <strong>Röntgendemonstration in Vorlesung 5:</strong>
+        Im Menü „Röntgendemo &amp; Bedienhilfe“ auswählen.
+        Dort sind Start/Pause, Neustart, Geschwindigkeit,
+        Erklärungen und Sichtbarkeit verfügbar.
+        Die Apparatur ist zunächst nicht greifbar oder bemalbar.
+      </p>
+
+      <p>
         <strong>Raumwahl:</strong>
         Mit Laser auf eine Raumtafel zeigen und Trigger drücken.
       </p>
@@ -94,6 +110,7 @@
         WASD/Pfeiltasten laufen, Q/E drehen.
         Mit der Maus ziehen, um sich umzuschauen.
         Objekte anklicken, um sie auszuwählen.
+        Die Demonstration lässt sich über das vorhandene Menü bedienen.
       </p>
     </details>
 
