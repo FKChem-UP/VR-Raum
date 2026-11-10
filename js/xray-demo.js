@@ -2,37 +2,32 @@
 
 (function (F) {
   /*
-   * ============================================================
-   * RÖNTGENDEMONSTRATION — RÖNTGEN-1
-   * ============================================================
+   * RÖNTGEN-2
    *
-   * Ergänzung für die hochgeladenen Galerie-2-/Komfort-1-Dateien.
-   *
-   * - Keine zweite Szene, Kamera oder Controllersteuerung.
-   * - Keine Änderung der bisherigen Raumdateien notwendig.
-   * - Plattform nur in vorlesung-5.
-   * - Bestehendes Menü bekommt eine Demonstrationsseite.
-   * - Geometrische Reflexauswahl etwa 25-mal pro Sekunde.
-   * - Teilchen verwenden InstancedMesh.
-   * - Pause vermeidet erneute Reflexberechnung.
+   * Nur Vorlesung 5:
+   * - durchgehbare Apparatur auf flacher Bodenmarkierung;
+   * - Informationen beim Anvisieren mit dem vorhandenen Laser;
+   * - keine zweite Kamera oder Controllersteuerung;
+   * - Apparatur nicht greifbar oder bemalbar;
+   * - bestehende Menü- und Zeichenaktionen bleiben erhalten.
    *
    * Fachliche Grenzen:
-   * - Primitives kubisches Modellgitter.
-   * - Keine Strukturfaktoren oder Reflexintensitäten.
-   * - Illustrative Ewald-Schalentoleranz.
-   * - Apparatur und Teilchen nicht maßstabsgetreu.
+   * Primitives kubisches Modellgitter, geometrische Reflexauswahl,
+   * keine Strukturfaktoren/Intensitäten/Auslöschungen.
+   * Ewald-Schalentoleranz und Teilchenbewegung sind illustrativ.
+   * Abstände, Größen und Zeiten sind nicht maßstabsgetreu.
    */
+
+  if (!F || !F.RoomBuilder || !F.Menu || !F.findHit) {
+    console.error(
+      "Röntgen-2: room-builder.js und vr-tools.js vorher laden."
+    );
+    return;
+  }
 
   const T = AFRAME.THREE;
   const V = T.Vector3;
   const vec = (x, y, z) => new V(x, y, z);
-
-  if (!F || !F.RoomBuilder || !F.Menu) {
-    console.error(
-      "Röntgen-1: room-builder.js und vr-tools.js müssen vorher geladen sein."
-    );
-    return;
-  }
 
   function wrapText(ctx, value, maxWidth) {
     const lines = [];
@@ -57,6 +52,81 @@
     return lines;
   }
 
+  function visibleInTree(object) {
+    for (let current = object; current; current = current.parent) {
+      if (!current.visible) return false;
+    }
+    return true;
+  }
+
+  function getDemo() {
+    const el = document.getElementById("fkc-xray-experiment");
+
+    return el && el.isConnected && el.components
+      ? el.components["fkc-xray-demo"]
+      : null;
+  }
+
+  /*
+   * Ergänzung der vorhandenen Trefferprüfung.
+   *
+   * Ein Infotreffer wird als reine Bedienfläche zurückgegeben:
+   * - kein Zeichnen;
+   * - kein Modellreset;
+   * - kein Raumwechsel, da kein dataset.roomId vorhanden ist.
+   *
+   * Menütreffer und näher liegende vorhandene Raumobjekte
+   * behalten Vorrang. Außerhalb von Vorlesung 5 wird direkt
+   * die bisherige Trefferprüfung verwendet.
+   */
+  const previousFindHit = F.findHit;
+
+  F.findHit = function (raycaster, includeSurfaces) {
+    const original = previousFindHit.call(
+      this, raycaster, includeSurfaces
+    );
+
+    if (F.Menu && F.Menu.opened) return original;
+
+    const demo = getDemo();
+
+    if (
+      !demo ||
+      demo.removed ||
+      !demo.shown ||
+      !demo.infoMeshes
+    ) return original;
+
+    const infoHit = demo.findInformationHit(raycaster);
+    if (!infoHit) return original;
+
+    if (original) {
+      const originalDistance =
+        raycaster.ray.origin.distanceTo(original.point);
+
+      if (originalDistance <= infoHit.distance) return original;
+    }
+
+    const normal = infoHit.face
+      ? infoHit.face.normal.clone().applyMatrix3(
+          new T.Matrix3().getNormalMatrix(infoHit.object.matrixWorld)
+        ).normalize()
+      : raycaster.ray.direction.clone().negate();
+
+    if (normal.dot(raycaster.ray.direction) > 0) normal.negate();
+
+    return {
+      type: "action",
+      el: demo.el,
+      mesh: infoHit.object,
+      point: infoHit.point.clone(),
+      normal,
+      uv: infoHit.uv ? infoHit.uv.clone() : null,
+      xrayInfo: demo.infoLookup.get(infoHit.object),
+      xrayDemo: demo
+    };
+  };
+
   AFRAME.registerComponent("fkc-xray-demo", {
     schema: {
       wavelength: {default: 0.7107},
@@ -68,36 +138,49 @@
       this.time = 0;
       this.paused = true;
       this.shown = true;
-      this.explanations = false;
+      this.explanations = true;
+      this.removed = false;
       this.lastCalculation = -Infinity;
       this.lastFrame = -1;
-      this.frameHits = new Set();
+
       this.spots = [];
-      this.labels = [];
+      this.frameHits = new Set();
       this.streams = [];
       this.reflections = [];
-      this.removed = false;
 
       this.geometries = new Set();
       this.materials = new Set();
       this.textures = new Set();
       this.materialCache = new Map();
 
+      this.infoEntries = [];
+      this.infoMeshes = [];
+      this.infoLookup = new Map();
+      this.selectedInfo = null;
+      this.lastInfoTime = -Infinity;
+
       this.model = new T.Group();
       this.el.setObject3D("xray-demo", this.model);
 
+      this.rotationQ = new T.Quaternion();
       this.cameraQ = new T.Quaternion();
       this.parentQ = new T.Quaternion();
-      this.rotationQ = new T.Quaternion();
-      this.cameraPosition = new V();
+
       this.normal = new V();
       this.horizontal = new V();
       this.gTemp = new V();
       this.outTemp = new V();
       this.endTemp = new V();
-      this.labelTemp = new V();
-      this.dummy = new T.Object3D();
+
+      this.cameraPosition = new V();
+      this.forward = new V();
+      this.panelPosition = new V();
+      this.localPosition = new V();
+
+      this.bounds = new T.Box3();
+      this.partBounds = new T.Box3();
       this.axisY = vec(0, 1, 0);
+      this.dummy = new T.Object3D();
 
       this.colors = {
         electron: 0x56d9ff,
@@ -116,6 +199,7 @@
       this.buildScattering();
       this.buildReciprocalGrid();
       this.buildInformation();
+      this.buildInfoPanel();
 
       this.updateFrame(true);
 
@@ -203,8 +287,7 @@
 
       mesh.position.copy(a).add(b).multiplyScalar(0.5);
       mesh.quaternion.setFromUnitVectors(
-        vec(0, 1, 0),
-        direction.normalize()
+        vec(0, 1, 0), direction.normalize()
       );
 
       (parent || this.model).add(mesh);
@@ -212,18 +295,116 @@
     },
 
     /*
-     * Beschriftungen als Canvastexturen:
-     * Unicode ohne zusätzliche Schriftdateien.
-     *
-     * Die Beschriftungen sind keine A-Frame-Primitives,
-     * keine Modellziele und keine Zeichenflächen.
+     * Info-Markierungen bestehen ausschließlich aus THREE-
+     * Geometrie. Sie werden nicht automatisch als Malflächen
+     * oder greifbare Modelle registriert.
      */
-    label: function (
-      shortText, longText, position, color, width, fixed
-    ) {
+    makeMarkerTexture: function () {
+      if (this.markerTexture) return this.markerTexture;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.fillStyle = "#163347";
+      ctx.beginPath();
+      ctx.arc(64, 64, 57, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#b9f3ff";
+      ctx.lineWidth = 7;
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 88px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("i", 64, 69);
+
+      const texture = new T.CanvasTexture(canvas);
+      texture.minFilter = T.LinearFilter;
+      texture.magFilter = T.LinearFilter;
+      texture.generateMipmaps = false;
+
+      this.textures.add(texture);
+      this.markerTexture = texture;
+      return texture;
+    },
+
+    addInfo: function (title, text, position, targets) {
+      const entry = {
+        title,
+        text,
+        targets: (targets || []).filter(Boolean),
+        marker: new T.Group(),
+        markerFace: null
+      };
+
+      entry.marker.position.copy(position);
+
+      const core = new T.Mesh(
+        this.trackGeometry(new T.SphereGeometry(0.105, 10, 8)),
+        this.basic(0x276f8b)
+      );
+
+      const face = new T.Mesh(
+        this.trackGeometry(new T.PlaneGeometry(0.34, 0.34)),
+        this.trackMaterial(new T.MeshBasicMaterial({
+          map: this.makeMarkerTexture(),
+          transparent: true,
+          alphaTest: 0.05,
+          side: T.DoubleSide,
+          depthWrite: false,
+          toneMapped: false
+        }))
+      );
+
+      face.position.z = 0.12;
+      entry.marker.add(core, face);
+      entry.markerFace = face;
+
+      this.model.add(entry.marker);
+      this.infoEntries.push(entry);
+
+      /*
+       * Tatsächliche Bauteilgeometrien und Marker registrieren.
+       * Keine großen unsichtbaren Hitboxen über der Apparatur.
+       */
+      const register = object => {
+        object.traverse(child => {
+          if (!child.isMesh || this.infoLookup.has(child)) return;
+
+          this.infoMeshes.push(child);
+          this.infoLookup.set(child, entry);
+        });
+      };
+
+      entry.targets.forEach(register);
+      register(entry.marker);
+
+      return entry;
+    },
+
+    findInformationHit: function (raycaster) {
+      if (!visibleInTree(this.model)) return null;
+
+      this.el.object3D.updateWorldMatrix(true, true);
+
+      const targets = this.infoMeshes.filter(mesh =>
+        visibleInTree(mesh)
+      );
+
+      const hits = raycaster.intersectObjects(targets, false);
+
+      return hits.length ? hits[0] : null;
+    },
+
+    buildInfoPanel: function () {
       const canvas = document.createElement("canvas");
       canvas.width = 1024;
-      canvas.height = 256;
+      canvas.height = 512;
 
       const texture = new T.CanvasTexture(canvas);
       texture.minFilter = T.LinearFilter;
@@ -235,95 +416,319 @@
         new T.MeshBasicMaterial({
           map: texture,
           side: T.DoubleSide,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
           toneMapped: false
         })
       );
 
-      const mesh = new T.Mesh(
-        this.trackGeometry(
-          new T.PlaneGeometry(width || 3, (width || 3) / 4)
-        ),
+      /*
+       * Panel in Weltkoordinaten, nicht mit der Apparatur skaliert.
+       * Es ist kein Trefferziel und keine Zeichenfläche.
+       */
+      this.infoPanel = new T.Mesh(
+        this.trackGeometry(new T.PlaneGeometry(1.05, 0.525)),
         material
       );
 
-      mesh.position.copy(position);
-      this.model.add(mesh);
+      this.infoPanel.renderOrder = 95;
+      this.infoPanel.frustumCulled = false;
+      this.infoPanel.visible = false;
 
-      const entry = {
-        mesh,
-        canvas,
-        texture,
-        shortText,
-        longText: longText || shortText,
-        color: color || "#edf4ff",
-        fixed: Boolean(fixed)
-      };
+      this.el.sceneEl.object3D.add(this.infoPanel);
 
-      this.labels.push(entry);
-      this.drawLabel(entry);
-      return mesh;
+      this.infoCanvas = canvas;
+      this.infoTexture = texture;
+
+      this.highlight = new T.Box3Helper(
+        this.bounds, 0xb9f3ff
+      );
+
+      this.trackGeometry(this.highlight.geometry);
+      this.trackMaterial(this.highlight.material);
+
+      this.highlight.material.transparent = true;
+      this.highlight.material.opacity = 0.85;
+      this.highlight.material.toneMapped = false;
+      this.highlight.visible = false;
+
+      this.el.sceneEl.object3D.add(this.highlight);
     },
 
-    drawLabel: function (entry) {
-      const ctx = entry.canvas.getContext("2d");
-      const w = entry.canvas.width;
-      const h = entry.canvas.height;
+    drawInformation: function (entry) {
+      const ctx = this.infoCanvas.getContext("2d");
+      const w = this.infoCanvas.width;
+      const h = this.infoCanvas.height;
 
-      ctx.fillStyle = "#101d30";
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "rgba(16,29,48,0.96)";
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = entry.color;
+      ctx.strokeStyle = "#b9f3ff";
       ctx.lineWidth = 5;
       ctx.strokeRect(4, 4, w - 8, h - 8);
 
-      const value = entry.fixed || this.explanations
-        ? entry.longText
-        : entry.shortText;
+      let titleSize = 49;
+      let titleLines;
 
-      let fontSize = entry.fixed ? 39 : 58;
+      do {
+        ctx.font = "bold " + titleSize + "px Arial";
+        titleLines = wrapText(ctx, entry.title, w - 80);
+        if (titleLines.length <= 2) break;
+        titleSize -= 2;
+      } while (titleSize > 30);
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#b9f3ff";
+
+      let y = 28;
+
+      titleLines.forEach(line => {
+        ctx.fillText(line, 40, y, w - 80);
+        y += titleSize * 1.16;
+      });
+
+      y += 12;
+      ctx.strokeStyle = "#53778d";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(40, y);
+      ctx.lineTo(w - 40, y);
+      ctx.stroke();
+
+      y += 18;
+
+      let size = 39;
       let lines;
 
       do {
-        ctx.font = "bold " + fontSize + "px Arial";
-        lines = wrapText(ctx, value, w - 60);
+        ctx.font = size + "px Arial";
+        lines = wrapText(ctx, entry.text, w - 80);
 
-        if (
-          lines.length * fontSize * 1.15 <= h - 35 &&
-          lines.every(line => ctx.measureText(line).width <= w - 60)
-        ) break;
+        if (lines.length * size * 1.22 <= h - y - 62) break;
+        size -= 1;
+      } while (size > 24);
 
-        fontSize -= 2;
-      } while (fontSize >= 22);
+      ctx.fillStyle = "#ffffff";
 
-      ctx.fillStyle = entry.color;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const lineHeight = fontSize * 1.15;
-      const firstY = h / 2 - (lines.length - 1) * lineHeight / 2;
-
-      lines.forEach((line, index) => {
-        ctx.fillText(
-          line, w / 2,
-          firstY + index * lineHeight,
-          w - 60
-        );
+      lines.forEach(line => {
+        ctx.fillText(line, 40, y, w - 80);
+        y += size * 1.22;
       });
 
-      entry.texture.needsUpdate = true;
+      ctx.fillStyle = "#a9bdd0";
+      ctx.font = "24px Arial";
+      ctx.fillText(
+        "Laser wegnehmen: Erklärung verschwindet",
+        40, h - 39, w - 80
+      );
+
+      this.infoTexture.needsUpdate = true;
+    },
+
+    placeInformation: function () {
+      const camera = this.el.sceneEl.camera;
+      if (!camera) return;
+
+      camera.getWorldPosition(this.cameraPosition);
+      camera.getWorldDirection(this.forward);
+
+      /*
+       * Aufrechte Tafel ohne Kopfneigung.
+       * Position nur beim Wechsel der Erklärung festlegen:
+       * kein permanentes Mitschwingen bei Kopfbewegungen.
+       */
+      this.forward.y = 0;
+
+      if (this.forward.lengthSq() < 0.0001) {
+        this.forward.set(0, 0, -1);
+      } else {
+        this.forward.normalize();
+      }
+
+      this.panelPosition.copy(this.cameraPosition)
+        .addScaledVector(this.forward, 1.55);
+
+      this.panelPosition.y = Math.max(
+        0.38, this.cameraPosition.y - 0.30
+      );
+
+      this.infoPanel.position.copy(this.panelPosition);
+
+      this.infoPanel.quaternion.setFromUnitVectors(
+        vec(0, 0, 1), this.forward.clone().negate()
+      );
+
+      /*
+       * Auch bei einem transformierten scene.object3D korrekte
+       * lokale Position und Orientierung verwenden.
+       */
+      const parent = this.infoPanel.parent;
+
+      if (parent) {
+        parent.updateWorldMatrix(true, false);
+        parent.worldToLocal(this.infoPanel.position);
+        parent.getWorldQuaternion(this.parentQ);
+
+        this.infoPanel.quaternion.premultiply(
+          this.parentQ.invert()
+        );
+      }
+
+      this.infoPanel.updateWorldMatrix(true, false);
+    },
+
+    selectInformation: function (entry, time) {
+      this.lastInfoTime = time;
+
+      if (entry !== this.selectedInfo) {
+        this.clearInformation();
+
+        this.selectedInfo = entry;
+        this.drawInformation(entry);
+        this.placeInformation();
+      }
+
+      entry.marker.scale.setScalar(1.22);
+      this.infoPanel.visible = true;
+    },
+
+    clearInformation: function () {
+      if (this.selectedInfo) {
+        this.selectedInfo.marker.scale.setScalar(1);
+      }
+
+      this.selectedInfo = null;
+
+      if (this.infoPanel) this.infoPanel.visible = false;
+      if (this.highlight) this.highlight.visible = false;
+    },
+
+    updateHighlight: function () {
+      const entry = this.selectedInfo;
+
+      if (!entry || !entry.targets.length) {
+        this.highlight.visible = false;
+        return;
+      }
+
+      this.bounds.makeEmpty();
+
+      entry.targets.forEach(object => {
+        object.updateWorldMatrix(true, true);
+        this.partBounds.setFromObject(object);
+        this.bounds.union(this.partBounds);
+      });
+
+      if (this.bounds.isEmpty()) {
+        this.highlight.visible = false;
+        return;
+      }
+
+      this.bounds.expandByScalar(0.018);
+      this.highlight.visible = true;
+      this.highlight.updateMatrixWorld(true);
+    },
+
+    updateInformation: function (time) {
+      const scene = this.el.sceneEl;
+      const camera = scene.camera;
+
+      if (camera) {
+        camera.getWorldQuaternion(this.cameraQ);
+        this.el.object3D.getWorldQuaternion(this.parentQ);
+
+        this.parentQ.invert().multiply(this.cameraQ);
+
+        this.infoEntries.forEach(entry => {
+          entry.marker.quaternion.copy(this.parentQ);
+          entry.marker.visible = this.explanations && this.shown;
+        });
+      }
+
+      if (
+        !this.shown ||
+        !scene.is("vr-mode") ||
+        (F.Menu && F.Menu.opened)
+      ) {
+        this.clearInformation();
+        return;
+      }
+
+      /*
+       * Die vorhandenen Controller berechnen ihre Treffer.
+       * Keine zusätzlichen Controller und keine eigene
+       * WebXR-Eingabesteuerung.
+       *
+       * Ein Treffer kann abhängig von der Tickreihenfolge
+       * aus dem unmittelbar vorherigen Renderframe stammen.
+       */
+      const candidates = [];
+
+      scene.querySelectorAll("[fkc-controller]").forEach(hand => {
+        const tools = hand.components["fkc-controller"];
+        const grabber = hand.components["fkc-grabber"];
+
+        if (
+          !tools ||
+          !tools.source ||
+          (grabber && grabber.grabbed)
+        ) return;
+
+        const hit = tools.hit;
+
+        if (
+          hit &&
+          hit.xrayDemo === this &&
+          hit.xrayInfo
+        ) {
+          candidates.push(hit.xrayInfo);
+        }
+      });
+
+      /*
+       * Wenn beide Hände verschiedene Teile anvisieren,
+       * bleibt die bereits angezeigte Erklärung bevorzugt.
+       * Ansonsten ist die erste aktive Hand maßgeblich.
+       */
+      const entry = candidates.includes(this.selectedInfo)
+        ? this.selectedInfo
+        : candidates[0];
+
+      if (entry) {
+        this.selectInformation(entry, time);
+        this.updateHighlight();
+      } else if (time - this.lastInfoTime > 350) {
+        this.clearInformation();
+      }
     },
 
     setExplanations: function (value) {
+      /*
+       * Menüschalter steuert jetzt die Info-Markierungen.
+       * Bauteile selbst bleiben auch ohne Marker anvisierbar.
+       */
       this.explanations = Boolean(value);
-      this.labels.forEach(entry => this.drawLabel(entry));
+
+      this.infoEntries.forEach(entry => {
+        entry.marker.visible = this.explanations && this.shown;
+      });
+
+      if (F.invalidateHits) F.invalidateHits();
     },
 
     setShown: function (value) {
       this.shown = Boolean(value);
       this.model.visible = this.shown;
 
-      // Ausblenden pausiert; Einblenden startet nicht automatisch.
-      if (!this.shown) this.paused = true;
+      if (!this.shown) {
+        this.paused = true;
+        this.clearInformation();
+      }
+
+      if (F.invalidateHits) F.invalidateHits();
     },
 
     restart: function () {
@@ -331,18 +736,15 @@
       this.paused = true;
       this.lastFrame = -1;
       this.lastCalculation = -Infinity;
+
       this.clearSpots();
+      this.clearInformation();
       this.updateFrame(true);
     },
 
-    /*
-     * Ein InstancedMesh pro Teilchenfarbe und Strahlabschnitt.
-     */
     addStream: function (start, end, color, count, rate) {
       const mesh = new T.InstancedMesh(
-        this.particleGeometry,
-        this.basic(color),
-        count
+        this.particleGeometry, this.basic(color), count
       );
 
       mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -382,11 +784,17 @@
       edges.position.copy(tube.position);
       this.model.add(edges);
 
-      this.label(
+      /*
+       * Röhrenhülle bewusst nicht als flächiges Infoziel:
+       * sonst würde sie Kathode und Anode verdecken.
+       * Die Röhrenerklärung besitzt einen eigenen Marker.
+       */
+      this.addInfo(
         "Evakuierte Röntgenröhre",
-        "Evakuierte Röntgenröhre\nVakuum ermöglicht weitgehend\nungestörten Elektronenflug",
-        vec(-3.2, 2.5, -0.8),
-        "#c7e4ff", 3.3
+        "Das Vakuum ermöglicht einen weitgehend ungestörten " +
+        "Elektronenflug von der Kathode zur Anode.",
+        vec(-3.1, 1.52, -0.85),
+        []
       );
 
       const coilPoints = [];
@@ -402,7 +810,7 @@
         ));
       }
 
-      this.model.add(new T.Mesh(
+      const coil = new T.Mesh(
         this.trackGeometry(new T.TubeGeometry(
           new T.CatmullRomCurve3(coilPoints),
           180, 0.027, 6, false
@@ -411,35 +819,41 @@
           emissive: 0xff651c,
           emissiveIntensity: 1.3
         })
-      ));
+      );
 
-      this.rod(
+      this.model.add(coil);
+
+      const wire1 = this.rod(
         vec(-5, 0.18, 0), vec(-5.6, 0.5, 0),
         0.035, 0x8f9caf
       );
 
-      this.rod(
+      const wire2 = this.rod(
         vec(-4.3, 0.18, 0), vec(-5.6, -0.5, 0),
         0.035, 0x8f9caf
       );
 
-      this.label(
+      this.addInfo(
         "W-Glühkathode (−)",
-        "W-Glühkathode (−)\nHeißer Wolframdraht emittiert\nElektronen: Glühemission",
-        vec(-5, 1.25, 0),
-        "#ffbc72", 3
+        "Der heiße Wolframdraht emittiert Elektronen durch " +
+        "Glühemission. Die Kathode liegt gegenüber der Anode " +
+        "auf negativem elektrischem Potential.",
+        vec(-4.75, 0.68, 0.35),
+        [coil, wire1, wire2]
       );
 
-      this.label(
-        "Beschleunigte Elektronen",
-        "Elektronen fliegen zur Anode (+)\nDie Hochspannung beschleunigt sie\nEnergiegewinn: etwa eU",
-        vec(-2.5, -1.6, 0),
-        "#56d9ff", 3.3
-      );
-
-      this.rod(
+      const electronGuide = this.rod(
         vec(-4.1, -0.75, 0), vec(-0.35, -0.75, 0),
         0.015, this.colors.electron
+      );
+
+      this.addInfo(
+        "Beschleunigte Elektronen",
+        "Die Hochspannung beschleunigt die Elektronen zur " +
+        "Anode (+). Ihr Energiegewinn beträgt näherungsweise eU. " +
+        "Die türkisfarbenen Kugeln sind schematische Marker.",
+        vec(-2.5, 0.45, 0.38),
+        [electronGuide]
       );
 
       const count = 28;
@@ -481,21 +895,26 @@
 
       this.model.add(this.impact);
 
-      this.label(
+      this.addInfo(
         "Mo-Anode (+)",
-        "Mo-Anode (+)\nElektronen werden abgebremst\nIhre Energie wird überwiegend zu Wärme",
-        vec(0.4, 1.6, -0.7),
-        "#e0e9ff", 3.5
+        "An der Molybdän-Anode werden die Elektronen abgebremst. " +
+        "Ihre Energie wird überwiegend in Wärme umgewandelt; " +
+        "ein kleiner Anteil wird als Röntgenstrahlung abgegeben.",
+        vec(0.45, 1.05, -0.55),
+        [anode]
       );
 
-      this.label(
+      this.addInfo(
         "Brems- und charakteristische Strahlung",
-        "Bremsstrahlung: kontinuierliches Spektrum\nCharakteristische Strahlung: Schalenlücke\nwird aufgefüllt; Mo-Kα: L → K",
-        vec(1.7, 2.7, 1.4),
-        "#ffc38c", 4.2
+        "Bremsstrahlung besitzt ein kontinuierliches Spektrum. " +
+        "Charakteristische Linien entstehen nach Ionisation " +
+        "innerer Schalen. Bei Mo-Kα wird eine K-Schalenlücke " +
+        "durch einen Übergang aus der L-Schale aufgefüllt.",
+        vec(0.72, 0.55, 1.85),
+        [this.impact]
       );
 
-      this.box(
+      const windowMesh = this.box(
         [0.85, 0.85, 0.045],
         vec(0, 0, 1.27),
         this.material(0x9bdceb, {
@@ -505,11 +924,13 @@
         })
       );
 
-      this.label(
+      this.addInfo(
         "Austrittsfenster",
-        "Austrittsfenster\nLässt Röntgenstrahlung austreten\nTrennt Vakuum und Umgebung",
-        vec(-1.7, -1.15, 1.6),
-        "#b4eaf2", 3.4
+        "Das Fenster lässt Röntgenstrahlung austreten und " +
+        "trennt das Vakuum der Röhre von der Umgebung. " +
+        "Die Darstellung ist schematisch.",
+        vec(-0.7, 0.6, 1.35),
+        [windowMesh]
       );
     },
 
@@ -522,9 +943,7 @@
       this.mono = vec(0, 0, 3);
 
       this.beamDirection = vec(
-        Math.sin(this.alpha),
-        0,
-        Math.cos(this.alpha)
+        Math.sin(this.alpha), 0, Math.cos(this.alpha)
       );
 
       const graphite = this.box(
@@ -535,49 +954,45 @@
 
       graphite.rotation.y = theta;
 
-      this.label(
+      this.addInfo(
         "Graphit-Monochromator",
-        "Graphit-Monochromator, (002)\nBragg-Beugung wählt Mo-Kα aus\nKeine perfekte spektrale Reinigung",
-        vec(-1.5, 1.1, 3.4),
-        "#e3e9f4", 3.7
+        "Bragg-Beugung an Graphit-(002)-Ebenen wählt in dieser " +
+        "Darstellung Mo-Kα aus. Der Strahl wird um 2θ abgelenkt. " +
+        "Ein realer Monochromator bewirkt keine perfekte " +
+        "spektrale Reinigung.",
+        vec(-0.55, 0.95, 3),
+        [graphite]
       );
 
-      this.box(
+      const catcher = this.box(
         [0.45, 0.85, 0.22],
         vec(0, 0, 6.3),
         this.material(0x705046)
       );
 
-      this.label(
-        "Strahlfänger",
-        "Strahlfänger am Monochromator\nFängt geradlinig weiterlaufende,\nnicht ausgewählte Strahlung ab",
-        vec(-2, -1, 5.8),
-        "#ffb585", 3.5
+      this.addInfo(
+        "Strahlfänger am Monochromator",
+        "Der Strahlfänger absorbiert geradlinig weiterlaufende " +
+        "Strahlung, die vom Monochromator nicht in die gezeigte " +
+        "Messrichtung ausgewählt wurde.",
+        vec(-0.55, 0.6, 6.3),
+        [catcher]
       );
 
       this.addStream(
-        this.target, this.mono,
-        this.colors.brems, 14, 0.6
+        this.target, this.mono, this.colors.brems, 14, 0.6
       );
-
       this.addStream(
-        this.target, this.mono,
-        this.colors.other, 14, 0.6
+        this.target, this.mono, this.colors.other, 14, 0.6
       );
-
       this.addStream(
-        this.target, this.mono,
-        this.colors.ka, 14, 0.6
+        this.target, this.mono, this.colors.ka, 14, 0.6
       );
-
       this.addStream(
-        this.mono, vec(0, 0, 6.15),
-        this.colors.brems, 11, 0.6
+        this.mono, vec(0, 0, 6.15), this.colors.brems, 11, 0.6
       );
-
       this.addStream(
-        this.mono, vec(0, 0, 6.15),
-        this.colors.other, 11, 0.6
+        this.mono, vec(0, 0, 6.15), this.colors.other, 11, 0.6
       );
 
       const collimatorCenter = this.mono.clone()
@@ -600,8 +1015,7 @@
       );
 
       collimator.quaternion.setFromUnitVectors(
-        vec(0, 0, 1),
-        this.beamDirection
+        vec(0, 0, 1), this.beamDirection
       );
 
       collimator.position.copy(collimatorCenter)
@@ -609,21 +1023,19 @@
 
       this.model.add(collimator);
 
-      this.label(
+      this.addInfo(
         "Kollimator",
-        "Kollimator\nBegrenzt Querschnitt und Divergenz\nFokussiert und verstärkt nicht",
-        collimatorCenter.clone().add(vec(2.1, 1.3, 0)),
-        "#dce7ff", 3.5
+        "Der Kollimator begrenzt den Strahlquerschnitt und die " +
+        "Divergenz. Er fokussiert und verstärkt die Strahlung nicht.",
+        collimatorCenter.clone().add(vec(0.55, 0.65, 0)),
+        [collimator]
       );
 
       this.samplePosition = this.mono.clone()
         .addScaledVector(this.beamDirection, 4);
 
       this.addStream(
-        this.mono,
-        this.samplePosition,
-        this.colors.ka,
-        28, 0.6
+        this.mono, this.samplePosition, this.colors.ka, 28, 0.6
       );
     },
 
@@ -653,9 +1065,7 @@
       );
 
       const atoms = new T.InstancedMesh(
-        atomGeometry,
-        this.basic(0xd7f5ff),
-        27
+        atomGeometry, this.basic(0xd7f5ff), 27
       );
 
       let index = 0;
@@ -673,26 +1083,24 @@
       atoms.instanceMatrix.needsUpdate = true;
       this.crystal.add(atoms);
 
-      this.rod(
-        vec(0, -0.9, 0),
-        vec(0, -0.23, 0),
-        0.045, 0xaab7ca,
-        this.scattering
+      const sampleSupport = this.rod(
+        vec(0, -0.9, 0), vec(0, -0.23, 0),
+        0.045, 0xaab7ca, this.scattering
       );
 
-      this.label(
+      this.addInfo(
         "Rotierender Einkristall",
-        "Rotierender Einkristall\nRotation bringt neue hkl in Beugungsstellung\nReflexe bei erfüllter Beugungsbedingung",
-        this.samplePosition.clone().add(vec(-2, 1.5, 0)),
-        "#b8eeff", 4
+        "Die Rotation bringt unterschiedliche Netzebenen " +
+        "in Beugungsstellung. Reflexe entstehen bei erfüllter " +
+        "Beugungsbedingung. Gezeigt wird ein primitives " +
+        "kubisches Modellgitter.",
+        this.samplePosition.clone().add(vec(-0.55, 0.65, 0)),
+        [this.crystal, sampleSupport]
       );
 
       this.line(
-        vec(0, 0, 0),
-        vec(0, 0, 5.7),
-        this.colors.ka,
-        this.scattering,
-        0.55
+        vec(0, 0, 0), vec(0, 0, 5.7),
+        this.colors.ka, this.scattering, 0.55
       );
 
       const stop = new T.Mesh(
@@ -706,28 +1114,25 @@
       stop.position.set(0, 0, 5.7);
       this.scattering.add(stop);
 
-      this.rod(
-        vec(0, -1.1, 5.7),
-        vec(0, -0.2, 5.7),
-        0.045, 0x8a98ac,
-        this.scattering
+      const stopSupport = this.rod(
+        vec(0, -1.1, 5.7), vec(0, -0.2, 5.7),
+        0.045, 0x8a98ac, this.scattering
       );
 
       const stopWorld = this.samplePosition.clone()
         .addScaledVector(this.beamDirection, 5.7);
 
-      this.label(
+      this.addInfo(
         "Beamstop",
-        "Beamstop\nAbsorbiert den direkten Primärstrahl\nDieser wird hier nicht als Reflex genutzt",
-        stopWorld.clone().add(vec(-1.7, -1.4, 0)),
-        "#d8e2f1", 3.8
+        "Der Beamstop absorbiert den direkten Primärstrahl " +
+        "hinter der Probe. Dieser direkte Strahl wird hier " +
+        "nicht als Beugungsreflex verwendet.",
+        stopWorld.clone().add(vec(-0.55, 0.55, 0)),
+        [stop, stopSupport]
       );
 
       this.addStream(
-        this.samplePosition,
-        stopWorld,
-        this.colors.ka,
-        35, 0.6
+        this.samplePosition, stopWorld, this.colors.ka, 35, 0.6
       );
 
       this.detectorRadius = 4.7;
@@ -737,7 +1142,7 @@
       this.detector = new T.Group();
       this.scattering.add(this.detector);
 
-      this.box(
+      const housing = this.box(
         [2.98, 2.48, 0.16],
         vec(0, 0, 0.08),
         this.material(0x536175),
@@ -775,18 +1180,24 @@
         );
       }
 
-      this.detectorLabel = this.label(
+      this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
-        "Flächendetektor sammelt Reflexereignisse\nwährend eines Rotationsabschnitts\nKeine Messung während der Fahrt",
+        "Der Detektor sammelt Reflexereignisse während eines " +
+        "Rotationsabschnitts. Während seiner Fahrt werden hier " +
+        "keine Ereignisse gesammelt. Die Flecken zeigen " +
+        "geometrische Treffer, keine berechneten Intensitäten.",
         vec(0, 0, 0),
-        "#b9d8ff", 4
+        [housing, face]
       );
 
-      this.label(
+      this.addInfo(
         "Gebeugte Strahlung",
-        "Gebeugte Strahlung\nDiskrete, orientierungsabhängige Richtungen\nNur ein Teil trifft den Detektor",
-        this.samplePosition.clone().add(vec(3.3, 2.8, 1.7)),
-        "#92c7ff", 4.2
+        "Die gebeugte Strahlung läuft in diskreten, von der " +
+        "Kristallorientierung abhängigen Richtungen. Nur ein " +
+        "Teil trifft die aktuelle Detektorfläche. Die blauen " +
+        "Strahlen sind symbolisch sichtbar gemacht.",
+        this.samplePosition.clone().add(vec(1.4, 0.8, 1.5)),
+        []
       );
 
       const arcPoints = [];
@@ -816,11 +1227,8 @@
 
       for (let i = 0; i < 24; i++) {
         const ray = this.line(
-          vec(0, 0, 0),
-          vec(0, 0, 1),
-          this.colors.diffraction,
-          this.scattering,
-          0.7
+          vec(0, 0, 0), vec(0, 0, 1),
+          this.colors.diffraction, this.scattering, 0.7
         );
 
         ray.frustumCulled = false;
@@ -885,36 +1293,49 @@
     },
 
     buildInformation: function () {
-      this.label(
+      /*
+       * Allgemeine Informationen sind ebenfalls nur auf
+       * Anforderung sichtbar. Ihre Marker liegen oberhalb
+       * der Bodenfläche.
+       */
+      this.addInfo(
         "Röntgenröhre → Einkristallbeugung",
-        "Röntgenröhre → Einkristallbeugung\nRöntgen-1 · Start/Pause im B/Y-Menü\nApparatur zunächst nicht greifbar",
-        vec(-2.8, 3.8, 1.8),
-        "#edf4ff", 5,
-        true
+        "Start/Pause und Geschwindigkeit: B/Y-Menü, dann " +
+        "„Röntgendemo & Bedienhilfe“. Bauteile und i-Markierungen " +
+        "mit dem Laser anvisieren. Die Apparatur ist durchgehbar, " +
+        "aber nicht greifbar oder bemalbar.",
+        vec(-4, -0.25, 4.8),
+        []
       );
 
-      this.label(
+      this.addInfo(
         "Modellvereinfachungen",
-        "Nicht maßstabsgetreu: Abstände, Größen, Zeiten\nRöntgenstrahlung ist unsichtbar; Farben symbolisch\nBewegte Kugeln sind schematische Teilchenmarker",
-        vec(-3.2, -2.15, 3.1),
-        "#bdcbe0", 5,
-        true
+        "Abstände, Größen und Zeiten sind nicht maßstabsgetreu. " +
+        "Röntgenstrahlung ist unsichtbar; die Farben sind " +
+        "symbolisch. Bewegte Kugeln dienen nur als schematische " +
+        "Teilchenmarker.",
+        vec(-3.6, -0.25, 6.1),
+        []
       );
 
-      this.label(
+      this.addInfo(
         "Geometrisches Beugungsmodell",
-        "Mo-Kα: λ = 0,7107 Å; primitives kubisches Gitter\nReflexpositionen ohne Strukturfaktoren/Intensitäten\nEwald-Schalentoleranz nur zur Veranschaulichung",
-        vec(2.7, -2.15, 8.5),
-        "#bdcbe0", 5,
-        true
+        "Mo-Kα: λ = 0,7107 Å; primitives kubisches Modellgitter. " +
+        "Berechnet werden geometrische Reflexpositionen, keine " +
+        "Strukturfaktoren oder Intensitäten. Die Ewald-" +
+        "Schalentoleranz dient nur der Veranschaulichung.",
+        vec(-3.2, -0.25, 7.4),
+        []
       );
 
-      this.label(
+      this.addInfo(
         "Farblegende",
-        "Türkis: Elektronen · Orange: Bremsstrahlung\nViolett: andere charakteristische Linien\nGrün: Mo-Kα · Blau: gebeugte Strahlung",
-        vec(-3.8, 1.2, 8),
-        "#edf4ff", 4.7,
-        true
+        "Türkis: Elektronen. Orange: Bremsstrahlung. " +
+        "Violett: andere charakteristische Linien. " +
+        "Grün: Mo-Kα. Blau: gebeugte Strahlung. " +
+        "Die Farben stellen keine sichtbaren Strahlungsfarben dar.",
+        vec(-2.8, -0.25, 8.7),
+        []
       );
     },
 
@@ -930,8 +1351,6 @@
     calculateReflections: function (omega, moving) {
       const waveNumber = 1 / this.data.wavelength;
       const tolerance = 0.010;
-      const normal = this.normal;
-      const horizontal = this.horizontal;
 
       this.rotationQ.setFromAxisAngle(this.axisY, omega);
       this.reflections.length = 0;
@@ -949,7 +1368,6 @@
 
         point.direction.copy(this.outTemp).normalize();
 
-        // Beschränkung auf die gezeigte Vorwärtsgeometrie.
         if (point.direction.z < 0.15) continue;
 
         point.hit = false;
@@ -957,14 +1375,14 @@
         point.x = 0;
         point.y = 0;
 
-        const denominator = point.direction.dot(normal);
+        const denominator = point.direction.dot(this.normal);
 
         if (denominator > 0) {
           const distance = this.detectorRadius / denominator;
 
           this.endTemp.copy(point.direction).multiplyScalar(distance);
 
-          point.x = this.endTemp.dot(horizontal);
+          point.x = this.endTemp.dot(this.horizontal);
           point.y = this.endTemp.y;
 
           point.hit =
@@ -983,8 +1401,7 @@
           !this.frameHits.has(point.key)
         ) {
           const spot = new T.Mesh(
-            this.spotGeometry,
-            this.spotMaterial
+            this.spotGeometry, this.spotMaterial
           );
 
           spot.position.set(point.x, point.y, -0.028);
@@ -1007,9 +1424,11 @@
       this.reflectionParticles.count = count;
 
       this.reflectionDisplays.forEach((ray, index) => {
-        const reflection = this.reflections[index];
-        ray.visible = Boolean(reflection);
+        const reflection = index < count
+          ? this.reflections[index]
+          : null;
 
+        ray.visible = Boolean(reflection);
         if (!reflection) return;
 
         this.endTemp.copy(reflection.direction)
@@ -1019,15 +1438,12 @@
 
         positions.setXYZ(0, 0, 0, 0);
         positions.setXYZ(
-          1,
-          this.endTemp.x,
-          this.endTemp.y,
-          this.endTemp.z
+          1, this.endTemp.x, this.endTemp.y, this.endTemp.z
         );
 
         positions.needsUpdate = true;
 
-        // Nur Sichtbarkeitsgewichtung, keine Intensität.
+        // Sichtbarkeitsgewichtung, keine Reflexintensität.
         ray.material.opacity =
           0.2 + 0.6 * reflection.visibility;
       });
@@ -1077,17 +1493,17 @@
 
       this.detector.rotation.y = beta;
 
-      this.labelTemp.copy(this.detector.position)
+      /*
+       * Info-Markierung folgt dem beweglichen Detektor.
+       */
+      this.localPosition.copy(this.detector.position)
         .applyAxisAngle(this.axisY, this.alpha)
         .add(this.samplePosition);
 
-      this.labelTemp.y += 2;
+      this.localPosition.y += 1.55;
+      this.detectorInfo.marker.position.copy(this.localPosition);
 
-      this.detectorLabel.position.copy(this.labelTemp);
-
-      if (force) {
-        this.calculateReflections(omega, moving);
-      }
+      if (force) this.calculateReflections(omega, moving);
 
       for (let i = 0; i < this.electrons.length; i++) {
         const electron = this.electrons[i];
@@ -1133,50 +1549,43 @@
           .multiplyScalar(reflection.distance * flight);
 
         this.dummy.updateMatrix();
-
-        this.reflectionParticles.setMatrixAt(
-          i, this.dummy.matrix
-        );
+        this.reflectionParticles.setMatrixAt(i, this.dummy.matrix);
       }
 
       this.reflectionParticles.instanceMatrix.needsUpdate = true;
     },
 
     tick: function (time, delta) {
-      if (this.removed || !this.model || !this.shown) return;
+      if (this.removed || !this.model) return;
 
-      const camera = this.el.sceneEl.camera;
-
-      if (camera) {
-        camera.getWorldQuaternion(this.cameraQ);
-        this.el.object3D.getWorldQuaternion(this.parentQ);
-
-        this.parentQ.invert().multiply(this.cameraQ);
-
-        this.labels.forEach(entry => {
-          entry.mesh.quaternion.copy(this.parentQ);
-        });
+      if (!this.shown) {
+        this.clearInformation();
+        return;
       }
 
-      if (this.paused) return;
+      if (!this.paused) {
+        this.time += Math.min(
+          Math.max((delta || 0) / 1000, 0), 0.05
+        ) * this.data.speed;
 
-      this.time += Math.min(
-        Math.max((delta || 0) / 1000, 0),
-        0.05
-      ) * this.data.speed;
+        const calculate = time - this.lastCalculation >= 40;
 
-      // Reale Renderzeit für ungefähr 25 Auswertungen/s.
-      const calculate = time - this.lastCalculation >= 40;
+        if (calculate) this.lastCalculation = time;
+        this.updateFrame(calculate);
+      }
 
-      if (calculate) this.lastCalculation = time;
-
-      this.updateFrame(calculate);
+      // Informationen funktionieren auch bei pausierter Animation.
+      this.updateInformation(time);
     },
 
     remove: function () {
       this.removed = true;
+      this.clearInformation();
 
       if (this.spots) this.clearSpots();
+
+      if (this.infoPanel) this.infoPanel.removeFromParent();
+      if (this.highlight) this.highlight.removeFromParent();
 
       if (this.geometries) {
         this.geometries.forEach(geometry => geometry.dispose());
@@ -1190,6 +1599,9 @@
         this.textures.forEach(texture => texture.dispose());
       }
 
+      if (this.infoLookup) this.infoLookup.clear();
+      if (this.infoMeshes) this.infoMeshes.length = 0;
+
       this.el.removeObject3D("xray-demo");
 
       if (F.invalidateHits) F.invalidateHits();
@@ -1197,92 +1609,9 @@
   });
 
   /*
-   * ============================================================
-   * PLATTFORM UND RAUMINTEGRATION
-   * ============================================================
-   *
-   * Dieser Wrapper ruft den bisherigen Builder unverändert auf.
-   * Danach wird nur Vorlesung 5 ergänzt.
+   * Flache Bodenmarkierung statt erhöhtem Podest.
+   * Keine zusätzliche Navigationssperre.
    */
-
-  const previousBuild = F.RoomBuilder.build;
-
-  F.RoomBuilder.build = function (parent, config, rooms) {
-    const result = previousBuild.call(
-      this, parent, config, rooms
-    );
-
-    if (config.id !== "vorlesung-5") return result;
-
-    const platform = F.create("a-entity", {
-      id: "fkc-xray-platform"
-    }, parent);
-
-    /*
-     * Plattform als THREE-Geometrie:
-     * keine automatische Registrierung als Malfläche.
-     */
-    const baseGeometry = new T.BoxGeometry(8, 0.24, 8);
-    const baseMaterial = new T.MeshStandardMaterial({
-      color: "#75531e",
-      roughness: 0.65,
-      metalness: 0.15
-    });
-
-    const base = new T.Mesh(baseGeometry, baseMaterial);
-    base.position.y = 0.12;
-
-    const topGeometry = new T.BoxGeometry(7.94, 0.035, 7.94);
-    const topMaterial = new T.MeshStandardMaterial({
-      color: "#283b40",
-      roughness: 0.7
-    });
-
-    const top = new T.Mesh(topGeometry, topMaterial);
-    top.position.y = 0.2575;
-
-    const platformGroup = new T.Group();
-    platformGroup.add(base, top);
-    platform.setObject3D("mesh", platformGroup);
-
-    const demo = F.create("a-entity", {
-      id: "fkc-xray-experiment",
-
-      /*
-       * Verschiebung zentriert die ursprünglich asymmetrische
-       * Apparatur ungefähr auf der Plattform.
-       */
-      position: {x: -0.33, y: 1.4, z: -3.025},
-      scale: {x: 0.55, y: 0.55, z: 0.55}
-    }, parent);
-
-    demo.setAttribute(
-      "fkc-xray-demo",
-      "wavelength: 0.7107; lattice: 5; speed: 1"
-    );
-
-    /*
-     * A-Frame-Komponente übernimmt die Ressourcenfreigabe
-     * der Plattform beim Entfernen des Raumes.
-     */
-    platform.setAttribute("fkc-xray-platform-cleanup", "");
-
-    // Gleicher Abstandspuffer wie bei den bestehenden Podesten.
-    const previousWalkable = result.isWalkable;
-
-    result.isWalkable = function (x, z) {
-      if (Math.abs(x) < 4.28 && Math.abs(z) < 4.28) {
-        return false;
-      }
-
-      return previousWalkable(x, z);
-    };
-
-    if (F.invalidateHits) F.invalidateHits();
-
-    return result;
-  };
-
   AFRAME.registerComponent("fkc-xray-platform-cleanup", {
     remove: function () {
       const object = this.el.getObject3D("mesh");
@@ -1310,27 +1639,92 @@
     }
   });
 
+  const previousBuild = F.RoomBuilder.build;
+
+  F.RoomBuilder.build = function (parent, config, rooms) {
+    const result = previousBuild.call(
+      this, parent, config, rooms
+    );
+
+    if (config.id !== "vorlesung-5") return result;
+
+    const platform = F.create("a-entity", {
+      id: "fkc-xray-platform"
+    }, parent);
+
+    const group = new T.Group();
+
+    const floor = new T.Mesh(
+      new T.PlaneGeometry(8, 8),
+      new T.MeshStandardMaterial({
+        color: "#283b40",
+        roughness: 0.8,
+        metalness: 0,
+        side: T.DoubleSide
+      })
+    );
+
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.012;
+    group.add(floor);
+
+    const borderMaterial = new T.MeshStandardMaterial({
+      color: "#c5a052",
+      roughness: 0.55,
+      metalness: 0.2
+    });
+
+    const horizontalGeometry = new T.BoxGeometry(
+      8, 0.003, 0.035
+    );
+
+    const verticalGeometry = new T.BoxGeometry(
+      0.035, 0.003, 8
+    );
+
+    [-1, 1].forEach(sign => {
+      const horizontal = new T.Mesh(
+        horizontalGeometry, borderMaterial
+      );
+
+      horizontal.position.set(0, 0.015, sign * 3.98);
+      group.add(horizontal);
+
+      const vertical = new T.Mesh(
+        verticalGeometry, borderMaterial
+      );
+
+      vertical.position.set(sign * 3.98, 0.015, 0);
+      group.add(vertical);
+    });
+
+    platform.setObject3D("mesh", group);
+    platform.setAttribute("fkc-xray-platform-cleanup", "");
+
+    const demo = F.create("a-entity", {
+      id: "fkc-xray-experiment",
+      position: {x: -0.33, y: 1.4, z: -3.025},
+      scale: {x: 0.55, y: 0.55, z: 0.55}
+    }, parent);
+
+    demo.setAttribute(
+      "fkc-xray-demo",
+      "wavelength: 0.7107; lattice: 5; speed: 1"
+    );
+
+    /*
+     * result.isWalkable bleibt unverändert:
+     * Raumgrenzen und vorhandene Stationspodeste gelten weiter,
+     * aber die zentrale Demonstration ist kein Hindernis.
+     */
+    if (F.invalidateHits) F.invalidateHits();
+    return result;
+  };
+
   /*
-   * ============================================================
-   * MENÜERGÄNZUNG
-   * ============================================================
-   *
-   * Das bestehende Hauptmenü hat bereits zehn Buttons.
-   * In Vorlesung 5 ersetzt deshalb der vierte Button
-   * "Bedienhilfe anzeigen" durch "Röntgendemo & Bedienhilfe".
-   *
-   * Die Bedienhilfe bleibt auf der neuen Unterseite erreichbar.
-   * Alle anderen Menüseiten bleiben unverändert.
+   * Menüergänzung:
+   * vorhandenes Hauptmenü und Bedienhilfe weiterverwenden.
    */
-
-  function getDemo() {
-    const el = document.getElementById("fkc-xray-experiment");
-
-    return el && el.isConnected
-      ? el.components["fkc-xray-demo"]
-      : null;
-  }
-
   function paintButton(menu, entry, index, selected) {
     const ctx = menu.ctx;
     const pressed = index === menu.pressedIndex;
@@ -1340,16 +1734,11 @@
     ctx.fillRect(entry.x, entry.y + 5, entry.w, entry.h);
 
     ctx.fillStyle = pressed ? "#98b0c5" : "#cddff3";
-    ctx.fillRect(
-      entry.x, entry.y + offset, entry.w, entry.h
-    );
+    ctx.fillRect(entry.x, entry.y + offset, entry.w, entry.h);
 
     ctx.strokeStyle = selected ? "#173527" : "#a9bcae";
     ctx.lineWidth = selected ? 6 : 2;
-
-    ctx.strokeRect(
-      entry.x, entry.y + offset, entry.w, entry.h
-    );
+    ctx.strokeRect(entry.x, entry.y + offset, entry.w, entry.h);
 
     ctx.fillStyle = "#173527";
     ctx.font = selected ? "bold 30px Arial" : "30px Arial";
@@ -1364,7 +1753,7 @@
 
   function notify(menu, text) {
     menu.blockDrawing();
-    F.setStatus(text);
+    if (F.setStatus) F.setStatus(text);
     menu.notify(text);
   }
 
@@ -1396,7 +1785,6 @@
 
     const ctx = this.ctx;
     const demo = getDemo();
-
     this.buttons = [];
 
     ctx.fillStyle = "#f4f7f5";
@@ -1409,7 +1797,7 @@
     ctx.font = "27px Arial";
     ctx.fillText(
       demo
-        ? "Vorlesung 5 · zentrale Demonstration"
+        ? "Vorlesung 5 · durchgehbare Demonstration"
         : "Demonstration in diesem Raum nicht verfügbar",
       55, 125, 914
     );
@@ -1430,17 +1818,11 @@
 
     const button = (label, action, selected) => {
       const entry = {
-        x: 55,
-        y,
-        w: 914,
-        h: 72,
-        label,
-        action
+        x: 55, y, w: 914, h: 72, label, action
       };
 
       const index = this.buttons.length;
       this.buttons.push(entry);
-
       paintButton(this, entry, index, selected);
       y += 86;
     };
@@ -1448,24 +1830,23 @@
     if (demo) {
       const speedLabel = demo.data.speed === 0.5
         ? "0,5×"
-        : demo.data.speed === 2
-          ? "2×"
-          : "1×";
+        : demo.data.speed === 2 ? "2×" : "1×";
 
       text(
         (demo.paused ? "Status: pausiert" : "Status: läuft") +
         " · Geschwindigkeit: " + speedLabel +
-        "\nBeim Schließen des Menüs läuft die Animation weiter."
+        "\nBauteil oder i-Markierung mit dem Laser anvisieren."
       );
 
       button(
-        demo.paused ? "Animation starten / fortsetzen" : "Animation pausieren",
+        demo.paused
+          ? "Animation starten / fortsetzen"
+          : "Animation pausieren",
         () => {
           const current = getDemo();
           if (!current) return;
 
           if (!current.shown) current.setShown(true);
-
           current.paused = !current.paused;
 
           notify(
@@ -1500,15 +1881,16 @@
 
           notify(
             this,
-            "Geschwindigkeit: " + String(next).replace(".", ",") + "×"
+            "Geschwindigkeit: " +
+            String(next).replace(".", ",") + "×"
           );
         }
       );
 
       button(
         demo.explanations
-          ? "Ausführliche Erklärungen ausschalten"
-          : "Ausführliche Erklärungen einschalten",
+          ? "Info-Markierungen ausblenden"
+          : "Info-Markierungen anzeigen",
         () => {
           const current = getDemo();
           if (!current) return;
@@ -1518,15 +1900,17 @@
           notify(
             this,
             current.explanations
-              ? "Ausführliche Erklärungen sichtbar."
-              : "Kurze Bauteilnamen sichtbar."
+              ? "Info-Markierungen sichtbar."
+              : "Marker aus; Bauteile bleiben anvisierbar."
           );
         },
         demo.explanations
       );
 
       button(
-        demo.shown ? "Demonstration ausblenden" : "Demonstration einblenden",
+        demo.shown
+          ? "Demonstration ausblenden"
+          : "Demonstration einblenden",
         () => {
           const current = getDemo();
           if (!current) return;
@@ -1562,8 +1946,8 @@
 
     if (demo) {
       text(
-        "Reflexpositionen schematisch: keine Intensitäten.\n" +
-        "Apparatur nicht greifbar oder bemalbar."
+        "Apparatur durchgehbar; nicht greifbar oder bemalbar.\n" +
+        "Reflexpositionen schematisch, keine Intensitäten."
       );
     }
 
@@ -1572,7 +1956,6 @@
 
     ctx.fillStyle = "#244d35";
     ctx.font = "bold 25px Arial";
-
     ctx.fillText(
       this.message || "Buttons mit Laser + Trigger auswählen",
       55, 1113, 910
@@ -1580,9 +1963,8 @@
 
     ctx.fillStyle = "#607668";
     ctx.font = "23px Arial";
-
     ctx.fillText(
-      "B/Y schließt · Demonstration · Version Röntgen-1",
+      "B/Y schließt · Laser-Informationen · Version Röntgen-2",
       55, 1160, 914
     );
 
