@@ -3,17 +3,18 @@
 (function (F) {
   /*
    * ============================================================
-   * WILLKOMMEN-2
+   * WILLKOMMEN-3
    *
    * NaCl-Elementarzelle -> periodisches Gitter ->
    * Einkristallit -> körnige Salzprobe im Becherglas.
    *
-   * Änderungen gegenüber Willkommen-1:
-   * - Sattere Ionenfarben.
-   * - Dunkler, zur Betrachtungsrichtung ausgerichteter Hintergrund.
-   * - Zellrahmen für 3x3x3, 6x6x6 und 9x9x9 Zellen.
-   * - Längerer beschleunigter atomarer Zoom.
-   * - Deutlicheres Becherglas mit geformtem Ausguss und mL-Skala.
+   * Änderungen gegenüber Willkommen-2:
+   * - Dunkler Hintergrund und dunkle Bodenscheibe entfernt.
+   * - Schwarze Na+/Cl--Schrift ohne Schildhintergrund.
+   * - Modellfarben gehen beim Herauszoomen in Weiß über.
+   * - Zusätzliche, zunehmend feinere Kugel-Detailstufen.
+   * - Geschlossene Kristalloberfläche entsteht allmählich.
+   * - Separate frühe Würfelhülle entfernt.
    *
    * Fachliche Grundlage:
    * NaCl: Fm-3m, Nr. 225.
@@ -27,26 +28,26 @@
    * Gerade Summe i+j+k: Cl.
    * Ungerade Summe i+j+k: Na.
    *
-   * Ausgangszelle: i,j,k = 0 ... 2.
    * Gemeinsame Randionen werden nicht doppelt erzeugt.
    *
-   * Spätere Darstellungen sind didaktische Detailstufen.
-   * Nicht jede atomare Position eines makroskopischen Kristalls
-   * wird berechnet oder gezeichnet.
+   * Der spätere Übergang ist eine didaktische Detailstufe:
+   * Oberflächennahe Kugeln stellen einen immer feineren,
+   * nicht mehr vollständig atomar aufgelösten Bereich dar.
+   * Nicht alle Positionen eines großen Kristalls werden erzeugt.
    *
-   * Keine Wachstums- oder maßstabsgetreue optische Simulation.
+   * Weiß ist eine Darstellungsfarbe, keine Farbänderung
+   * der tatsächlichen Ionen. Ein idealer NaCl-Einkristall
+   * kann transparent sein.
+   *
+   * Keine Kristallwachstumssimulation.
+   * Keine maßstabsgetreue Reise über atomare Größenordnungen.
    * Keine Änderung an Navigation oder Raumbeleuchtung.
    * ============================================================
    */
 
-  if (
-    !F ||
-    !F.RoomBuilder ||
-    !F.Menu ||
-    !window.AFRAME
-  ) {
+  if (!F || !F.RoomBuilder || !F.Menu || !window.AFRAME) {
     console.error(
-      "Willkommen-2: A-Frame, room-builder.js und vr-tools.js " +
+      "Willkommen-3: A-Frame, room-builder.js und vr-tools.js " +
       "müssen vorher geladen sein."
     );
     return;
@@ -57,6 +58,7 @@
 
   const END = 42;
   const BOUND = 1.34;
+  const CRYSTAL_SPAN = 2.2;
 
   const COLORS = {
     sodium: "#a345ff",
@@ -64,7 +66,7 @@
     gold: "#f1c45b",
     paper: "#fffdf5",
     ink: "#202a2e",
-    backdrop: "#172936"
+    white: "#ffffff"
   };
 
   const PHASE_TIMES = [0, 6, 11, 16, 20, 26, 34];
@@ -72,31 +74,45 @@
   const PHASES = [
     {
       title: "NaCl · eine konventionelle Elementarzelle",
-      text: "Fm3̅m · Nr. 225 · Z = 4 · beide Ionen sechsfacht koordiniert"
+      text:
+        "Fm3̅m · Nr. 225 · Z = 4 · " +
+        "beide Ionen sechsfacht koordiniert"
     },
     {
       title: "Periodische Ordnung · 3 × 3 × 3 Zellen",
-      text: "Ein größerer Ausschnitt wird sichtbar — kein Kristallwachstum."
+      text:
+        "Ein größerer Ausschnitt wird sichtbar — " +
+        "kein Kristallwachstum."
     },
     {
       title: "Periodische Ordnung · 6 × 6 × 6 Zellen",
-      text: "Der goldene Rahmen kennzeichnet weiterhin die Ausgangszelle."
+      text:
+        "Der goldene Rahmen kennzeichnet weiterhin " +
+        "die Ausgangszelle."
     },
     {
       title: "Periodische Ordnung · 9 × 9 × 9 Zellen",
-      text: "Die einzelnen Zellen werden beim weiteren Herauszoomen kleiner."
+      text:
+        "Beim Herauszoomen werden die einzelnen " +
+        "Zellen und Ionen kleiner."
     },
     {
       title: "Vom Ionengitter zum Einkristallit",
-      text: "Der Zoom beschleunigt sich; einzelne Ionen werden nicht mehr aufgelöst."
+      text:
+        "Modellfarben verblassen; immer feinere Kugeln " +
+        "gehen in eine geschlossene Kristalloberfläche über."
     },
     {
       title: "Viele unterschiedlich orientierte Kristallite",
-      text: "Der goldmarkierte Kristallit enthält die ursprüngliche Elementarzelle."
+      text:
+        "Der goldmarkierte Kristallit enthält " +
+        "die ursprüngliche Elementarzelle."
     },
     {
       title: "NaCl · eine körnige Feststoffprobe",
-      text: "Weiße Salzprobe im schematischen 500-mL-Becherglas."
+      text:
+        "Weiße Salzprobe im schematischen " +
+        "500-mL-Becherglas."
     }
   ];
 
@@ -151,10 +167,8 @@
   }
 
   /*
-   * Für eine gerade Anzahl von Zellen kann die Ausgangszelle
-   * nicht exakt in der Mitte des gesamten Blocks liegen.
-   * Sie bleibt an derselben Gitterposition; der zusätzliche
-   * Platz liegt bei 6x6x6 überwiegend auf der negativen Seite.
+   * Bei gerader Zellzahl bleibt die Ausgangszelle an
+   * derselben Position und liegt nicht exakt im Blockzentrum.
    */
   function cellBounds(n) {
     const first = -Math.floor(n / 2);
@@ -181,9 +195,8 @@
     }
 
     /*
-     * Eine zusätzliche Nachbarschicht:
-     * vollständig sechs Gegenionen für alle Positionen
-     * innerhalb des gezeigten Zellblocks.
+     * Zusätzliche direkte Nachbarn gewährleisten
+     * vollständige Koordination auch an den Blockrändern.
      */
     const interior = Array.from(map.values());
 
@@ -195,6 +208,37 @@
     });
 
     return map;
+  }
+
+  /*
+   * Vereinfachte Kugeldarstellung der äußeren Kristallregion.
+   *
+   * Nur die äußere Positionsschicht wird erzeugt.
+   * Kanten und Ecken werden dabei nicht doppelt angelegt.
+   * Der Würfelcharakter ergibt sich aus der Anordnung
+   * der Kugeln, nicht aus einer zusätzlichen Rahmenhülle.
+   */
+  function shellPositions(count) {
+    const points = [];
+    const last = count - 1;
+
+    for (let i = 0; i < count; i++) {
+      for (let j = 0; j < count; j++) {
+        for (let k = 0; k < count; k++) {
+          if (
+            i !== 0 && i !== last &&
+            j !== 0 && j !== last &&
+            k !== 0 && k !== last
+          ) {
+            continue;
+          }
+
+          points.push([i, j, k]);
+        }
+      }
+    }
+
+    return points;
   }
 
   AFRAME.registerComponent("fkc-welcome-demo", {
@@ -219,6 +263,8 @@
       this.tempPosition = new V();
       this.dummy = new T.Object3D();
 
+      this.whiteColor = new T.Color(COLORS.white);
+
       this.lastPhase = -1;
       this.lastState = "";
       this.lastInstanceUpdate = -1000;
@@ -237,11 +283,11 @@
       this.specimen = new T.Group();
       this.visual.add(this.specimen);
 
-      this.makeBackdrop();
       this.makeTypography();
       this.makeLattice();
       this.makeCoordination();
       this.makeSpecimen();
+      this.makeFineIonDetail();
 
       this.updateAnimation(true);
       this.updateBillboards();
@@ -258,7 +304,6 @@
         material,
         opacity === undefined ? 1 : opacity
       );
-
       return material;
     },
 
@@ -332,54 +377,6 @@
       material.visible = material.opacity > 0.001;
     },
 
-    makeBackdrop: function () {
-      /*
-       * Opaque, nur raumgebundene Darstellungshilfe.
-       * Sie steht stets hinter dem Modell, aus Sicht des Betrachters.
-       * Kein Raycastziel, kein Navigationshindernis.
-       */
-      const material = this.ownMaterial(
-        new T.MeshBasicMaterial({
-          color: COLORS.backdrop,
-          side: T.DoubleSide
-        })
-      );
-
-      this.backdrop = new T.Group();
-      this.root.add(this.backdrop);
-
-      this.mesh(
-        this.ownGeometry(new T.PlaneGeometry(3.65, 3.35)),
-        material,
-        this.backdrop
-      );
-
-      const borderGeometry = this.ownGeometry(
-        new T.EdgesGeometry(
-          this.ownGeometry(new T.PlaneGeometry(3.65, 3.35))
-        )
-      );
-
-      const border = new T.LineSegments(
-        borderGeometry,
-        this.lineMaterial(COLORS.gold, 0.8)
-      );
-
-      border.position.z = 0.008;
-      this.backdrop.add(border);
-
-      const floorMaterial = this.basic("#223643", 0.96);
-
-      this.floorDisc = this.mesh(
-        this.ownGeometry(new T.CircleGeometry(1.9, 64)),
-        floorMaterial,
-        this.root
-      );
-
-      this.floorDisc.rotation.x = -Math.PI / 2;
-      this.floorDisc.position.y = 0.017;
-    },
-
     makeTypography: function () {
       const quoteTexture = this.makeTexture(
         2048, 440, (ctx, w, h) => {
@@ -450,29 +447,29 @@
       this.labelMaterials = {};
 
       [
-        ["Na", "Na⁺", COLORS.sodium],
-        ["Cl", "Cl⁻", COLORS.chloride]
-      ].forEach(([id, text, color]) => {
+        ["Na", "Na⁺"],
+        ["Cl", "Cl⁻"]
+      ].forEach(([id, text]) => {
         const texture = this.makeTexture(
-          192, 96, (ctx, w, h) => {
-            ctx.fillStyle = "rgba(255,253,247,0.97)";
-            ctx.fillRect(6, 6, w - 12, h - 12);
+          256, 128, (ctx, w, h) => {
+            /*
+             * Vollständig transparenter Hintergrund:
+             * kein weißes Rechteck und kein farbiger Rahmen.
+             */
+            ctx.clearRect(0, 0, w, h);
 
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 8;
-            ctx.strokeRect(6, 6, w - 12, h - 12);
-
-            ctx.fillStyle = "#171923";
+            ctx.fillStyle = "#000000";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.font = "bold 64px Arial";
-            ctx.fillText(text, w / 2, h / 2 + 2);
+            ctx.font = "bold 88px Arial";
+            ctx.fillText(text, w / 2, h / 2 + 3);
           }
         );
 
         this.labelMaterials[id] = this.ownMaterial(
           new T.SpriteMaterial({
             map: texture.texture,
+            color: "#ffffff",
             transparent: true,
             depthTest: true,
             depthWrite: false
@@ -540,13 +537,6 @@
       const seen = new Set(initial.keys());
       const levels = [Array.from(initial.values())];
 
-      /*
-       * Ebene 0: Ionenpositionen der Ausgangszelle.
-       * Ebene 1: ihre ergänzenden direkten Nachbarn.
-       * Ebene 2: zusätzlich benötigte Positionen für 3x3x3.
-       * Ebene 3: zusätzlich benötigte Positionen für 6x6x6.
-       * Ebene 4: zusätzlich benötigte Positionen für 9x9x9.
-       */
       [1, 3, 6, 9].forEach(n => {
         const next = [];
 
@@ -580,17 +570,12 @@
 
           if (!points.length) return;
 
-          const material = this.lit(
-            type === "Na" ? COLORS.sodium : COLORS.chloride
-          );
+          const color = type === "Na"
+            ? COLORS.sodium
+            : COLORS.chloride;
 
-          /*
-           * Kleiner Eigenleuchtanteil für stabile Modellfarben.
-           * Es werden keine zusätzlichen Raumlichter erzeugt.
-           */
-          material.emissive.set(
-            type === "Na" ? COLORS.sodium : COLORS.chloride
-          );
+          const material = this.lit(color);
+          material.emissive.set(color);
           material.emissiveIntensity = 0.15;
 
           const mesh = new T.InstancedMesh(
@@ -604,7 +589,12 @@
           const radius = type === "Na" ? 0.115 : 0.165;
 
           this.ionLayers.push({
-            mesh, material, points, radius, level
+            mesh,
+            material,
+            points,
+            radius,
+            level,
+            originalColor: new T.Color(color)
           });
 
           if (level === 0) {
@@ -613,7 +603,13 @@
                 this.labelMaterials[type]
               );
 
-              sprite.scale.set(0.225, 0.1125, 1);
+              /*
+               * Unterschiedliche Schriftgrößen passend
+               * zu den unterschiedlich großen Kugeln.
+               */
+              const width = type === "Na" ? 0.19 : 0.25;
+              sprite.scale.set(width, width / 2, 1);
+
               this.atomic.add(sprite);
 
               this.labels.push({
@@ -627,8 +623,7 @@
       });
 
       /*
-       * Gemeinsame Gitterlinien:
-       * Jede Zellkante wird geometrisch nur einmal erzeugt.
+       * Gemeinsame Gitterlinien statt doppelter Zellkanten.
        */
       this.frames = [];
 
@@ -782,8 +777,10 @@
       this.selectedPosition = new V(0, -0.72, 0.18);
       this.selectedSize = 0.16;
 
-      this.selectedMaterial = this.lit("#eff6fa");
-      this.selectedMaterial.roughness = 0.26;
+      this.selectedMaterial = this.lit(COLORS.white);
+      this.selectedMaterial.roughness = 0.4;
+      this.selectedMaterial.emissive.set("#ffffff");
+      this.selectedMaterial.emissiveIntensity = 0.08;
 
       this.selectedCrystal = this.mesh(
         cube, this.selectedMaterial, this.specimen
@@ -802,31 +799,11 @@
       this.selectedCrystal.add(this.selectedGold);
 
       /*
-       * Frühe Hüllfläche als Detailstufen-Übergang.
-       * Sie deutet den größeren geordneten Bereich an, während
-       * das explizite Ionengitter weiter schrumpft.
+       * Keine separate frühe Würfelhülle mehr.
+       * Die Oberfläche dieses Kristalliten übernimmt
+       * später unmittelbar die weiße Kugeldarstellung.
        */
-      this.envelopeMaterial = this.basic("#adc8df", 0.075);
 
-      this.envelope = this.mesh(
-        cube, this.envelopeMaterial, this.visual
-      );
-
-      this.envelope.rotation.copy(this.atomic.rotation);
-      this.envelope.scale.setScalar(2.2);
-
-      this.envelopeEdgeMaterial = this.lineMaterial("#8faac0", 0.3);
-
-      this.envelopeEdges = new T.LineSegments(
-        edges, this.envelopeEdgeMaterial
-      );
-
-      this.envelope.add(this.envelopeEdges);
-
-      /*
-       * Vereinfachte Kristallkörner der endgültigen Probe.
-       * Keine Packungs- oder Partikeldynamiksimulation.
-       */
       let seed = 745219;
 
       const random = () => {
@@ -855,7 +832,9 @@
 
             if (
               position.distanceTo(this.selectedPosition) < 0.20
-            ) continue;
+            ) {
+              continue;
+            }
 
             const rotation = new T.Quaternion().setFromEuler(
               new T.Euler(
@@ -897,6 +876,84 @@
       this.makeBeaker();
     },
 
+    makeFineIonDetail: function () {
+      /*
+       * Drei feinere, oberflächennahe Kugeldarstellungen.
+       *
+       * Alle haben dieselbe äußere Größe, Orientierung
+       * und Position wie der spätere Kristallit.
+       * Die Kugelradien nehmen von Detailstufe zu
+       * Detailstufe ab.
+       *
+       * Die Matrizen werden nur einmal erzeugt.
+       * Während der Animation ändern sich anschließend
+       * lediglich Sichtbarkeit und Materialdeckkraft.
+       */
+      this.fineDetail = new T.Group();
+      this.fineDetail.rotation.copy(this.atomic.rotation);
+      this.visual.add(this.fineDetail);
+
+      this.fineLayers = [];
+
+      const sphere = this.ownGeometry(
+        new T.SphereGeometry(1, 8, 6)
+      );
+
+      [19, 31, 49].forEach(count => {
+        const positions = shellPositions(count);
+
+        /*
+         * Kugeln passen mit ihrer ganzen Oberfläche
+         * in den späteren Kristallwürfel.
+         *
+         * r = 0.29 * Abstand der Kugelzentren.
+         */
+        const spacing = 1 / ((count - 1) + 0.58);
+        const radius = spacing * 0.29;
+        const half = (count - 1) * spacing / 2;
+
+        const material = this.lit(COLORS.white);
+        material.roughness = 0.4;
+        material.emissive.set("#ffffff");
+        material.emissiveIntensity = 0.08;
+
+        const mesh = new T.InstancedMesh(
+          sphere,
+          material,
+          positions.length
+        );
+
+        mesh.frustumCulled = false;
+
+        positions.forEach(([i, j, k], index) => {
+          this.dummy.position.set(
+            i * spacing - half,
+            j * spacing - half,
+            k * spacing - half
+          );
+
+          this.dummy.quaternion.identity();
+          this.dummy.scale.setScalar(radius);
+          this.dummy.updateMatrix();
+
+          mesh.setMatrixAt(index, this.dummy.matrix);
+        });
+
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.visible = false;
+
+        this.fineDetail.add(mesh);
+
+        this.fineLayers.push({
+          count,
+          mesh,
+          material
+        });
+      });
+
+      this.fineDetail.scale.setScalar(CRYSTAL_SPAN);
+    },
+
     makeBeaker: function () {
       this.beaker = new T.Group();
       this.specimen.add(this.beaker);
@@ -914,11 +971,6 @@
         0.29
       );
 
-      /*
-       * Geformter Ausguss:
-       * Die obere Wand wird an einer Seite nach außen gezogen.
-       * Der Rand folgt derselben Kontur.
-       */
       const spoutAngle = Math.PI * 1.5;
 
       function spoutWeight(angle) {
@@ -948,7 +1000,6 @@
         const top = ramp(y, 0.65, 1.1);
         const radial = Math.sqrt(x * x + z * z);
         const extra = 0.23 * weight * top;
-
         const factor = (radial + extra) / radial;
 
         positions.setXYZ(
@@ -1036,9 +1087,7 @@
       baseRing.renderOrder = 4;
 
       /*
-       * Laborartige Skala auf der vorderen Glasfläche.
-       * 500-mL-Beschriftung ist schematisch, keine berechnete
-       * Füllmenge aus der atomaren Szene.
+       * Schematische Skala, kein berechnetes Probenvolumen.
        */
       const scaleTexture = this.makeTexture(
         384, 1024, (ctx, w, h) => {
@@ -1113,11 +1162,6 @@
     atomicScale: function () {
       const t = this.time;
 
-      /*
-       * Die Zellblöcke sind zunächst gut erkennbar.
-       * Nach 9x9x9 beschleunigt der Zoom deutlich und setzt
-       * sich noch mehrere Sekunden fort.
-       */
       if (t < 6) return 1.10;
 
       if (t < 10) {
@@ -1144,10 +1188,15 @@
         ));
       }
 
+      /*
+       * Kein abruptes Verschwinden in einem winzigen Punkt:
+       * Das vorhandene Gitter schrumpft weiter, während
+       * feinere Darstellungen den größeren Bereich übernehmen.
+       */
       const x = clamp((t - 19) / 7, 0, 1);
 
       return 0.26 * Math.exp(
-        Math.log(0.003 / 0.26) * Math.pow(x, 1.55)
+        Math.log(0.09 / 0.26) * Math.pow(x, 1.3)
       );
     },
 
@@ -1179,10 +1228,6 @@
     updateIonInstances: function (scale) {
       this.ionLayers.forEach(layer => {
         layer.points.forEach((point, index) => {
-          /*
-           * Nur während des Einblendens am Präsentationsrand
-           * wird eine Kugel weich verkleinert.
-           */
           const edge = Math.max(
             Math.abs(point.x),
             Math.abs(point.y),
@@ -1198,11 +1243,9 @@
 
           this.dummy.position.copy(point);
           this.dummy.quaternion.identity();
-          this.dummy.scale.setScalar(
-            layer.radius * reveal
-          );
-
+          this.dummy.scale.setScalar(layer.radius * reveal);
           this.dummy.updateMatrix();
+
           layer.mesh.setMatrixAt(index, this.dummy.matrix);
         });
 
@@ -1240,6 +1283,64 @@
       this.grainMesh.instanceMatrix.needsUpdate = true;
     },
 
+    updateFineDetail: function (cycle, specimenZoom) {
+      const t = this.time;
+
+      /*
+       * Detailstufen überlappen weich:
+       *
+       * 20.5 ... 23.2: gröbere weiße Kugeloberfläche.
+       * 22.0 ... 24.7: feinere Kugeloberfläche.
+       * 23.5 ... 26.0: sehr feine Kugeloberfläche.
+       *
+       * Ab 24 Sekunden übernimmt zusätzlich die geschlossene
+       * weiße Kristalloberfläche. Bei 26 Sekunden ist der
+       * Übergang vollständig.
+       */
+      const firstAlpha =
+        ramp(t, 20.5, 22.0) *
+        (1 - ramp(t, 22.0, 23.2));
+
+      const secondAlpha =
+        ramp(t, 22.0, 23.2) *
+        (1 - ramp(t, 23.5, 24.7));
+
+      const thirdAlpha =
+        ramp(t, 23.5, 24.7) *
+        (1 - ramp(t, 25.0, 26.0));
+
+      const alphas = [
+        firstAlpha,
+        secondAlpha,
+        thirdAlpha
+      ];
+
+      this.fineLayers.forEach((layer, index) => {
+        this.setAlpha(layer.material, alphas[index], cycle);
+        layer.mesh.visible = layer.material.visible;
+      });
+
+      /*
+       * Position und Größe entsprechen exakt dem
+       * ausgewählten Kristalliten im Darstellungsraum.
+       *
+       * Vor 26 s liegt dessen Zentrum bei (0,0,0).
+       * Danach folgt es dem weiteren Herauszoomen.
+       */
+      const progress = ramp(t, 26, 34);
+
+      this.fineDetail.position
+        .copy(this.selectedPosition)
+        .multiplyScalar(progress * specimenZoom);
+
+      this.fineDetail.scale.setScalar(
+        this.selectedSize * specimenZoom
+      );
+
+      this.fineDetail.visible =
+        alphas.some(alpha => alpha > 0.001);
+    },
+
     updateAnimation: function (updateInstances) {
       const t = this.time;
       const scale = this.atomicScale();
@@ -1250,7 +1351,12 @@
 
       this.atomic.scale.setScalar(scale);
 
-      const atomFade = 1 - ramp(t, 23, 26);
+      /*
+       * Die ursprünglichen Modellfarben gehen bereits
+       * vor dem Wechsel der Detailstufe langsam in Weiß über.
+       */
+      const whitening = ramp(t, 18.5, 22.0);
+      const atomFade = 1 - ramp(t, 22.0, 24.5);
 
       const levelAlpha = [
         1,
@@ -1261,10 +1367,21 @@
       ];
 
       this.ionLayers.forEach(layer => {
+        layer.material.color
+          .copy(layer.originalColor)
+          .lerp(this.whiteColor, whitening);
+
+        layer.material.emissive
+          .copy(layer.originalColor)
+          .lerp(this.whiteColor, whitening);
+
+        layer.material.emissiveIntensity =
+          lerp(0.15, 0.08, whitening);
+
         const alpha = levelAlpha[layer.level] * atomFade;
 
         this.setAlpha(layer.material, alpha, cycle);
-        layer.mesh.visible = alpha > 0.001;
+        layer.mesh.visible = layer.material.visible;
       });
 
       this.frames.forEach(entry => {
@@ -1285,7 +1402,7 @@
         if (entry.n === 9) {
           alpha =
             ramp(t, 17.5, 19) *
-            (1 - ramp(t, 21, 23));
+            (1 - ramp(t, 20, 22));
         }
 
         const extent = Math.max(
@@ -1296,9 +1413,13 @@
         if (extent * scale > BOUND) alpha = 0;
 
         this.setAlpha(entry.material, alpha, cycle);
-        entry.frame.visible = alpha > 0.001;
+        entry.frame.visible = entry.material.visible;
       });
 
+      /*
+       * Der Bezug bleibt zunächst an der Ausgangszelle.
+       * Danach übernimmt die goldene Kristallitkante.
+       */
       const originAlpha = 1 - ramp(t, 24, 26);
 
       this.setAlpha(this.originMaterial, originAlpha, cycle);
@@ -1318,7 +1439,7 @@
           : chlorideCoord;
 
         this.setAlpha(entry.material, alpha, cycle);
-        entry.lines.visible = alpha > 0.001;
+        entry.lines.visible = entry.material.visible;
       });
 
       const labelAlpha = 1 - ramp(t, 7, 10);
@@ -1332,29 +1453,9 @@
       });
 
       /*
-       * Die Hülle erscheint sehr schwach, während der atomare
-       * Zoom noch weitergeht. Erst später wird daraus der
-       * sichtbare makroskopische Kristallit.
+       * Makroskopischer Zoom bleibt unverändert.
        */
-      const envelopeAlpha =
-        ramp(t, 20, 23) *
-        (1 - ramp(t, 24.5, 27));
-
-      this.setAlpha(
-        this.envelopeMaterial, envelopeAlpha, cycle
-      );
-
-      this.setAlpha(
-        this.envelopeEdgeMaterial, envelopeAlpha, cycle
-      );
-
-      this.envelope.visible = envelopeAlpha > 0.001;
-
-      /*
-       * Größerer Einkristallit übernimmt die Orientierung
-       * des zuvor sichtbaren Gitters.
-       */
-      const initialZoom = 2.2 / this.selectedSize;
+      const initialZoom = CRYSTAL_SPAN / this.selectedSize;
 
       const specimenZoom = t <= 26
         ? initialZoom
@@ -1363,21 +1464,31 @@
             (1 - ramp(t, 26, 34))
           );
 
-      const crystalAlpha = ramp(t, 24, 27);
+      /*
+       * Erst nachdem die Kugeln fein und weiß geworden sind,
+       * schließen sich die sichtbaren Zwischenräume optisch.
+       *
+       * Keine separate Hülle:
+       * Dies ist bereits der spätere Einkristallit.
+       */
+      const crystalAlpha = ramp(t, 24.0, 26.0);
 
       this.setAlpha(
         this.selectedMaterial, crystalAlpha, cycle
       );
 
-      this.selectedCrystal.visible = crystalAlpha > 0.001;
+      this.selectedCrystal.visible =
+        this.selectedMaterial.visible;
 
       const goldAlpha =
-        ramp(t, 25, 27) *
+        ramp(t, 24.5, 26.5) *
         (1 - ramp(t, 31.5, 34));
 
       this.setAlpha(
         this.selectedGoldMaterial, goldAlpha, cycle
       );
+
+      this.updateFineDetail(cycle, specimenZoom);
 
       const grainAlpha = ramp(t, 27, 31);
 
@@ -1385,11 +1496,11 @@
         this.grainMaterial, grainAlpha, cycle
       );
 
-      this.grainMesh.visible = grainAlpha > 0.001;
+      this.grainMesh.visible = this.grainMaterial.visible;
 
       /*
-       * Becherglas erst einblenden, wenn es in die feste
-       * Präsentationsgröße passt.
+       * Becherglas erst sichtbar, wenn die gesamte
+       * Darstellung in den Präsentationsbereich passt.
        */
       const focusLength =
         this.selectedPosition.length() *
@@ -1414,8 +1525,6 @@
       }
 
       this.visual.visible = this.shown;
-      this.backdrop.visible = this.shown;
-      this.floorDisc.visible = this.shown;
 
       const phase = this.phaseIndex();
       const state = [
@@ -1457,25 +1566,26 @@
       this.faceViewer(this.quote);
 
       /*
-       * Infotafel liegt auf der Betrachterseite des Modells.
-       * Hintergrund liegt auf der gegenüberliegenden Seite.
-       * Nur horizontale Ausrichtung, kein Folgen der Kopfneigung.
+       * Infotafel auf der Betrachterseite.
+       * Nur horizontale Ausrichtung, keine Kopfneigung.
+       *
+       * Richtung wird im lokalen Raum des Modells berechnet.
        */
-      this.direction.set(this.eye.x, 0, this.eye.z);
+      this.root.updateWorldMatrix(true, false);
+      this.localEye.copy(this.eye);
+      this.root.worldToLocal(this.localEye);
+
+      this.direction.set(
+        this.localEye.x,
+        0,
+        this.localEye.z
+      );
 
       if (this.direction.lengthSq() < 0.0001) {
         this.direction.set(0, 0, 1);
       } else {
         this.direction.normalize();
       }
-
-      this.backdrop.position.set(
-        -this.direction.x * 1.85,
-        1.9,
-        -this.direction.z * 1.85
-      );
-
-      this.faceViewer(this.backdrop);
 
       this.phaseBoard.position.set(
         this.direction.x * 1.72,
@@ -1501,11 +1611,17 @@
           this.direction.normalize();
         }
 
+        /*
+         * Schwarze Schrift liegt minimal vor der
+         * zur Person gerichteten Kugeloberfläche.
+         * So bleibt die Kugel sichtbar und die Schrift
+         * wird nicht von der eigenen Kugel verdeckt.
+         */
         label.sprite.position
           .copy(label.center)
           .addScaledVector(
             this.direction,
-            label.radius + 0.014
+            label.radius + 0.008
           );
       });
     },
@@ -1557,6 +1673,7 @@
       this.geometries.clear();
       this.materials.clear();
       this.textures.clear();
+      this.baseOpacity.clear();
     }
   });
 
@@ -1582,8 +1699,8 @@
     parent.appendChild(experiment);
 
     /*
-     * Keine Navigationssperre und keine interaktiven
-     * oder bemalbaren Modellklassen.
+     * Keine Navigationssperre.
+     * Keine interaktiven oder bemalbaren Modellklassen.
      */
     return result;
   };
@@ -1592,7 +1709,7 @@
    * ============================================================
    * MENÜ ERGÄNZEN
    *
-   * Bestehende Röntgen-Unterseite bleibt unverändert.
+   * Bestehende Röntgen-Unterseite bleibt erhalten.
    * ============================================================
    */
   const previousRender = F.Menu.render;
@@ -1871,7 +1988,7 @@
     ctx.font = "23px Arial";
 
     ctx.fillText(
-      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-2",
+      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-3",
       55, 1160, 914
     );
 
