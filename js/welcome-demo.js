@@ -3,36 +3,34 @@
 (function (F) {
   /*
    * ============================================================
-   * WILLKOMMEN-4
+   * WILLKOMMEN-5
    *
-   * NaCl-Elementarzelle -> Gitter -> Einkristallit ->
-   * körnige Salzprobe -> vollständig rückwärts.
+   * Elementarzelle -> Gitter -> Einkristallit -> Salzprobe
+   * und vollständig rückwärts.
    *
-   * Änderungen:
-   * - Ausgangszelle zunächst 10 Sekunden sichtbar.
-   * - Weiße Kugeldetailstufen schließen ihre Zwischenräume.
-   * - Kugeloberflächen werden dabei allmählich abgeflacht.
-   * - Geschlossener Kristall erst nach dem Schließen der Lücken.
-   * - Automatische Rückwärtswiedergabe.
-   * - Richtungsabhängige Phasenbeschriftungen.
+   * Neu:
+   * - Rundes zentrales Podest, Durchmesser 4.9 m.
+   * - Tischplattenoberkante bei 0.85 m.
+   * - Darstellung bleibt vollständig über der Platte.
+   * - Erklärungstafel außerhalb des Podests.
+   * - Zentrale goldene Bodenraute entfernt.
+   * - Podest als Hindernis für die Sticknavigation.
    *
    * Fachlich:
-   * NaCl: Fm-3m, Nr. 225; konventionelle Zelle mit Z = 4.
-   * Cl auf 4a, Na auf 4b.
-   * Beide Ionensorten sechsfach koordiniert.
+   * NaCl, Fm-3m, Nr. 225, konventionelle Zelle Z = 4.
+   * Cl auf 4a; Na auf 4b; Koordination jeweils sechsfach.
    *
-   * Weiß und Oberflächenübergang sind didaktische Darstellung,
-   * keine tatsächliche Veränderung von Ionen oder Kristall.
-   * Keine Kristallwachstums- oder Auflösungssimulation.
-   * Späte Detailstufen zeigen nicht jede atomare Position.
+   * Weiße Detailstufen und das Schließen ihrer Zwischenräume
+   * sind Darstellungswechsel, keine physikalische Verformung,
+   * kein Kristallwachstum und keine Auflösung.
    *
-   * Navigation und Raumbeleuchtung bleiben unverändert.
+   * Navigationseinstellungen und Raumlicht bleiben unverändert.
    * ============================================================
    */
 
   if (!F || !F.RoomBuilder || !F.Menu || !window.AFRAME) {
     console.error(
-      "Willkommen-4: A-Frame, room-builder.js und vr-tools.js " +
+      "Willkommen-5: A-Frame, room-builder.js und vr-tools.js " +
       "müssen vorher geladen sein."
     );
     return;
@@ -41,10 +39,15 @@
   const T = window.AFRAME.THREE;
   const V = T.Vector3;
 
-  // 46 Sekunden je Richtung, davon 10 Sekunden Ausgangszelle.
   const END = 46;
   const BOUND = 1.34;
   const CRYSTAL_SPAN = 2.2;
+
+  const TABLE_RADIUS = 2.45;
+  const TABLE_TOP = 0.85;
+  const SURFACE_GAP = 0.035;
+  const INFO_DISTANCE = 2.82;
+  const INFO_Y = 1.48;
 
   const COLORS = {
     sodium: "#a345ff",
@@ -185,9 +188,7 @@
       }
     }
 
-    const interior = Array.from(map.values());
-
-    interior.forEach(([i, j, k]) => {
+    Array.from(map.values()).forEach(([i, j, k]) => {
       DIRECTIONS.forEach(([di, dj, dk]) => {
         const p = [i + di, j + dj, k + dk];
         map.set(key(...p), p);
@@ -197,10 +198,6 @@
     return map;
   }
 
-  /*
-   * Nur äußere Positionsschicht.
-   * Kanten und Ecken werden nicht doppelt erzeugt.
-   */
   function shellPositions(count) {
     const points = [];
     const last = count - 1;
@@ -222,6 +219,24 @@
     }
 
     return points;
+  }
+
+  /*
+   * Unterste y-Koordinate eines gedrehten Würfels.
+   * size ist dessen volle Kantenlänge.
+   */
+  function cubeHalfHeight(quaternion, size) {
+    const matrix = new T.Matrix4().makeRotationFromQuaternion(
+      quaternion
+    );
+
+    const e = matrix.elements;
+
+    return size * 0.5 * (
+      Math.abs(e[1]) +
+      Math.abs(e[5]) +
+      Math.abs(e[9])
+    );
   }
 
   window.AFRAME.registerComponent("fkc-welcome-demo", {
@@ -253,20 +268,35 @@
       this.lastInstanceUpdate = -1000;
       this.lastGeometryTime = NaN;
 
+      this.atomicMinimumLocal = -1;
+      this.grainMinimumLocal = -1.1;
+
       this.root = new T.Group();
       this.el.setObject3D("welcome-demo", this.root);
 
       this.visual = new T.Group();
-      this.visual.position.set(0, 1.9, 0);
       this.root.add(this.visual);
 
       this.atomic = new T.Group();
       this.atomic.rotation.set(0.18, 0.42, -0.04);
       this.visual.add(this.atomic);
 
+      this.atomicQuaternion = this.atomic.quaternion.clone();
+      this.atomicRotationMatrix = new T.Matrix4()
+        .makeRotationFromQuaternion(this.atomicQuaternion);
+
+      const e = this.atomicRotationMatrix.elements;
+      this.rotationY = [e[1], e[5], e[9]];
+
+      this.unitCubeHalfHeight = cubeHalfHeight(
+        this.atomicQuaternion,
+        1
+      );
+
       this.specimen = new T.Group();
       this.visual.add(this.specimen);
 
+      this.makePodium();
       this.makeTypography();
       this.makeLattice();
       this.makeCoordination();
@@ -277,11 +307,6 @@
       this.updateBillboards();
     },
 
-    /*
-     * Die bisherige Bildfolge bleibt erhalten.
-     * Nur ihre ersten sechs Sekunden werden auf zehn gedehnt.
-     * Rückwärts wird exakt dieselbe Bildfolge durchlaufen.
-     */
     storyTime: function () {
       return this.time <= 10
         ? this.time * 0.6
@@ -370,6 +395,83 @@
       material.visible = material.opacity > 0.001;
     },
 
+    makePodium: function () {
+      this.podium = new T.Group();
+      this.root.add(this.podium);
+
+      const stone = this.ownMaterial(
+        new T.MeshStandardMaterial({
+          color: "#eee9de",
+          roughness: 0.66,
+          metalness: 0
+        })
+      );
+
+      const topMaterial = this.ownMaterial(
+        new T.MeshStandardMaterial({
+          color: "#fffdf8",
+          roughness: 0.48,
+          metalness: 0
+        })
+      );
+
+      const goldMaterial = this.ownMaterial(
+        new T.MeshStandardMaterial({
+          color: "#c5a052",
+          roughness: 0.4,
+          metalness: 0.45
+        })
+      );
+
+      const base = this.mesh(
+        this.ownGeometry(
+          new T.CylinderGeometry(1.83, 1.94, 0.12, 64)
+        ),
+        stone,
+        this.podium
+      );
+      base.position.y = 0.066;
+
+      const body = this.mesh(
+        this.ownGeometry(
+          new T.CylinderGeometry(1.7, 1.78, 0.60, 64)
+        ),
+        stone,
+        this.podium
+      );
+      body.position.y = 0.426;
+
+      const rim = this.mesh(
+        this.ownGeometry(
+          new T.CylinderGeometry(
+            TABLE_RADIUS - 0.015,
+            TABLE_RADIUS - 0.015,
+            0.035,
+            96
+          )
+        ),
+        goldMaterial,
+        this.podium
+      );
+      rim.position.y = 0.7475;
+
+      const top = this.mesh(
+        this.ownGeometry(
+          new T.CylinderGeometry(
+            TABLE_RADIUS,
+            TABLE_RADIUS,
+            0.085,
+            96
+          )
+        ),
+        topMaterial,
+        this.podium
+      );
+
+      // Oberkante exakt TABLE_TOP.
+      top.position.y = TABLE_TOP - 0.085 / 2;
+    },
+
     makeTypography: function () {
       const quoteTexture = this.makeTexture(
         2048, 440, (ctx, w, h) => {
@@ -397,6 +499,7 @@
 
           ctx.fillStyle = "#746544";
           ctx.font = "42px Arial";
+
           ctx.fillText(
             "Johann Wolfgang von Goethe · Faust I",
             w / 2, 370, w - 120
@@ -417,7 +520,7 @@
         this.root
       );
 
-      this.quote.position.set(0, 4.25, 0);
+      this.quote.position.set(0, 4.43, 0);
 
       this.phaseTexture = this.makeTexture(1536, 300, () => {});
 
@@ -434,7 +537,16 @@
         this.root
       );
 
-      this.phaseBoard.position.set(0, 0.39, 1.7);
+      /*
+       * Unterkante 1.148 m:
+       * vollständig oberhalb der 0.85-m-Tischplatte.
+       * Die Tafel liegt zusätzlich außerhalb des Podests.
+       */
+      this.phaseBoard.position.set(
+        0,
+        INFO_Y,
+        INFO_DISTANCE
+      );
 
       this.labelMaterials = {};
 
@@ -575,7 +687,9 @@
           material.emissiveIntensity = 0.15;
 
           const mesh = new T.InstancedMesh(
-            sphere, material, points.length
+            sphere,
+            material,
+            points.length
           );
 
           mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -590,6 +704,7 @@
             points,
             radius,
             level,
+            minimumLocal: -1,
             originalColor: new T.Color(color)
           });
 
@@ -651,13 +766,16 @@
 
       this.originMaterial = this.lineMaterial(COLORS.gold, 1);
       this.originFrame = new T.LineSegments(
-        edges, this.originMaterial
+        edges,
+        this.originMaterial
       );
       this.atomic.add(this.originFrame);
 
       this.originTintMaterial = this.basic(COLORS.gold, 0.06);
       this.originTint = this.mesh(
-        cube, this.originTintMaterial, this.atomic
+        cube,
+        this.originTintMaterial,
+        this.atomic
       );
     },
 
@@ -687,7 +805,9 @@
         const center = example.center;
 
         const neighbors = DIRECTIONS.map(d =>
-          center.clone().add(new V(d[0] / 2, d[1] / 2, d[2] / 2))
+          center.clone().add(
+            new V(d[0] / 2, d[1] / 2, d[2] / 2)
+          )
         );
 
         const vertices = [];
@@ -739,7 +859,9 @@
       this.selectedMaterial.emissiveIntensity = 0.08;
 
       this.selectedCrystal = this.mesh(
-        cube, this.selectedMaterial, this.specimen
+        cube,
+        this.selectedMaterial,
+        this.specimen
       );
 
       this.selectedCrystal.position.copy(this.selectedPosition);
@@ -748,7 +870,8 @@
 
       this.selectedGoldMaterial = this.lineMaterial(COLORS.gold, 1);
       this.selectedGold = new T.LineSegments(
-        edges, this.selectedGoldMaterial
+        edges,
+        this.selectedGoldMaterial
       );
       this.selectedCrystal.add(this.selectedGold);
 
@@ -790,10 +913,13 @@
               )
             );
 
+            const size = 0.115 + random() * 0.035;
+
             this.grains.push({
               position,
               rotation,
-              size: 0.115 + random() * 0.035
+              size,
+              halfHeight: cubeHalfHeight(rotation, size)
             });
           }
         }
@@ -803,7 +929,9 @@
       this.grainMaterial.roughness = 0.56;
 
       this.grainMesh = new T.InstancedMesh(
-        cube, this.grainMaterial, this.grains.length
+        cube,
+        this.grainMaterial,
+        this.grains.length
       );
 
       this.grainMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -812,7 +940,8 @@
 
       for (let i = 0; i < this.grains.length; i++) {
         this.grainMesh.setColorAt(
-          i, new T.Color().setScalar(0.86 + random() * 0.14)
+          i,
+          new T.Color().setScalar(0.86 + random() * 0.14)
         );
       }
 
@@ -820,16 +949,6 @@
       this.makeBeaker();
     },
 
-    /*
-     * Kugeln -> abgerundete Körper -> lückenlos gekachelte Fläche.
-     *
-     * Die Körper werden relativ zum Abstand größer.
-     * Zugleich flachen ihre Oberflächen allmählich ab.
-     * Am Ende passen benachbarte Flächen exakt zusammen.
-     *
-     * Erst anschließend übernimmt der einfache Kristallwürfel.
-     * Das ist ein Darstellungswechsel, keine Ionenverformung.
-     */
     makeFineIonDetail: function () {
       this.fineDetail = new T.Group();
       this.fineDetail.rotation.copy(this.atomic.rotation);
@@ -840,11 +959,6 @@
       [19, 31, 49].forEach(count => {
         const points = shellPositions(count);
 
-        /*
-         * Ausgangsgeometrie mit Würfeltopologie.
-         * Ihre Punkte werden zunächst auf eine Kugel projiziert.
-         * Später kehren sie kontinuierlich zur Würfelfläche zurück.
-         */
         const geometry = this.ownGeometry(
           new T.BoxGeometry(2, 2, 2, 3, 3, 3)
         );
@@ -859,7 +973,9 @@
         material.roughness = 0.4;
 
         const mesh = new T.InstancedMesh(
-          geometry, material, points.length
+          geometry,
+          material,
+          points.length
         );
 
         mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -880,11 +996,6 @@
     },
 
     updateFineGeometry: function (t) {
-      /*
-       * Der Füllgrad nimmt stetig zu.
-       * 0: getrennte Kugeln.
-       * 1: lückenlos aneinanderliegende Flächen.
-       */
       const fill = ramp(t, 21, 26);
       const flatten = ramp(t, 22.5, 26);
 
@@ -1033,7 +1144,9 @@
       }
 
       const lipCurve = new T.CatmullRomCurve3(
-        lipPoints, true, "centripetal"
+        lipPoints,
+        true,
+        "centripetal"
       );
 
       const lip = this.mesh(
@@ -1128,19 +1241,25 @@
 
       if (t < 10) {
         return Math.exp(lerp(
-          Math.log(1.10), Math.log(0.68), ramp(t, 6, 10)
+          Math.log(1.10),
+          Math.log(0.68),
+          ramp(t, 6, 10)
         ));
       }
 
       if (t < 15) {
         return Math.exp(lerp(
-          Math.log(0.68), Math.log(0.35), ramp(t, 10, 15)
+          Math.log(0.68),
+          Math.log(0.35),
+          ramp(t, 10, 15)
         ));
       }
 
       if (t < 19) {
         return Math.exp(lerp(
-          Math.log(0.35), Math.log(0.26), ramp(t, 15, 19)
+          Math.log(0.35),
+          Math.log(0.26),
+          ramp(t, 15, 19)
         ));
       }
 
@@ -1188,7 +1307,11 @@
     },
 
     updateIonInstances: function (scale) {
+      const ry = this.rotationY;
+
       this.ionLayers.forEach(layer => {
+        let minimum = Infinity;
+
         layer.points.forEach((point, index) => {
           const edge = Math.max(
             Math.abs(point.x),
@@ -1198,15 +1321,27 @@
 
           const available = BOUND / scale - edge;
           const reveal = clamp(available / layer.radius, 0, 1);
+          const radius = layer.radius * reveal;
 
           this.dummy.position.copy(point);
           this.dummy.quaternion.identity();
-          this.dummy.scale.setScalar(layer.radius * reveal);
+          this.dummy.scale.setScalar(radius);
           this.dummy.updateMatrix();
 
           layer.mesh.setMatrixAt(index, this.dummy.matrix);
+
+          if (radius > 0.00001) {
+            const y =
+              ry[0] * point.x +
+              ry[1] * point.y +
+              ry[2] * point.z -
+              radius;
+
+            minimum = Math.min(minimum, y);
+          }
         });
 
+        layer.minimumLocal = minimum;
         layer.mesh.instanceMatrix.needsUpdate = true;
       });
     },
@@ -1218,8 +1353,7 @@
         .copy(this.selectedPosition)
         .multiplyScalar(1 - progress);
 
-      this.specimen.position.copy(focus).multiplyScalar(-zoom);
-      this.specimen.scale.setScalar(zoom);
+      let minimum = Infinity;
 
       this.grains.forEach((grain, index) => {
         const distance = grain.position.distanceTo(focus) * zoom;
@@ -1236,8 +1370,16 @@
         this.dummy.updateMatrix();
 
         this.grainMesh.setMatrixAt(index, this.dummy.matrix);
+
+        if (reveal > 0.00001) {
+          minimum = Math.min(
+            minimum,
+            grain.position.y - grain.halfHeight * reveal
+          );
+        }
       });
 
+      this.grainMinimumLocal = minimum;
       this.grainMesh.instanceMatrix.needsUpdate = true;
     },
 
@@ -1263,6 +1405,133 @@
 
       this.fineDetail.visible =
         alphas.some(alpha => alpha > 0.001);
+    },
+
+    /*
+     * Tiefster Punkt im lokalen Raum von visual.
+     *
+     * InstancedMesh-Grenzen werden bewusst nicht über Box3
+     * geschätzt: Bei älteren THREE-Versionen berücksichtigt
+     * dies nicht zuverlässig sämtliche Instanzmatrizen.
+     */
+    placeAbovePodium: function (t, scale, zoom) {
+      let minimum = Infinity;
+
+      // Sichtbare Ionen: gedrehte Zentren plus Kugelradius.
+      this.ionLayers.forEach(layer => {
+        if (
+          layer.mesh.visible &&
+          Number.isFinite(layer.minimumLocal)
+        ) {
+          minimum = Math.min(
+            minimum,
+            layer.minimumLocal * scale
+          );
+        }
+      });
+
+      // Ausgangszellrahmen und schwache Goldfläche.
+      if (
+        this.originMaterial.visible ||
+        this.originTintMaterial.visible
+      ) {
+        minimum = Math.min(
+          minimum,
+          -this.unitCubeHalfHeight * scale
+        );
+      }
+
+      // Sichtbare Zellrahmen: gedrehte Blockgrenzen.
+      const ry = this.rotationY;
+
+      this.frames.forEach(entry => {
+        if (!entry.frame.visible) return;
+
+        let y = 0;
+
+        ry.forEach(coefficient => {
+          y += coefficient * (
+            coefficient >= 0
+              ? entry.bounds.min
+              : entry.bounds.max
+          );
+        });
+
+        minimum = Math.min(minimum, y * scale);
+      });
+
+      /*
+       * Die größere Detaildarstellung wird kurz vor ihrem
+       * Erscheinen sanft vorbereitet. Dadurch muss das Modell
+       * beim ersten weißen Detailbild nicht plötzlich steigen.
+       */
+      const fineMinimum =
+        this.fineDetail.position.y -
+        this.unitCubeHalfHeight * this.selectedSize * zoom;
+
+      if (t >= 19 && t < 20.5 && Number.isFinite(minimum)) {
+        minimum = lerp(
+          minimum,
+          Math.min(minimum, fineMinimum),
+          ramp(t, 19, 20.5)
+        );
+      }
+
+      if (
+        this.fineDetail.visible ||
+        this.selectedCrystal.visible
+      ) {
+        minimum = Math.min(minimum, fineMinimum);
+      }
+
+      // Weitere Kristallkörner.
+      if (
+        this.grainMesh.visible &&
+        Number.isFinite(this.grainMinimumLocal)
+      ) {
+        minimum = Math.min(
+          minimum,
+          this.specimen.position.y +
+          this.grainMinimumLocal * zoom
+        );
+      }
+
+      /*
+       * Glasboden:
+       * Mittelpunkt -1.1, Dicke 0.065 -> Unterkante -1.1325.
+       * Die vorbereitende Anpassung beginnt vor dem Glasfade.
+       */
+      const glassMinimum =
+        this.specimen.position.y - 1.1325 * zoom;
+
+      if (
+        t >= 33 &&
+        !this.beaker.visible &&
+        Number.isFinite(minimum)
+      ) {
+        minimum = lerp(
+          minimum,
+          Math.min(minimum, glassMinimum),
+          ramp(t, 33, 34)
+        );
+      }
+
+      if (this.beaker.visible) {
+        minimum = Math.min(minimum, glassMinimum);
+      }
+
+      if (!Number.isFinite(minimum)) minimum = 0;
+
+      /*
+       * Während der bewegten Instanzdarstellung kleiner
+       * zusätzlicher Sicherheitsabstand für die 40-ms-Updates.
+       * Endansicht: nur SURFACE_GAP über der Platte.
+       */
+      const instanceMargin =
+        t > 6 && t < 34.5 ? 0.035 : 0;
+
+      this.visual.position.y =
+        TABLE_TOP + SURFACE_GAP + instanceMargin - minimum;
     },
 
     updateAnimation: function (updateInstances) {
@@ -1298,6 +1567,7 @@
           layer.material,
           levelAlpha[layer.level] * atomFade
         );
+
         layer.mesh.visible = layer.material.visible;
       });
 
@@ -1324,6 +1594,7 @@
       });
 
       const originAlpha = 1 - ramp(t, 24, 26);
+
       this.setAlpha(this.originMaterial, originAlpha);
       this.setAlpha(this.originTintMaterial, originAlpha);
 
@@ -1338,6 +1609,7 @@
           entry.material,
           entry.type === "Na" ? sodiumCoord : chlorideCoord
         );
+
         entry.lines.visible = entry.material.visible;
       });
 
@@ -1359,19 +1631,18 @@
             Math.log(initialZoom) * (1 - ramp(t, 26, 34))
           );
 
-      /*
-       * Die einfache geschlossene Oberfläche übernimmt
-       * erst, wenn die Detailkörper lückenlos zusammenpassen.
-       */
-      const crystalAlpha = ramp(t, 26.0, 27.0);
+      this.setAlpha(
+        this.selectedMaterial,
+        ramp(t, 26.0, 27.0)
+      );
 
-      this.setAlpha(this.selectedMaterial, crystalAlpha);
-      this.selectedCrystal.visible = this.selectedMaterial.visible;
+      this.selectedCrystal.visible =
+        this.selectedMaterial.visible;
 
-      const goldAlpha =
-        ramp(t, 25.0, 27.0) * (1 - ramp(t, 31.5, 34));
-
-      this.setAlpha(this.selectedGoldMaterial, goldAlpha);
+      this.setAlpha(
+        this.selectedGoldMaterial,
+        ramp(t, 25.0, 27.0) * (1 - ramp(t, 31.5, 34))
+      );
 
       this.updateFineDetail(t, specimenZoom);
 
@@ -1394,10 +1665,6 @@
 
       this.beaker.visible = glassAlpha > 0.001;
 
-      /*
-       * Gruppenpositionen jeden Frame aktualisieren.
-       * Die aufwendigeren Instanzmatrizen nur bei Bedarf.
-       */
       const progress = ramp(t, 26, 34);
 
       this.specimen.position
@@ -1413,9 +1680,12 @@
         this.lastGeometryTime = t;
       }
 
+      this.placeAbovePodium(t, scale, specimenZoom);
       this.visual.visible = this.shown;
 
+      // Podest und Tafeln bleiben auch bei ausgeblendeter Animation.
       const phase = this.phaseIndex();
+
       const state = [
         this.paused,
         this.shown,
@@ -1423,7 +1693,10 @@
         this.playDirection
       ].join(":");
 
-      if (phase !== this.lastPhase || state !== this.lastState) {
+      if (
+        phase !== this.lastPhase ||
+        state !== this.lastState
+      ) {
         this.lastPhase = phase;
         this.lastState = state;
         this.drawPhase(phase);
@@ -1431,10 +1704,6 @@
     },
 
     faceViewer: function (object) {
-      /*
-       * Alle Tafeln sind direkte Kinder von root.
-       * Augenposition deshalb in dessen lokalen Raum umrechnen.
-       */
       this.localEye.copy(this.eye);
       this.root.worldToLocal(this.localEye);
 
@@ -1460,7 +1729,11 @@
       this.localEye.copy(this.eye);
       this.root.worldToLocal(this.localEye);
 
-      this.direction.set(this.localEye.x, 0, this.localEye.z);
+      this.direction.set(
+        this.localEye.x,
+        0,
+        this.localEye.z
+      );
 
       if (this.direction.lengthSq() < 0.0001) {
         this.direction.set(0, 0, 1);
@@ -1468,10 +1741,14 @@
         this.direction.normalize();
       }
 
+      /*
+       * Tangential außerhalb der runden Tischplatte.
+       * Keine Stelle dieser Tafel liegt im Podest.
+       */
       this.phaseBoard.position.set(
-        this.direction.x * 1.72,
-        0.39,
-        this.direction.z * 1.72
+        this.direction.x * INFO_DISTANCE,
+        INFO_Y,
+        this.direction.z * INFO_DISTANCE
       );
 
       this.faceViewer(this.phaseBoard);
@@ -1479,6 +1756,7 @@
       if (!this.shown || this.storyTime() >= 10) return;
 
       this.atomic.updateWorldMatrix(true, false);
+
       this.localEye.copy(this.eye);
       this.atomic.worldToLocal(this.localEye);
 
@@ -1493,7 +1771,10 @@
 
         label.sprite.position
           .copy(label.center)
-          .addScaledVector(this.direction, label.radius + 0.008);
+          .addScaledVector(
+            this.direction,
+            label.radius + 0.008
+          );
       });
     },
 
@@ -1506,12 +1787,16 @@
           0.05
         );
 
-        this.time += seconds * this.data.speed * this.playDirection;
+        this.time +=
+          seconds * this.data.speed * this.playDirection;
 
         if (this.playDirection > 0 && this.time >= END) {
           this.time = END;
           this.playDirection = -1;
-        } else if (this.playDirection < 0 && this.time <= 0) {
+        } else if (
+          this.playDirection < 0 &&
+          this.time <= 0
+        ) {
           this.time = 0;
           this.playDirection = 1;
 
@@ -1545,19 +1830,57 @@
   /*
    * ============================================================
    * BEGRÜSSUNGSRAUM ERGÄNZEN
+   *
+   * Vorhandener Raumaufbau und Röntgenwrapper bleiben erhalten.
    * ============================================================
    */
   const previousBuild = F.RoomBuilder.build;
 
   F.RoomBuilder.build = function (parent, config, rooms) {
-    const result = previousBuild.call(this, parent, config, rooms);
+    const result = previousBuild.call(
+      this,
+      parent,
+      config,
+      rooms
+    );
 
     if (config.kind !== "welcome") return result;
+
+    /*
+     * In der hochgeladenen Galerie-2-Datei ist dies
+     * die zentrale goldene Bodenraute.
+     * Der goldene Rand am äußeren Raumboden bleibt erhalten.
+     */
+    const floorDiamond = parent.querySelector(
+      "#welcome-floor-diamond"
+    );
+
+    if (floorDiamond) floorDiamond.remove();
 
     const experiment = document.createElement("a-entity");
     experiment.id = "fkc-welcome-experiment";
     experiment.setAttribute("fkc-welcome-demo", "");
     parent.appendChild(experiment);
+
+    /*
+     * Rundes Podest für die bestehende Sticknavigation sperren.
+     * Die bestehenden Hindernisse und Raumgrenzen bleiben gültig.
+     *
+     * Dies betrifft die Software-Navigation, nicht physisches
+     * Gehen innerhalb der realen VR-Spielfläche.
+     */
+    if (result && typeof result.isWalkable === "function") {
+      const previousWalkable = result.isWalkable;
+      const clearanceRadius = TABLE_RADIUS + 0.28;
+
+      result.isWalkable = function (x, z) {
+        if (x * x + z * z < clearanceRadius * clearanceRadius) {
+          return false;
+        }
+
+        return previousWalkable.call(this, x, z);
+      };
+    }
 
     return result;
   };
@@ -1597,17 +1920,33 @@
         const ctx = this.ctx;
 
         ctx.fillStyle = "#a9bcae";
-        ctx.fillRect(item.x, item.y + 5, item.w, item.h);
+        ctx.fillRect(
+          item.x,
+          item.y + 5,
+          item.w,
+          item.h
+        );
 
         ctx.fillStyle = pressed ? "#bba466" : "#efe0b8";
-        ctx.fillRect(item.x, item.y + offset, item.w, item.h);
+        ctx.fillRect(
+          item.x,
+          item.y + offset,
+          item.w,
+          item.h
+        );
 
         ctx.strokeStyle = "#a9bcae";
         ctx.lineWidth = 2;
-        ctx.strokeRect(item.x, item.y + offset, item.w, item.h);
+        ctx.strokeRect(
+          item.x,
+          item.y + offset,
+          item.w,
+          item.h
+        );
 
         ctx.fillStyle = "#263f33";
         ctx.font = "30px Arial";
+
         ctx.fillText(
           item.label,
           item.x + 22,
@@ -1637,9 +1976,14 @@
 
     ctx.fillStyle = "#263f33";
     ctx.font = "bold 43px Arial";
-    ctx.fillText("Vom Ionengitter zur Salzprobe", 55, 75, 914);
+
+    ctx.fillText(
+      "Vom Ionengitter zur Salzprobe",
+      55, 75, 914
+    );
 
     ctx.font = "27px Arial";
+
     ctx.fillText(
       "Hin und zurück · NaCl · Koordination 6 : 6",
       55, 125, 914
@@ -1658,7 +2002,10 @@
       ctx.fillStyle = "#a9bcae";
       ctx.fillRect(x, y + 5, w, h);
 
-      ctx.fillStyle = pressed ? "#b8c7bd" : color || "#dfe9e2";
+      ctx.fillStyle = pressed
+        ? "#b8c7bd"
+        : color || "#dfe9e2";
+
       ctx.fillRect(x, y + offset, w, h);
 
       ctx.strokeStyle = "#a9bcae";
@@ -1667,9 +2014,18 @@
 
       ctx.fillStyle = "#263f33";
       ctx.font = "29px Arial";
-      ctx.fillText(label, x + 22, y + 41 + offset, w - 44);
 
-      this.buttons.push({x, y, w, h, label, action});
+      ctx.fillText(
+        label,
+        x + 22,
+        y + 41 + offset,
+        w - 44
+      );
+
+      this.buttons.push({
+        x, y, w, h, label, action
+      });
+
       y += 76;
     };
 
@@ -1685,7 +2041,9 @@
 
         feedback(
           this,
-          demo.paused ? "Animation pausiert." : "Animation läuft."
+          demo.paused
+            ? "Animation pausiert."
+            : "Animation läuft."
         );
       },
       "#efe0b8"
@@ -1695,7 +2053,11 @@
       "Zum Anfang — anschließend pausiert",
       () => {
         demo.restart();
-        feedback(this, "Elementarzelle angezeigt. Animation pausiert.");
+
+        feedback(
+          this,
+          "Elementarzelle angezeigt. Animation pausiert."
+        );
       }
     );
 
@@ -1705,13 +2067,19 @@
         : "Nächste Phase — Richtung Elementarzelle",
       () => {
         demo.nextPhase();
-        feedback(this, "Nächste Phase angezeigt. Animation pausiert.");
+
+        feedback(
+          this,
+          "Nächste Phase angezeigt. Animation pausiert."
+        );
       }
     );
 
     button(
       "Richtung: " +
-      (demo.playDirection > 0 ? "Herauszoomen" : "Hineinzoomen") +
+      (demo.playDirection > 0
+        ? "Herauszoomen"
+        : "Hineinzoomen") +
       " — wechseln",
       () => {
         demo.reverseDirection();
@@ -1733,14 +2101,23 @@
         const index = speeds.indexOf(demo.data.speed);
         const next = speeds[(index + 1) % speeds.length];
 
-        demo.el.setAttribute("fkc-welcome-demo", "speed", next);
-        feedback(this, "Geschwindigkeit: " + next + "×");
+        demo.el.setAttribute(
+          "fkc-welcome-demo",
+          "speed",
+          next
+        );
+
+        feedback(
+          this,
+          "Geschwindigkeit: " + next + "×"
+        );
       },
       "#cddff3"
     );
 
     button(
-      "Hin und zurück wiederholen: " + (demo.loop ? "an" : "aus"),
+      "Hin und zurück wiederholen: " +
+      (demo.loop ? "an" : "aus"),
       () => {
         demo.loop = !demo.loop;
 
@@ -1754,7 +2131,9 @@
     );
 
     button(
-      demo.shown ? "Animation ausblenden" : "Animation einblenden",
+      demo.shown
+        ? "Animation ausblenden"
+        : "Animation einblenden",
       () => {
         demo.setShown(!demo.shown);
 
@@ -1762,13 +2141,20 @@
           this,
           demo.shown
             ? "Eingeblendet; bei Bedarf starten."
-            : "Ausgeblendet und pausiert."
+            : "Ausgeblendet und pausiert. Podest bleibt sichtbar."
         );
       }
     );
 
-    button("Allgemeine Bedienhilfe", () => this.navigate("help"));
-    button("Zurück zum Hauptmenü", () => this.navigate("home"));
+    button(
+      "Allgemeine Bedienhilfe",
+      () => this.navigate("help")
+    );
+
+    button(
+      "Zurück zum Hauptmenü",
+      () => this.navigate("home")
+    );
 
     ctx.fillStyle = "#6b624e";
     ctx.font = "25px Arial";
@@ -1788,14 +2174,18 @@
       55, 992, 914
     );
 
-    ctx.fillStyle = this.message ? "#dcefe2" : "#edf2ee";
+    ctx.fillStyle = this.message
+      ? "#dcefe2"
+      : "#edf2ee";
+
     ctx.fillRect(35, 1078, 954, 53);
 
     ctx.fillStyle = "#244d35";
     ctx.font = "bold 25px Arial";
 
     ctx.fillText(
-      this.message || "Buttons mit Laser + Trigger auswählen",
+      this.message ||
+      "Buttons mit Laser + Trigger auswählen",
       55, 1113, 910
     );
 
@@ -1803,7 +2193,7 @@
     ctx.font = "23px Arial";
 
     ctx.fillText(
-      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-4",
+      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-5",
       55, 1160, 914
     );
 
