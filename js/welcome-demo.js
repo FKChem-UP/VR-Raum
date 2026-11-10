@@ -3,60 +3,46 @@
 (function (F) {
   /*
    * ============================================================
-   * WILLKOMMEN-3
+   * WILLKOMMEN-4
    *
-   * NaCl-Elementarzelle -> periodisches Gitter ->
-   * Einkristallit -> körnige Salzprobe im Becherglas.
+   * NaCl-Elementarzelle -> Gitter -> Einkristallit ->
+   * körnige Salzprobe -> vollständig rückwärts.
    *
-   * Änderungen gegenüber Willkommen-2:
-   * - Dunkler Hintergrund und dunkle Bodenscheibe entfernt.
-   * - Schwarze Na+/Cl--Schrift ohne Schildhintergrund.
-   * - Modellfarben gehen beim Herauszoomen in Weiß über.
-   * - Zusätzliche, zunehmend feinere Kugel-Detailstufen.
-   * - Geschlossene Kristalloberfläche entsteht allmählich.
-   * - Separate frühe Würfelhülle entfernt.
+   * Änderungen:
+   * - Ausgangszelle zunächst 10 Sekunden sichtbar.
+   * - Weiße Kugeldetailstufen schließen ihre Zwischenräume.
+   * - Kugeloberflächen werden dabei allmählich abgeflacht.
+   * - Geschlossener Kristall erst nach dem Schließen der Lücken.
+   * - Automatische Rückwärtswiedergabe.
+   * - Richtungsabhängige Phasenbeschriftungen.
    *
-   * Fachliche Grundlage:
-   * NaCl: Fm-3m, Nr. 225.
-   * Cl: 4a (0,0,0).
-   * Na: 4b (1/2,1/2,1/2).
-   * Konventionelle kubische Zelle: Z = 4.
-   * Beide Ionensorten: sechs nächste Gegenionen.
+   * Fachlich:
+   * NaCl: Fm-3m, Nr. 225; konventionelle Zelle mit Z = 4.
+   * Cl auf 4a, Na auf 4b.
+   * Beide Ionensorten sechsfach koordiniert.
    *
-   * Halbgitterdarstellung:
-   * Koordinaten = (i-1,j-1,k-1)/2.
-   * Gerade Summe i+j+k: Cl.
-   * Ungerade Summe i+j+k: Na.
+   * Weiß und Oberflächenübergang sind didaktische Darstellung,
+   * keine tatsächliche Veränderung von Ionen oder Kristall.
+   * Keine Kristallwachstums- oder Auflösungssimulation.
+   * Späte Detailstufen zeigen nicht jede atomare Position.
    *
-   * Gemeinsame Randionen werden nicht doppelt erzeugt.
-   *
-   * Der spätere Übergang ist eine didaktische Detailstufe:
-   * Oberflächennahe Kugeln stellen einen immer feineren,
-   * nicht mehr vollständig atomar aufgelösten Bereich dar.
-   * Nicht alle Positionen eines großen Kristalls werden erzeugt.
-   *
-   * Weiß ist eine Darstellungsfarbe, keine Farbänderung
-   * der tatsächlichen Ionen. Ein idealer NaCl-Einkristall
-   * kann transparent sein.
-   *
-   * Keine Kristallwachstumssimulation.
-   * Keine maßstabsgetreue Reise über atomare Größenordnungen.
-   * Keine Änderung an Navigation oder Raumbeleuchtung.
+   * Navigation und Raumbeleuchtung bleiben unverändert.
    * ============================================================
    */
 
   if (!F || !F.RoomBuilder || !F.Menu || !window.AFRAME) {
     console.error(
-      "Willkommen-3: A-Frame, room-builder.js und vr-tools.js " +
+      "Willkommen-4: A-Frame, room-builder.js und vr-tools.js " +
       "müssen vorher geladen sein."
     );
     return;
   }
 
-  const T = AFRAME.THREE;
+  const T = window.AFRAME.THREE;
   const V = T.Vector3;
 
-  const END = 42;
+  // 46 Sekunden je Richtung, davon 10 Sekunden Ausgangszelle.
+  const END = 46;
   const BOUND = 1.34;
   const CRYSTAL_SPAN = 2.2;
 
@@ -69,50 +55,59 @@
     white: "#ffffff"
   };
 
-  const PHASE_TIMES = [0, 6, 11, 16, 20, 26, 34];
+  const PHASE_TIMES = [0, 10, 15, 20, 24, 30, 38];
 
   const PHASES = [
     {
       title: "NaCl · eine konventionelle Elementarzelle",
-      text:
-        "Fm3̅m · Nr. 225 · Z = 4 · " +
-        "beide Ionen sechsfacht koordiniert"
+      forward:
+        "Fm3̅m · Nr. 225 · Z = 4 · beide Ionen sechsfacht koordiniert",
+      reverse:
+        "Zurück bei der Elementarzelle: Na⁺ und Cl⁻ sind sechsfacht koordiniert."
     },
     {
       title: "Periodische Ordnung · 3 × 3 × 3 Zellen",
-      text:
-        "Ein größerer Ausschnitt wird sichtbar — " +
-        "kein Kristallwachstum."
+      forward:
+        "Ein größerer Ausschnitt wird sichtbar — kein Kristallwachstum.",
+      reverse:
+        "Wir zoomen zur goldmarkierten Ausgangszelle hinein."
     },
     {
       title: "Periodische Ordnung · 6 × 6 × 6 Zellen",
-      text:
-        "Der goldene Rahmen kennzeichnet weiterhin " +
-        "die Ausgangszelle."
+      forward:
+        "Der goldene Rahmen kennzeichnet weiterhin die Ausgangszelle.",
+      reverse:
+        "Die einzelnen Zellen werden beim Hineinzoomen wieder größer."
     },
     {
       title: "Periodische Ordnung · 9 × 9 × 9 Zellen",
-      text:
-        "Beim Herauszoomen werden die einzelnen " +
-        "Zellen und Ionen kleiner."
+      forward:
+        "Beim Herauszoomen werden die einzelnen Zellen und Ionen kleiner.",
+      reverse:
+        "Das Ionengitter wird sichtbar; Grün und Lila sind Modellfarben."
     },
     {
       title: "Vom Ionengitter zum Einkristallit",
-      text:
-        "Modellfarben verblassen; immer feinere Kugeln " +
-        "gehen in eine geschlossene Kristalloberfläche über."
+      reverseTitle: "Vom Einkristallit zum Ionengitter",
+      forward:
+        "Die weiße Kugeldarstellung wird dichter; Zwischenräume schließen sich.",
+      reverse:
+        "Die Darstellung öffnet sich: einzelne Kugeln und Modellfarben werden sichtbar."
     },
     {
       title: "Viele unterschiedlich orientierte Kristallite",
-      text:
-        "Der goldmarkierte Kristallit enthält " +
-        "die ursprüngliche Elementarzelle."
+      reverseTitle: "Hineinzoomen in einen ausgewählten Kristalliten",
+      forward:
+        "Der goldmarkierte Kristallit enthält die ursprüngliche Elementarzelle.",
+      reverse:
+        "Der goldmarkierte Kristallit wird größer; die übrige Probe tritt zurück."
     },
     {
       title: "NaCl · eine körnige Feststoffprobe",
-      text:
-        "Weiße Salzprobe im schematischen " +
-        "500-mL-Becherglas."
+      forward:
+        "Weiße Salzprobe im schematischen 500-mL-Becherglas.",
+      reverse:
+        "Ausgehend von der Salzprobe zoomen wir wieder bis zur Elementarzelle hinein."
     }
   ];
 
@@ -166,10 +161,6 @@
       el.components["fkc-welcome-demo"];
   }
 
-  /*
-   * Bei gerader Zellzahl bleibt die Ausgangszelle an
-   * derselben Position und liegt nicht exakt im Blockzentrum.
-   */
   function cellBounds(n) {
     const first = -Math.floor(n / 2);
 
@@ -194,10 +185,6 @@
       }
     }
 
-    /*
-     * Zusätzliche direkte Nachbarn gewährleisten
-     * vollständige Koordination auch an den Blockrändern.
-     */
     const interior = Array.from(map.values());
 
     interior.forEach(([i, j, k]) => {
@@ -211,12 +198,8 @@
   }
 
   /*
-   * Vereinfachte Kugeldarstellung der äußeren Kristallregion.
-   *
-   * Nur die äußere Positionsschicht wird erzeugt.
-   * Kanten und Ecken werden dabei nicht doppelt angelegt.
-   * Der Würfelcharakter ergibt sich aus der Anordnung
-   * der Kugeln, nicht aus einer zusätzlichen Rahmenhülle.
+   * Nur äußere Positionsschicht.
+   * Kanten und Ecken werden nicht doppelt erzeugt.
    */
   function shellPositions(count) {
     const points = [];
@@ -241,13 +224,14 @@
     return points;
   }
 
-  AFRAME.registerComponent("fkc-welcome-demo", {
+  window.AFRAME.registerComponent("fkc-welcome-demo", {
     schema: {
       speed: {type: "number", default: 1}
     },
 
     init: function () {
       this.time = 0;
+      this.playDirection = 1;
       this.paused = false;
       this.loop = true;
       this.shown = true;
@@ -262,12 +246,12 @@
       this.direction = new V();
       this.tempPosition = new V();
       this.dummy = new T.Object3D();
-
       this.whiteColor = new T.Color(COLORS.white);
 
       this.lastPhase = -1;
       this.lastState = "";
       this.lastInstanceUpdate = -1000;
+      this.lastGeometryTime = NaN;
 
       this.root = new T.Group();
       this.el.setObject3D("welcome-demo", this.root);
@@ -291,6 +275,17 @@
 
       this.updateAnimation(true);
       this.updateBillboards();
+    },
+
+    /*
+     * Die bisherige Bildfolge bleibt erhalten.
+     * Nur ihre ersten sechs Sekunden werden auf zehn gedehnt.
+     * Rückwärts wird exakt dieselbe Bildfolge durchlaufen.
+     */
+    storyTime: function () {
+      return this.time <= 10
+        ? this.time * 0.6
+        : this.time - 4;
     },
 
     ownGeometry: function (geometry) {
@@ -368,11 +363,9 @@
       );
     },
 
-    setAlpha: function (material, alpha, cycle) {
+    setAlpha: function (material, alpha) {
       material.opacity =
-        this.baseOpacity.get(material) *
-        clamp(alpha, 0, 1) *
-        (cycle === undefined ? 1 : cycle);
+        this.baseOpacity.get(material) * clamp(alpha, 0, 1);
 
       material.visible = material.opacity > 0.001;
     },
@@ -404,7 +397,6 @@
 
           ctx.fillStyle = "#746544";
           ctx.font = "42px Arial";
-
           ctx.fillText(
             "Johann Wolfgang von Goethe · Faust I",
             w / 2, 370, w - 120
@@ -452,12 +444,7 @@
       ].forEach(([id, text]) => {
         const texture = this.makeTexture(
           256, 128, (ctx, w, h) => {
-            /*
-             * Vollständig transparenter Hintergrund:
-             * kein weißes Rechteck und kein farbiger Rahmen.
-             */
             ctx.clearRect(0, 0, w, h);
-
             ctx.fillStyle = "#000000";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -484,6 +471,7 @@
       const w = canvas.width;
       const h = canvas.height;
       const entry = PHASES[phase];
+      const backward = this.playDirection < 0;
 
       ctx.fillStyle = COLORS.paper;
       ctx.fillRect(0, 0, w, h);
@@ -496,27 +484,36 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "bold 48px Arial";
-      ctx.fillText(entry.title, w / 2, 64, w - 80);
+
+      ctx.fillText(
+        backward && entry.reverseTitle
+          ? entry.reverseTitle
+          : entry.title,
+        w / 2, 64, w - 80
+      );
 
       ctx.font = "35px Arial";
 
-      const lines = wrap(ctx, entry.text, w - 100);
+      const text = backward ? entry.reverse : entry.forward;
+      const lines = wrap(ctx, text, w - 100);
 
       lines.slice(0, 2).forEach((line, index) => {
         ctx.fillText(line, w / 2, 124 + index * 43, w - 80);
       });
 
       const state = !this.shown
-        ? "Animation ausgeblendet"
+        ? "Ausgeblendet"
         : this.paused
           ? "Pausiert"
           : "Animation läuft";
 
       ctx.fillStyle = "#776441";
-      ctx.font = "30px Arial";
+      ctx.font = "29px Arial";
 
       ctx.fillText(
-        state + " · B/Y → Begrüßungsanimation & Bedienhilfe",
+        state + " · " +
+        (backward ? "Hineinzoomen" : "Herauszoomen") +
+        " · B/Y → Animationsmenü",
         w / 2, 254, w - 70
       );
 
@@ -542,7 +539,6 @@
 
         latticePositions(n).forEach((position, id) => {
           if (seen.has(id)) return;
-
           seen.add(id);
           next.push(position);
         });
@@ -603,13 +599,8 @@
                 this.labelMaterials[type]
               );
 
-              /*
-               * Unterschiedliche Schriftgrößen passend
-               * zu den unterschiedlich großen Kugeln.
-               */
               const width = type === "Na" ? 0.19 : 0.25;
               sprite.scale.set(width, width / 2, 1);
-
               this.atomic.add(sprite);
 
               this.labels.push({
@@ -622,9 +613,6 @@
         });
       });
 
-      /*
-       * Gemeinsame Gitterlinien statt doppelter Zellkanten.
-       */
       this.frames = [];
 
       [3, 6, 9].forEach(n => {
@@ -637,25 +625,14 @@
             const v = bounds.min + b;
 
             vertices.push(
-              bounds.min, u, v,
-              bounds.max, u, v
-            );
-
-            vertices.push(
-              u, bounds.min, v,
-              u, bounds.max, v
-            );
-
-            vertices.push(
-              u, v, bounds.min,
-              u, v, bounds.max
+              bounds.min, u, v, bounds.max, u, v,
+              u, bounds.min, v, u, bounds.max, v,
+              u, v, bounds.min, u, v, bounds.max
             );
           }
         }
 
-        const geometry = this.ownGeometry(
-          new T.BufferGeometry()
-        );
+        const geometry = this.ownGeometry(new T.BufferGeometry());
 
         geometry.setAttribute(
           "position",
@@ -669,24 +646,16 @@
         this.frames.push({n, bounds, frame, material});
       });
 
-      const cube = this.ownGeometry(
-        new T.BoxGeometry(1, 1, 1)
-      );
-
-      const edges = this.ownGeometry(
-        new T.EdgesGeometry(cube)
-      );
+      const cube = this.ownGeometry(new T.BoxGeometry(1, 1, 1));
+      const edges = this.ownGeometry(new T.EdgesGeometry(cube));
 
       this.originMaterial = this.lineMaterial(COLORS.gold, 1);
-
       this.originFrame = new T.LineSegments(
         edges, this.originMaterial
       );
-
       this.atomic.add(this.originFrame);
 
       this.originTintMaterial = this.basic(COLORS.gold, 0.06);
-
       this.originTint = this.mesh(
         cube, this.originTintMaterial, this.atomic
       );
@@ -717,11 +686,9 @@
       examples.forEach(example => {
         const center = example.center;
 
-        const neighbors = DIRECTIONS.map(d => {
-          return center.clone().add(
-            new V(d[0] / 2, d[1] / 2, d[2] / 2)
-          );
-        });
+        const neighbors = DIRECTIONS.map(d =>
+          center.clone().add(new V(d[0] / 2, d[1] / 2, d[2] / 2))
+        );
 
         const vertices = [];
 
@@ -734,18 +701,12 @@
 
         octEdges.forEach(([a, b]) => {
           vertices.push(
-            neighbors[a].x,
-            neighbors[a].y,
-            neighbors[a].z,
-            neighbors[b].x,
-            neighbors[b].y,
-            neighbors[b].z
+            neighbors[a].x, neighbors[a].y, neighbors[a].z,
+            neighbors[b].x, neighbors[b].y, neighbors[b].z
           );
         });
 
-        const geometry = this.ownGeometry(
-          new T.BufferGeometry()
-        );
+        const geometry = this.ownGeometry(new T.BufferGeometry());
 
         geometry.setAttribute(
           "position",
@@ -766,13 +727,8 @@
     },
 
     makeSpecimen: function () {
-      const cube = this.ownGeometry(
-        new T.BoxGeometry(1, 1, 1)
-      );
-
-      const edges = this.ownGeometry(
-        new T.EdgesGeometry(cube)
-      );
+      const cube = this.ownGeometry(new T.BoxGeometry(1, 1, 1));
+      const edges = this.ownGeometry(new T.EdgesGeometry(cube));
 
       this.selectedPosition = new V(0, -0.72, 0.18);
       this.selectedSize = 0.16;
@@ -791,18 +747,10 @@
       this.selectedCrystal.scale.setScalar(this.selectedSize);
 
       this.selectedGoldMaterial = this.lineMaterial(COLORS.gold, 1);
-
       this.selectedGold = new T.LineSegments(
         edges, this.selectedGoldMaterial
       );
-
       this.selectedCrystal.add(this.selectedGold);
-
-      /*
-       * Keine separate frühe Würfelhülle mehr.
-       * Die Oberfläche dieses Kristalliten übernimmt
-       * später unmittelbar die weiße Kugeldarstellung.
-       */
 
       let seed = 745219;
 
@@ -830,9 +778,7 @@
               z + (random() - 0.5) * 0.025
             );
 
-            if (
-              position.distanceTo(this.selectedPosition) < 0.20
-            ) {
+            if (position.distanceTo(this.selectedPosition) < 0.20) {
               continue;
             }
 
@@ -866,92 +812,123 @@
 
       for (let i = 0; i < this.grains.length; i++) {
         this.grainMesh.setColorAt(
-          i,
-          new T.Color().setScalar(0.86 + random() * 0.14)
+          i, new T.Color().setScalar(0.86 + random() * 0.14)
         );
       }
 
       this.grainMesh.instanceColor.needsUpdate = true;
-
       this.makeBeaker();
     },
 
+    /*
+     * Kugeln -> abgerundete Körper -> lückenlos gekachelte Fläche.
+     *
+     * Die Körper werden relativ zum Abstand größer.
+     * Zugleich flachen ihre Oberflächen allmählich ab.
+     * Am Ende passen benachbarte Flächen exakt zusammen.
+     *
+     * Erst anschließend übernimmt der einfache Kristallwürfel.
+     * Das ist ein Darstellungswechsel, keine Ionenverformung.
+     */
     makeFineIonDetail: function () {
-      /*
-       * Drei feinere, oberflächennahe Kugeldarstellungen.
-       *
-       * Alle haben dieselbe äußere Größe, Orientierung
-       * und Position wie der spätere Kristallit.
-       * Die Kugelradien nehmen von Detailstufe zu
-       * Detailstufe ab.
-       *
-       * Die Matrizen werden nur einmal erzeugt.
-       * Während der Animation ändern sich anschließend
-       * lediglich Sichtbarkeit und Materialdeckkraft.
-       */
       this.fineDetail = new T.Group();
       this.fineDetail.rotation.copy(this.atomic.rotation);
       this.visual.add(this.fineDetail);
 
       this.fineLayers = [];
 
-      const sphere = this.ownGeometry(
-        new T.SphereGeometry(1, 8, 6)
-      );
-
       [19, 31, 49].forEach(count => {
-        const positions = shellPositions(count);
+        const points = shellPositions(count);
 
         /*
-         * Kugeln passen mit ihrer ganzen Oberfläche
-         * in den späteren Kristallwürfel.
-         *
-         * r = 0.29 * Abstand der Kugelzentren.
+         * Ausgangsgeometrie mit Würfeltopologie.
+         * Ihre Punkte werden zunächst auf eine Kugel projiziert.
+         * Später kehren sie kontinuierlich zur Würfelfläche zurück.
          */
-        const spacing = 1 / ((count - 1) + 0.58);
-        const radius = spacing * 0.29;
-        const half = (count - 1) * spacing / 2;
-
-        const material = this.lit(COLORS.white);
-        material.roughness = 0.4;
-        material.emissive.set("#ffffff");
-        material.emissiveIntensity = 0.08;
-
-        const mesh = new T.InstancedMesh(
-          sphere,
-          material,
-          positions.length
+        const geometry = this.ownGeometry(
+          new T.BoxGeometry(2, 2, 2, 3, 3, 3)
         );
 
+        const boxPositions = new Float32Array(
+          geometry.attributes.position.array
+        );
+
+        const material = this.lit(COLORS.white);
+        material.emissive.set("#ffffff");
+        material.emissiveIntensity = 0.08;
+        material.roughness = 0.4;
+
+        const mesh = new T.InstancedMesh(
+          geometry, material, points.length
+        );
+
+        mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
         mesh.frustumCulled = false;
-
-        positions.forEach(([i, j, k], index) => {
-          this.dummy.position.set(
-            i * spacing - half,
-            j * spacing - half,
-            k * spacing - half
-          );
-
-          this.dummy.quaternion.identity();
-          this.dummy.scale.setScalar(radius);
-          this.dummy.updateMatrix();
-
-          mesh.setMatrixAt(index, this.dummy.matrix);
-        });
-
-        mesh.instanceMatrix.needsUpdate = true;
         mesh.visible = false;
 
         this.fineDetail.add(mesh);
 
         this.fineLayers.push({
           count,
-          mesh,
-          material
+          points,
+          geometry,
+          boxPositions,
+          material,
+          mesh
         });
       });
+    },
 
-      this.fineDetail.scale.setScalar(CRYSTAL_SPAN);
+    updateFineGeometry: function (t) {
+      /*
+       * Der Füllgrad nimmt stetig zu.
+       * 0: getrennte Kugeln.
+       * 1: lückenlos aneinanderliegende Flächen.
+       */
+      const fill = ramp(t, 21, 26);
+      const flatten = ramp(t, 22.5, 26);
+
+      this.fineLayers.forEach(layer => {
+        const attr = layer.geometry.attributes.position;
+        const source = layer.boxPositions;
+
+        for (let i = 0; i < attr.count; i++) {
+          const x = source[i * 3];
+          const y = source[i * 3 + 1];
+          const z = source[i * 3 + 2];
+          const length = Math.sqrt(x * x + y * y + z * z);
+
+          attr.setXYZ(
+            i,
+            lerp(x / length, x, flatten),
+            lerp(y / length, y, flatten),
+            lerp(z / length, z, flatten)
+          );
+        }
+
+        attr.needsUpdate = true;
+        layer.geometry.computeVertexNormals();
+        layer.geometry.computeBoundingSphere();
+
+        const spacing = 1 / layer.count;
+        const radius = spacing * lerp(0.29, 0.5, fill);
+
+        layer.points.forEach(([i, j, k], index) => {
+          this.dummy.position.set(
+            (i + 0.5) * spacing - 0.5,
+            (j + 0.5) * spacing - 0.5,
+            (k + 0.5) * spacing - 0.5
+          );
+
+          this.dummy.quaternion.identity();
+          this.dummy.scale.setScalar(radius);
+          this.dummy.updateMatrix();
+
+          layer.mesh.setMatrixAt(index, this.dummy.matrix);
+        });
+
+        layer.mesh.instanceMatrix.needsUpdate = true;
+      });
     },
 
     makeBeaker: function () {
@@ -994,13 +971,10 @@
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
-
-        const angle = Math.atan2(x, z);
-        const weight = spoutWeight(angle);
+        const weight = spoutWeight(Math.atan2(x, z));
         const top = ramp(y, 0.65, 1.1);
         const radial = Math.sqrt(x * x + z * z);
-        const extra = 0.23 * weight * top;
-        const factor = (radial + extra) / radial;
+        const factor = (radial + 0.23 * weight * top) / radial;
 
         positions.setXYZ(
           i,
@@ -1018,7 +992,6 @@
         this.glassMaterial,
         this.beaker
       );
-
       wall.renderOrder = 3;
 
       this.baseGlassMaterial = this.ownMaterial(
@@ -1040,7 +1013,6 @@
         this.baseGlassMaterial,
         this.beaker
       );
-
       bottom.position.y = -1.1;
       bottom.renderOrder = 3;
 
@@ -1071,7 +1043,6 @@
         this.glassEdgeMaterial,
         this.beaker
       );
-
       lip.renderOrder = 4;
 
       const baseRing = this.mesh(
@@ -1086,21 +1057,15 @@
       baseRing.position.y = -1.08;
       baseRing.renderOrder = 4;
 
-      /*
-       * Schematische Skala, kein berechnetes Probenvolumen.
-       */
       const scaleTexture = this.makeTexture(
         384, 1024, (ctx, w, h) => {
           ctx.clearRect(0, 0, w, h);
-
           ctx.fillStyle = "#f2fbff";
           ctx.strokeStyle = "#f2fbff";
           ctx.lineWidth = 8;
-
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
           ctx.font = "bold 62px Arial";
-
           ctx.fillText("mL", 168, 62);
 
           for (let i = 0; i <= 8; i++) {
@@ -1113,8 +1078,7 @@
             ctx.stroke();
 
             if (major) {
-              const value = 500 - i * 50;
-              ctx.fillText(String(value), 165, y);
+              ctx.fillText(String(500 - i * 50), 165, y);
             }
           }
 
@@ -1159,40 +1123,27 @@
       return phase;
     },
 
-    atomicScale: function () {
-      const t = this.time;
-
+    atomicScale: function (t) {
       if (t < 6) return 1.10;
 
       if (t < 10) {
         return Math.exp(lerp(
-          Math.log(1.10),
-          Math.log(0.68),
-          ramp(t, 6, 10)
+          Math.log(1.10), Math.log(0.68), ramp(t, 6, 10)
         ));
       }
 
       if (t < 15) {
         return Math.exp(lerp(
-          Math.log(0.68),
-          Math.log(0.35),
-          ramp(t, 10, 15)
+          Math.log(0.68), Math.log(0.35), ramp(t, 10, 15)
         ));
       }
 
       if (t < 19) {
         return Math.exp(lerp(
-          Math.log(0.35),
-          Math.log(0.26),
-          ramp(t, 15, 19)
+          Math.log(0.35), Math.log(0.26), ramp(t, 15, 19)
         ));
       }
 
-      /*
-       * Kein abruptes Verschwinden in einem winzigen Punkt:
-       * Das vorhandene Gitter schrumpft weiter, während
-       * feinere Darstellungen den größeren Bereich übernehmen.
-       */
       const x = clamp((t - 19) / 7, 0, 1);
 
       return 0.26 * Math.exp(
@@ -1202,25 +1153,36 @@
 
     setShown: function (shown) {
       this.shown = !!shown;
-
       if (!this.shown) this.paused = true;
-
       this.updateAnimation(true);
     },
 
     restart: function () {
       this.time = 0;
+      this.playDirection = 1;
       this.paused = true;
       this.lastPhase = -1;
       this.updateAnimation(true);
     },
 
-    nextPhase: function () {
-      const next = PHASE_TIMES.find(
-        value => value > this.time + 0.1
-      );
+    reverseDirection: function () {
+      this.playDirection *= -1;
+      this.updateAnimation(true);
+    },
 
-      this.time = next === undefined ? 0 : next;
+    nextPhase: function () {
+      if (this.playDirection > 0) {
+        const next = PHASE_TIMES.find(
+          value => value > this.time + 0.1
+        );
+        this.time = next === undefined ? END : next;
+      } else {
+        const previous = PHASE_TIMES.slice().reverse().find(
+          value => value < this.time - 0.1
+        );
+        this.time = previous === undefined ? 0 : previous;
+      }
+
       this.paused = true;
       this.updateAnimation(true);
     },
@@ -1235,11 +1197,7 @@
           );
 
           const available = BOUND / scale - edge;
-
-          const reveal = clamp(
-            available / layer.radius,
-            0, 1
-          );
+          const reveal = clamp(available / layer.radius, 0, 1);
 
           this.dummy.position.copy(point);
           this.dummy.quaternion.identity();
@@ -1253,8 +1211,8 @@
       });
     },
 
-    updateGrainInstances: function (zoom) {
-      const progress = ramp(this.time, 26, 34);
+    updateGrainInstances: function (zoom, t) {
+      const progress = ramp(t, 26, 34);
 
       const focus = this.tempPosition
         .copy(this.selectedPosition)
@@ -1283,78 +1241,36 @@
       this.grainMesh.instanceMatrix.needsUpdate = true;
     },
 
-    updateFineDetail: function (cycle, specimenZoom) {
-      const t = this.time;
-
-      /*
-       * Detailstufen überlappen weich:
-       *
-       * 20.5 ... 23.2: gröbere weiße Kugeloberfläche.
-       * 22.0 ... 24.7: feinere Kugeloberfläche.
-       * 23.5 ... 26.0: sehr feine Kugeloberfläche.
-       *
-       * Ab 24 Sekunden übernimmt zusätzlich die geschlossene
-       * weiße Kristalloberfläche. Bei 26 Sekunden ist der
-       * Übergang vollständig.
-       */
-      const firstAlpha =
-        ramp(t, 20.5, 22.0) *
-        (1 - ramp(t, 22.0, 23.2));
-
-      const secondAlpha =
-        ramp(t, 22.0, 23.2) *
-        (1 - ramp(t, 23.5, 24.7));
-
-      const thirdAlpha =
-        ramp(t, 23.5, 24.7) *
-        (1 - ramp(t, 25.0, 26.0));
-
+    updateFineDetail: function (t, zoom) {
       const alphas = [
-        firstAlpha,
-        secondAlpha,
-        thirdAlpha
+        ramp(t, 20.5, 22.0) * (1 - ramp(t, 22.0, 23.2)),
+        ramp(t, 22.0, 23.2) * (1 - ramp(t, 23.5, 24.7)),
+        ramp(t, 23.5, 24.7) * (1 - ramp(t, 26.0, 27.0))
       ];
 
       this.fineLayers.forEach((layer, index) => {
-        this.setAlpha(layer.material, alphas[index], cycle);
+        this.setAlpha(layer.material, alphas[index]);
         layer.mesh.visible = layer.material.visible;
       });
 
-      /*
-       * Position und Größe entsprechen exakt dem
-       * ausgewählten Kristalliten im Darstellungsraum.
-       *
-       * Vor 26 s liegt dessen Zentrum bei (0,0,0).
-       * Danach folgt es dem weiteren Herauszoomen.
-       */
       const progress = ramp(t, 26, 34);
 
       this.fineDetail.position
         .copy(this.selectedPosition)
-        .multiplyScalar(progress * specimenZoom);
+        .multiplyScalar(progress * zoom);
 
-      this.fineDetail.scale.setScalar(
-        this.selectedSize * specimenZoom
-      );
+      this.fineDetail.scale.setScalar(this.selectedSize * zoom);
 
       this.fineDetail.visible =
         alphas.some(alpha => alpha > 0.001);
     },
 
     updateAnimation: function (updateInstances) {
-      const t = this.time;
-      const scale = this.atomicScale();
-
-      const cycle = this.loop && !this.paused
-        ? ramp(t, 0, 0.65) * (1 - ramp(t, 40, 42))
-        : 1;
+      const t = this.storyTime();
+      const scale = this.atomicScale(t);
 
       this.atomic.scale.setScalar(scale);
 
-      /*
-       * Die ursprünglichen Modellfarben gehen bereits
-       * vor dem Wechsel der Detailstufe langsam in Weiß über.
-       */
       const whitening = ramp(t, 18.5, 22.0);
       const atomFade = 1 - ramp(t, 22.0, 24.5);
 
@@ -1378,9 +1294,10 @@
         layer.material.emissiveIntensity =
           lerp(0.15, 0.08, whitening);
 
-        const alpha = levelAlpha[layer.level] * atomFade;
-
-        this.setAlpha(layer.material, alpha, cycle);
+        this.setAlpha(
+          layer.material,
+          levelAlpha[layer.level] * atomFade
+        );
         layer.mesh.visible = layer.material.visible;
       });
 
@@ -1388,21 +1305,11 @@
         let alpha = 0;
 
         if (entry.n === 3) {
-          alpha =
-            ramp(t, 8, 9.5) *
-            (1 - ramp(t, 13, 15));
-        }
-
-        if (entry.n === 6) {
-          alpha =
-            ramp(t, 13, 15) *
-            (1 - ramp(t, 17.5, 19));
-        }
-
-        if (entry.n === 9) {
-          alpha =
-            ramp(t, 17.5, 19) *
-            (1 - ramp(t, 20, 22));
+          alpha = ramp(t, 8, 9.5) * (1 - ramp(t, 13, 15));
+        } else if (entry.n === 6) {
+          alpha = ramp(t, 13, 15) * (1 - ramp(t, 17.5, 19));
+        } else {
+          alpha = ramp(t, 17.5, 19) * (1 - ramp(t, 20, 22));
         }
 
         const extent = Math.max(
@@ -1412,99 +1319,67 @@
 
         if (extent * scale > BOUND) alpha = 0;
 
-        this.setAlpha(entry.material, alpha, cycle);
+        this.setAlpha(entry.material, alpha);
         entry.frame.visible = entry.material.visible;
       });
 
-      /*
-       * Der Bezug bleibt zunächst an der Ausgangszelle.
-       * Danach übernimmt die goldene Kristallitkante.
-       */
       const originAlpha = 1 - ramp(t, 24, 26);
-
-      this.setAlpha(this.originMaterial, originAlpha, cycle);
-      this.setAlpha(this.originTintMaterial, originAlpha, cycle);
+      this.setAlpha(this.originMaterial, originAlpha);
+      this.setAlpha(this.originTintMaterial, originAlpha);
 
       const sodiumCoord =
-        ramp(t, 0.7, 1.2) *
-        (1 - ramp(t, 3, 3.5));
+        ramp(t, 0.7, 1.2) * (1 - ramp(t, 3, 3.5));
 
       const chlorideCoord =
-        ramp(t, 3.4, 3.9) *
-        (1 - ramp(t, 5.5, 6));
+        ramp(t, 3.4, 3.9) * (1 - ramp(t, 5.5, 6));
 
       this.coordination.forEach(entry => {
-        const alpha = entry.type === "Na"
-          ? sodiumCoord
-          : chlorideCoord;
-
-        this.setAlpha(entry.material, alpha, cycle);
+        this.setAlpha(
+          entry.material,
+          entry.type === "Na" ? sodiumCoord : chlorideCoord
+        );
         entry.lines.visible = entry.material.visible;
       });
 
       const labelAlpha = 1 - ramp(t, 7, 10);
 
       Object.values(this.labelMaterials).forEach(material => {
-        this.setAlpha(material, labelAlpha, cycle);
+        this.setAlpha(material, labelAlpha);
       });
 
       this.labels.forEach(label => {
         label.sprite.visible = labelAlpha > 0.001;
       });
 
-      /*
-       * Makroskopischer Zoom bleibt unverändert.
-       */
       const initialZoom = CRYSTAL_SPAN / this.selectedSize;
 
       const specimenZoom = t <= 26
         ? initialZoom
         : Math.exp(
-            Math.log(initialZoom) *
-            (1 - ramp(t, 26, 34))
+            Math.log(initialZoom) * (1 - ramp(t, 26, 34))
           );
 
       /*
-       * Erst nachdem die Kugeln fein und weiß geworden sind,
-       * schließen sich die sichtbaren Zwischenräume optisch.
-       *
-       * Keine separate Hülle:
-       * Dies ist bereits der spätere Einkristallit.
+       * Die einfache geschlossene Oberfläche übernimmt
+       * erst, wenn die Detailkörper lückenlos zusammenpassen.
        */
-      const crystalAlpha = ramp(t, 24.0, 26.0);
+      const crystalAlpha = ramp(t, 26.0, 27.0);
 
-      this.setAlpha(
-        this.selectedMaterial, crystalAlpha, cycle
-      );
-
-      this.selectedCrystal.visible =
-        this.selectedMaterial.visible;
+      this.setAlpha(this.selectedMaterial, crystalAlpha);
+      this.selectedCrystal.visible = this.selectedMaterial.visible;
 
       const goldAlpha =
-        ramp(t, 24.5, 26.5) *
-        (1 - ramp(t, 31.5, 34));
+        ramp(t, 25.0, 27.0) * (1 - ramp(t, 31.5, 34));
 
-      this.setAlpha(
-        this.selectedGoldMaterial, goldAlpha, cycle
-      );
+      this.setAlpha(this.selectedGoldMaterial, goldAlpha);
 
-      this.updateFineDetail(cycle, specimenZoom);
+      this.updateFineDetail(t, specimenZoom);
 
-      const grainAlpha = ramp(t, 27, 31);
-
-      this.setAlpha(
-        this.grainMaterial, grainAlpha, cycle
-      );
-
+      this.setAlpha(this.grainMaterial, ramp(t, 27, 31));
       this.grainMesh.visible = this.grainMaterial.visible;
 
-      /*
-       * Becherglas erst sichtbar, wenn die gesamte
-       * Darstellung in den Präsentationsbereich passt.
-       */
       const focusLength =
-        this.selectedPosition.length() *
-        (1 - ramp(t, 26, 34));
+        this.selectedPosition.length() * (1 - ramp(t, 26, 34));
 
       const glassFits =
         specimenZoom * (1.63 + focusLength) <= 1.68;
@@ -1514,14 +1389,28 @@
         : 0;
 
       this.glassMaterials.forEach(material => {
-        this.setAlpha(material, glassAlpha, cycle);
+        this.setAlpha(material, glassAlpha);
       });
 
       this.beaker.visible = glassAlpha > 0.001;
 
-      if (updateInstances) {
+      /*
+       * Gruppenpositionen jeden Frame aktualisieren.
+       * Die aufwendigeren Instanzmatrizen nur bei Bedarf.
+       */
+      const progress = ramp(t, 26, 34);
+
+      this.specimen.position
+        .copy(this.selectedPosition)
+        .multiplyScalar(-(1 - progress) * specimenZoom);
+
+      this.specimen.scale.setScalar(specimenZoom);
+
+      if (updateInstances && this.lastGeometryTime !== t) {
         this.updateIonInstances(scale);
-        this.updateGrainInstances(specimenZoom);
+        this.updateGrainInstances(specimenZoom, t);
+        this.updateFineGeometry(t);
+        this.lastGeometryTime = t;
       }
 
       this.visual.visible = this.shown;
@@ -1530,13 +1419,11 @@
       const state = [
         this.paused,
         this.shown,
-        this.loop
+        this.loop,
+        this.playDirection
       ].join(":");
 
-      if (
-        phase !== this.lastPhase ||
-        state !== this.lastState
-      ) {
+      if (phase !== this.lastPhase || state !== this.lastState) {
         this.lastPhase = phase;
         this.lastState = state;
         this.drawPhase(phase);
@@ -1544,13 +1431,18 @@
     },
 
     faceViewer: function (object) {
-      object.getWorldPosition(this.tempPosition);
+      /*
+       * Alle Tafeln sind direkte Kinder von root.
+       * Augenposition deshalb in dessen lokalen Raum umrechnen.
+       */
+      this.localEye.copy(this.eye);
+      this.root.worldToLocal(this.localEye);
 
       object.rotation.set(
         0,
         Math.atan2(
-          this.eye.x - this.tempPosition.x,
-          this.eye.z - this.tempPosition.z
+          this.localEye.x - object.position.x,
+          this.localEye.z - object.position.z
         ),
         0
       );
@@ -1558,28 +1450,17 @@
 
     updateBillboards: function () {
       const scene = this.el.sceneEl;
-
       if (!scene || !scene.camera) return;
 
       scene.camera.getWorldPosition(this.eye);
+      this.root.updateWorldMatrix(true, false);
 
       this.faceViewer(this.quote);
 
-      /*
-       * Infotafel auf der Betrachterseite.
-       * Nur horizontale Ausrichtung, keine Kopfneigung.
-       *
-       * Richtung wird im lokalen Raum des Modells berechnet.
-       */
-      this.root.updateWorldMatrix(true, false);
       this.localEye.copy(this.eye);
       this.root.worldToLocal(this.localEye);
 
-      this.direction.set(
-        this.localEye.x,
-        0,
-        this.localEye.z
-      );
+      this.direction.set(this.localEye.x, 0, this.localEye.z);
 
       if (this.direction.lengthSq() < 0.0001) {
         this.direction.set(0, 0, 1);
@@ -1595,10 +1476,9 @@
 
       this.faceViewer(this.phaseBoard);
 
-      if (!this.shown || this.time >= 10) return;
+      if (!this.shown || this.storyTime() >= 10) return;
 
       this.atomic.updateWorldMatrix(true, false);
-
       this.localEye.copy(this.eye);
       this.atomic.worldToLocal(this.localEye);
 
@@ -1611,53 +1491,38 @@
           this.direction.normalize();
         }
 
-        /*
-         * Schwarze Schrift liegt minimal vor der
-         * zur Person gerichteten Kugeloberfläche.
-         * So bleibt die Kugel sichtbar und die Schrift
-         * wird nicht von der eigenen Kugel verdeckt.
-         */
         label.sprite.position
           .copy(label.center)
-          .addScaledVector(
-            this.direction,
-            label.radius + 0.008
-          );
+          .addScaledVector(this.direction, label.radius + 0.008);
       });
     },
 
     tick: function (time, delta) {
       const menuOpen = F.Menu && F.Menu.opened;
 
-      if (
-        !this.paused &&
-        this.shown &&
-        !menuOpen
-      ) {
+      if (!this.paused && this.shown && !menuOpen) {
         const seconds = Math.min(
           Math.max((delta || 0) / 1000, 0),
           0.05
         );
 
-        this.time += seconds * this.data.speed;
+        this.time += seconds * this.data.speed * this.playDirection;
 
-        if (this.time >= END) {
-          if (this.loop) {
-            this.time = 0;
-            this.lastPhase = -1;
-          } else {
-            this.time = 35;
-            this.paused = true;
-          }
+        if (this.playDirection > 0 && this.time >= END) {
+          this.time = END;
+          this.playDirection = -1;
+        } else if (this.playDirection < 0 && this.time <= 0) {
+          this.time = 0;
+          this.playDirection = 1;
+
+          if (!this.loop) this.paused = true;
         }
       }
 
       const updateInstances =
         time - this.lastInstanceUpdate >= 40;
 
-      if (updateInstances) {
-        this.lastInstanceUpdate = time;
-      }
+      if (updateInstances) this.lastInstanceUpdate = time;
 
       this.updateAnimation(updateInstances);
       this.updateBillboards();
@@ -1685,31 +1550,21 @@
   const previousBuild = F.RoomBuilder.build;
 
   F.RoomBuilder.build = function (parent, config, rooms) {
-    const result = previousBuild.call(
-      this, parent, config, rooms
-    );
+    const result = previousBuild.call(this, parent, config, rooms);
 
     if (config.kind !== "welcome") return result;
 
     const experiment = document.createElement("a-entity");
-
     experiment.id = "fkc-welcome-experiment";
     experiment.setAttribute("fkc-welcome-demo", "");
-
     parent.appendChild(experiment);
 
-    /*
-     * Keine Navigationssperre.
-     * Keine interaktiven oder bemalbaren Modellklassen.
-     */
     return result;
   };
 
   /*
    * ============================================================
    * MENÜ ERGÄNZEN
-   *
-   * Bestehende Röntgen-Unterseite bleibt erhalten.
    * ============================================================
    */
   const previousRender = F.Menu.render;
@@ -1717,7 +1572,6 @@
   function feedback(menu, message) {
     menu.blockDrawing();
     menu.notify(message);
-
     if (F.setStatus) F.setStatus(message);
   }
 
@@ -1743,34 +1597,17 @@
         const ctx = this.ctx;
 
         ctx.fillStyle = "#a9bcae";
-        ctx.fillRect(
-          item.x, item.y + 5, item.w, item.h
-        );
+        ctx.fillRect(item.x, item.y + 5, item.w, item.h);
 
-        ctx.fillStyle = pressed
-          ? "#bba466"
-          : "#efe0b8";
-
-        ctx.fillRect(
-          item.x,
-          item.y + offset,
-          item.w,
-          item.h
-        );
+        ctx.fillStyle = pressed ? "#bba466" : "#efe0b8";
+        ctx.fillRect(item.x, item.y + offset, item.w, item.h);
 
         ctx.strokeStyle = "#a9bcae";
         ctx.lineWidth = 2;
-
-        ctx.strokeRect(
-          item.x,
-          item.y + offset,
-          item.w,
-          item.h
-        );
+        ctx.strokeRect(item.x, item.y + offset, item.w, item.h);
 
         ctx.fillStyle = "#263f33";
         ctx.font = "30px Arial";
-
         ctx.fillText(
           item.label,
           item.x + 22,
@@ -1799,26 +1636,21 @@
     ctx.fillRect(0, 0, 1024, 1200);
 
     ctx.fillStyle = "#263f33";
-    ctx.font = "bold 45px Arial";
-
-    ctx.fillText(
-      "Vom Ionengitter zur Salzprobe",
-      55, 75, 914
-    );
+    ctx.font = "bold 43px Arial";
+    ctx.fillText("Vom Ionengitter zur Salzprobe", 55, 75, 914);
 
     ctx.font = "27px Arial";
-
     ctx.fillText(
-      "NaCl · Fm3̅m · Koordination 6 : 6",
+      "Hin und zurück · NaCl · Koordination 6 : 6",
       55, 125, 914
     );
 
-    let y = 175;
+    let y = 160;
 
     const button = (label, action, color) => {
       const x = 55;
       const w = 914;
-      const h = 72;
+      const h = 64;
       const index = this.buttons.length;
       const pressed = index === this.pressedIndex;
       const offset = pressed ? 5 : 0;
@@ -1826,10 +1658,7 @@
       ctx.fillStyle = "#a9bcae";
       ctx.fillRect(x, y + 5, w, h);
 
-      ctx.fillStyle = pressed
-        ? "#b8c7bd"
-        : color || "#dfe9e2";
-
+      ctx.fillStyle = pressed ? "#b8c7bd" : color || "#dfe9e2";
       ctx.fillRect(x, y + offset, w, h);
 
       ctx.strokeStyle = "#a9bcae";
@@ -1837,20 +1666,11 @@
       ctx.strokeRect(x, y + offset, w, h);
 
       ctx.fillStyle = "#263f33";
-      ctx.font = "30px Arial";
+      ctx.font = "29px Arial";
+      ctx.fillText(label, x + 22, y + 41 + offset, w - 44);
 
-      ctx.fillText(
-        label,
-        x + 22,
-        y + 46 + offset,
-        w - 44
-      );
-
-      this.buttons.push({
-        x, y, w, h, label, action
-      });
-
-      y += 86;
+      this.buttons.push({x, y, w, h, label, action});
+      y += 76;
     };
 
     button(
@@ -1865,9 +1685,7 @@
 
         feedback(
           this,
-          demo.paused
-            ? "Animation pausiert."
-            : "Animation läuft."
+          demo.paused ? "Animation pausiert." : "Animation läuft."
         );
       },
       "#efe0b8"
@@ -1877,24 +1695,35 @@
       "Zum Anfang — anschließend pausiert",
       () => {
         demo.restart();
-
-        feedback(
-          this,
-          "Ausgangszelle wird angezeigt. Animation pausiert."
-        );
+        feedback(this, "Elementarzelle angezeigt. Animation pausiert.");
       }
     );
 
     button(
-      "Nächste Phase — anschließend pausiert",
+      demo.playDirection > 0
+        ? "Nächste Phase — Richtung Salzprobe"
+        : "Nächste Phase — Richtung Elementarzelle",
       () => {
         demo.nextPhase();
+        feedback(this, "Nächste Phase angezeigt. Animation pausiert.");
+      }
+    );
+
+    button(
+      "Richtung: " +
+      (demo.playDirection > 0 ? "Herauszoomen" : "Hineinzoomen") +
+      " — wechseln",
+      () => {
+        demo.reverseDirection();
 
         feedback(
           this,
-          "Nächste Phase angezeigt. Animation pausiert."
+          demo.playDirection > 0
+            ? "Richtung geändert: Herauszoomen."
+            : "Richtung geändert: Hineinzoomen."
         );
-      }
+      },
+      "#efe0b8"
     );
 
     button(
@@ -1904,83 +1733,69 @@
         const index = speeds.indexOf(demo.data.speed);
         const next = speeds[(index + 1) % speeds.length];
 
-        demo.el.setAttribute(
-          "fkc-welcome-demo",
-          "speed",
-          next
-        );
-
+        demo.el.setAttribute("fkc-welcome-demo", "speed", next);
         feedback(this, "Geschwindigkeit: " + next + "×");
       },
       "#cddff3"
     );
 
     button(
-      "Automatische Wiederholung: " +
-      (demo.loop ? "an" : "aus"),
+      "Hin und zurück wiederholen: " + (demo.loop ? "an" : "aus"),
       () => {
         demo.loop = !demo.loop;
 
         feedback(
           this,
           demo.loop
-            ? "Wiederholung eingeschaltet."
-            : "Wiederholung aus. Ende bei der Salzprobe."
+            ? "Hin- und Rückweg werden wiederholt."
+            : "Nach dem Rückweg bleibt die Elementarzelle stehen."
         );
       }
     );
 
     button(
-      demo.shown
-        ? "Animation ausblenden"
-        : "Animation einblenden",
+      demo.shown ? "Animation ausblenden" : "Animation einblenden",
       () => {
         demo.setShown(!demo.shown);
 
         feedback(
           this,
           demo.shown
-            ? "Animation eingeblendet; bei Bedarf starten."
-            : "Animation ausgeblendet und pausiert."
+            ? "Eingeblendet; bei Bedarf starten."
+            : "Ausgeblendet und pausiert."
         );
       }
     );
 
-    button(
-      "Allgemeine Bedienhilfe",
-      () => this.navigate("help")
-    );
-
-    button(
-      "Zurück zum Hauptmenü",
-      () => this.navigate("home")
-    );
+    button("Allgemeine Bedienhilfe", () => this.navigate("help"));
+    button("Zurück zum Hauptmenü", () => this.navigate("home"));
 
     ctx.fillStyle = "#6b624e";
     ctx.font = "25px Arial";
 
     ctx.fillText(
-      "Maßstabsübergänge vereinfacht · kein Kristallwachstum",
-      55, 914, 914
+      "Automatisch: Elementarzelle → Salzprobe → Elementarzelle",
+      55, 904, 914
+    );
+
+    ctx.fillText(
+      "Darstellungswechsel vereinfacht · kein Wachstum oder Auflösen",
+      55, 948, 914
     );
 
     ctx.fillText(
       "Während das Menü offen ist, hält die Animation an.",
-      55, 957, 914
+      55, 992, 914
     );
 
-    ctx.fillStyle = this.message
-      ? "#dcefe2"
-      : "#edf2ee";
-
+    ctx.fillStyle = this.message ? "#dcefe2" : "#edf2ee";
     ctx.fillRect(35, 1078, 954, 53);
 
     ctx.fillStyle = "#244d35";
     ctx.font = "bold 25px Arial";
 
     ctx.fillText(
-      this.message ||
-      "Buttons mit Laser + Trigger auswählen",
+      this.message || "Buttons mit Laser + Trigger auswählen",
       55, 1113, 910
     );
 
@@ -1988,7 +1803,7 @@
     ctx.font = "23px Arial";
 
     ctx.fillText(
-      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-3",
+      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-4",
       55, 1160, 914
     );
 
