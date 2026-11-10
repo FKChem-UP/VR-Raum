@@ -3,37 +3,42 @@
 (function (F) {
   /*
    * ============================================================
-   * WILLKOMMEN-6
+   * WILLKOMMEN-7
    *
    * Elementarzelle -> Gitter -> Einkristallit -> Salzprobe
    * und vollständig rückwärts.
    *
-   * Änderungen gegenüber Willkommen-5:
-   * - Eine durchgehende logarithmische Zoomkurve.
-   * - Keine zusätzlichen weißen Kugelwürfel.
-   * - Die vorhandenen Gitterkugeln schließen ihre Zwischenräume.
-   * - Erst die geschlossene Darstellung wird durch einen
-   *   geometrisch passenden einfachen Kristallwürfel ersetzt.
-   * - Deckende Festkörper und kräftigere Rahmen.
-   * - Erklärungstafel vollständig unter der Podestoberkante.
+   * Änderungen gegenüber Willkommen-6:
+   * - Fester Mittelpunkt für Elementarzelle, Gitter und
+   *   den sich schließenden Kugelwürfel.
+   * - Keine automatische Höhenkorrektur anhand wechselnder
+   *   sichtbarer Geometrie.
+   * - Erst der geschlossene Einkristall sinkt langsam ab.
+   * - Rückwärts erreicht er zuerst den festen Mittelpunkt;
+   *   danach bleibt dieser beim Hineinzoomen unverändert.
+   *
+   * Beibehalten:
+   * - Anfangszelle 10 Sekunden sichtbar.
+   * - Durchgehende logarithmische Zoomkurve.
+   * - Füllen derselben Gitterdarstellung.
+   * - Deckende Festkörper und kräftige Rahmen.
+   * - Erklärungstafel unter der Podestoberkante.
    *
    * Fachlich:
    * NaCl, Fm-3m, Nr. 225, konventionelle Zelle Z = 4.
    * Cl auf 4a; Na auf 4b; Koordination jeweils sechsfach.
    *
-   * Das Weißwerden und das Schließen der Zwischenräume sind
+   * Weißwerden und Schließen der Zwischenräume sind
    * schematische Darstellungswechsel, keine physikalische
    * Ionenverformung, kein Wachstum und keine Auflösung.
    *
    * Raumaufbau, Steuerung und Röntgendemo bleiben unverändert.
-   * Die vorhandenen optionalen Builder-Anknüpfungen für
-   * Bodenraute und Navigation bleiben erhalten.
    * ============================================================
    */
 
   if (!F || !F.RoomBuilder || !F.Menu || !window.AFRAME) {
     console.error(
-      "Willkommen-6: A-Frame, room-builder.js und vr-tools.js " +
+      "Willkommen-7: A-Frame, room-builder.js und vr-tools.js " +
       "müssen vorher geladen sein."
     );
     return;
@@ -53,12 +58,11 @@
   const INFO_Y = 0.48;
 
   /*
-   * Das vollständige 9er-Gitter hat Ionenzentren von
+   * Das vollständige 9er-Gitter hat Zentren von
    * -4.5 bis +4.5 bei einem Abstand von 0.5.
    *
-   * Am Ende des Darstellungswechsels wird jedes Zentrum
-   * durch eine gekachelte Box mit Halbmaß 0.25 dargestellt.
-   * Die geschlossene Außenkontur hat deshalb Kantenlänge 9.5.
+   * Am Ende des Füllens haben die Kacheln Halbmaß 0.25.
+   * Die geschlossene Außenkontur hat Kantenlänge 9.5.
    */
   const FILLED_CENTER_LIMIT = 4.5;
   const FILLED_HALF_TILE = 0.25;
@@ -75,6 +79,19 @@
   const BOX_START = 22.5;
   const BOX_END = 25.5;
   const SOLID_SWITCH = 26;
+
+  /*
+   * Die Absenkung beginnt erst nach dem Wechsel
+   * zur geschlossenen Einkristalldarstellung.
+   */
+  const DESCENT_START = 26;
+  const DESCENT_END = 34;
+
+  /*
+   * Unterkante des Becherglasbodens:
+   * Mittelpunkt -1.1, Dicke 0.065.
+   */
+  const BEAKER_BOTTOM_Y = -1.1325;
 
   const COLORS = {
     sodium: "#a345ff",
@@ -122,15 +139,15 @@
       forward:
         "Dieselben weißen Kugeln füllen die Zwischenräume — ein Darstellungswechsel.",
       reverse:
-        "Die geschlossene Darstellung öffnet sich wieder zu einzelnen Kugeln."
+        "Am festen Mittelpunkt öffnet sich die Darstellung wieder zu einzelnen Kugeln."
     },
     {
       title: "Viele unterschiedlich orientierte Kristallite",
       reverseTitle: "Hineinzoomen in einen ausgewählten Kristalliten",
       forward:
-        "Der goldmarkierte Kristallit enthält die ursprüngliche Elementarzelle.",
+        "Der geschlossene Kristallit sinkt langsam zur körnigen Salzprobe.",
       reverse:
-        "Der goldmarkierte Kristallit wird größer; die übrige Probe tritt zurück."
+        "Der goldmarkierte Kristallit steigt zum festen Präsentationsmittelpunkt."
     },
     {
       title: "NaCl · eine körnige Feststoffprobe",
@@ -184,7 +201,9 @@
   }
 
   function currentDemo() {
-    const el = document.getElementById("fkc-welcome-experiment");
+    const el = document.getElementById(
+      "fkc-welcome-experiment"
+    );
 
     return el &&
       el.components &&
@@ -216,8 +235,8 @@
     }
 
     /*
-     * Deduplizierte Nachbarpositionen vervollständigen
-     * die Randkoordination.
+     * Deduplizierte Nachbarn zur Vervollständigung
+     * der Randkoordination.
      */
     Array.from(map.values()).forEach(([i, j, k]) => {
       DIRECTIONS.forEach(([di, dj, dk]) => {
@@ -227,20 +246,6 @@
     });
 
     return map;
-  }
-
-  function cubeHalfHeight(quaternion, size) {
-    const matrix = new T.Matrix4().makeRotationFromQuaternion(
-      quaternion
-    );
-
-    const e = matrix.elements;
-
-    return size * 0.5 * (
-      Math.abs(e[1]) +
-      Math.abs(e[5]) +
-      Math.abs(e[9])
-    );
   }
 
   window.AFRAME.registerComponent("fkc-welcome-demo", {
@@ -264,6 +269,8 @@
       this.localEye = new V();
       this.direction = new V();
       this.tempPosition = new V();
+      this.selectedCenter = new V();
+
       this.dummy = new T.Object3D();
       this.whiteColor = new T.Color(COLORS.white);
 
@@ -273,12 +280,16 @@
       this.lastGeometryTime = NaN;
       this.lastBoxAmount = NaN;
 
-      this.ionGeometryYSupport = 1;
-      this.grainMinimumLocal = -1.1;
-
       this.root = new T.Group();
       this.el.setObject3D("welcome-demo", this.root);
 
+      /*
+       * visual wird nicht mehr dynamisch nach oben
+       * oder unten versetzt.
+       *
+       * Sämtliche Modellpositionen werden ausdrücklich
+       * relativ zum festen Raumursprung berechnet.
+       */
       this.visual = new T.Group();
       this.root.add(this.visual);
 
@@ -286,17 +297,41 @@
       this.atomic.rotation.set(0.18, 0.42, -0.04);
       this.visual.add(this.atomic);
 
-      this.atomicQuaternion = this.atomic.quaternion.clone();
+      this.atomicQuaternion =
+        this.atomic.quaternion.clone();
 
-      this.atomicRotationMatrix = new T.Matrix4()
+      const rotationMatrix = new T.Matrix4()
         .makeRotationFromQuaternion(this.atomicQuaternion);
 
-      const e = this.atomicRotationMatrix.elements;
-      this.rotationY = [e[1], e[5], e[9]];
+      const e = rotationMatrix.elements;
 
-      this.unitCubeHalfHeight = cubeHalfHeight(
-        this.atomicQuaternion,
-        1
+      /*
+       * Einmalig festgelegte Präsentationshöhe.
+       *
+       * Sie berücksichtigt konservativ das gesamte
+       * gedrehte Präsentationsvolumen, nicht die jeweils
+       * gerade sichtbare Detailstufe.
+       *
+       * Dadurch bleibt auch das größere Gitter über dem
+       * Podest, ohne seinen Mittelpunkt zu verschieben.
+       */
+      const rotatedVerticalExtent = BOUND * (
+        Math.abs(e[1]) +
+        Math.abs(e[5]) +
+        Math.abs(e[9])
+      );
+
+      this.presentationCenter = new V(
+        0,
+        TABLE_TOP +
+          SURFACE_GAP +
+          rotatedVerticalExtent +
+          0.04,
+        0
+      );
+
+      this.atomic.position.copy(
+        this.presentationCenter
       );
 
       this.specimen = new T.Group();
@@ -314,9 +349,8 @@
 
     storyTime: function () {
       /*
-       * Die ersten sechs internen Sekunden werden auf
-       * zehn reale Animationssekunden gedehnt.
-       * In dieser Zeit bleibt die Ausgangszelle gleich groß.
+       * Zehn Sekunden Betrachtungszeit für die
+       * anfangs unverändert große Elementarzelle.
        */
       return this.time <= 10
         ? this.time * 0.6
@@ -352,6 +386,7 @@
       texture.generateMipmaps = false;
 
       this.textures.add(texture);
+
       return {canvas, texture};
     },
 
@@ -391,12 +426,6 @@
         alpha
       );
 
-      /*
-       * Nur Festkörper wechseln bei voller Sichtbarkeit
-       * in den wirklich deckenden Renderpfad.
-       *
-       * Glas und Texturen behalten ihre eigene Behandlung.
-       */
       material.userData.welcomeSolid = true;
 
       return material;
@@ -418,7 +447,8 @@
       const base = this.baseOpacity.get(material);
 
       material.opacity =
-        (base === undefined ? 1 : base) * clamp(alpha, 0, 1);
+        (base === undefined ? 1 : base) *
+        clamp(alpha, 0, 1);
 
       material.visible = material.opacity > 0.001;
 
@@ -553,14 +583,18 @@
       );
 
       this.quote = this.mesh(
-        this.ownGeometry(new T.PlaneGeometry(5.4, 1.16)),
+        this.ownGeometry(
+          new T.PlaneGeometry(5.4, 1.16)
+        ),
         this.quoteMaterial,
         this.root
       );
 
       this.quote.position.set(0, 4.43, 0);
 
-      this.phaseTexture = this.makeTexture(1536, 300, () => {});
+      this.phaseTexture = this.makeTexture(
+        1536, 300, () => {}
+      );
 
       this.phaseMaterial = this.ownMaterial(
         new T.MeshBasicMaterial({
@@ -570,17 +604,16 @@
       );
 
       this.phaseBoard = this.mesh(
-        this.ownGeometry(new T.PlaneGeometry(3.4, 0.664)),
+        this.ownGeometry(
+          new T.PlaneGeometry(3.4, 0.664)
+        ),
         this.phaseMaterial,
         this.root
       );
 
       /*
-       * Mitte 0.48 m, Oberkante 0.812 m.
-       * Damit liegt die gesamte Erklärungstafel unter
-       * der 0.85 m hohen Podestoberkante.
-       *
-       * Sie bleibt tangential außerhalb des Podests.
+       * Oberkante 0.812 m:
+       * unterhalb der Podestoberkante von 0.85 m.
        */
       this.phaseBoard.position.set(
         0,
@@ -601,7 +634,12 @@
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.font = "bold 88px Arial";
-            ctx.fillText(text, w / 2, h / 2 + 3);
+
+            ctx.fillText(
+              text,
+              w / 2,
+              h / 2 + 3
+            );
           }
         );
 
@@ -622,6 +660,7 @@
       const ctx = canvas.getContext("2d");
       const w = canvas.width;
       const h = canvas.height;
+
       const entry = PHASES[phase];
       const backward = this.playDirection < 0;
 
@@ -641,16 +680,26 @@
         backward && entry.reverseTitle
           ? entry.reverseTitle
           : entry.title,
-        w / 2, 64, w - 80
+        w / 2,
+        64,
+        w - 80
       );
 
       ctx.font = "35px Arial";
 
-      const text = backward ? entry.reverse : entry.forward;
+      const text = backward
+        ? entry.reverse
+        : entry.forward;
+
       const lines = wrap(ctx, text, w - 100);
 
       lines.slice(0, 2).forEach((line, index) => {
-        ctx.fillText(line, w / 2, 124 + index * 43, w - 80);
+        ctx.fillText(
+          line,
+          w / 2,
+          124 + index * 43,
+          w - 80
+        );
       });
 
       const state = !this.shown
@@ -666,7 +715,9 @@
         state + " · " +
         (backward ? "Hineinzoomen" : "Herauszoomen") +
         " · B/Y → Animationsmenü",
-        w / 2, 254, w - 70
+        w / 2,
+        254,
+        w - 70
       );
 
       this.phaseTexture.texture.needsUpdate = true;
@@ -691,6 +742,7 @@
 
         latticePositions(n).forEach((position, id) => {
           if (seen.has(id)) return;
+
           seen.add(id);
           next.push(position);
         });
@@ -699,13 +751,8 @@
       });
 
       /*
-       * Eine gemeinsame Geometrie für dieselben Gitterionen.
-       *
-       * Anfangs werden die Boxvertices auf eine Kugel
-       * projiziert. Später gehen sie kontinuierlich zurück
-       * auf die Boxkontur.
-       *
-       * Es wird kein zusätzlicher Kugelwürfel eingeblendet.
+       * Dieselbe gemeinsame Geometrie für die Gitterionen:
+       * zuerst kugelförmig, später geschlossene Boxkacheln.
        */
       this.ionGeometry = this.ownGeometry(
         new T.BoxGeometry(2, 2, 2, 4, 4, 4)
@@ -720,14 +767,20 @@
 
       levels.forEach((positions, level) => {
         ["Na", "Cl"].forEach(type => {
-          const points = positions.filter(([i, j, k]) => {
-            const sodium = Math.abs((i + j + k) % 2) === 1;
-            return type === "Na" ? sodium : !sodium;
-          }).map(([i, j, k]) => new V(
-            (i - 1) / 2,
-            (j - 1) / 2,
-            (k - 1) / 2
-          ));
+          const points = positions
+            .filter(([i, j, k]) => {
+              const sodium =
+                Math.abs((i + j + k) % 2) === 1;
+
+              return type === "Na"
+                ? sodium
+                : !sodium;
+            })
+            .map(([i, j, k]) => new V(
+              (i - 1) / 2,
+              (j - 1) / 2,
+              (k - 1) / 2
+            ));
 
           if (!points.length) return;
 
@@ -745,11 +798,16 @@
             points.length
           );
 
-          mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+          mesh.instanceMatrix.setUsage(
+            T.DynamicDrawUsage
+          );
+
           mesh.frustumCulled = false;
           this.atomic.add(mesh);
 
-          const radius = type === "Na" ? 0.115 : 0.165;
+          const radius = type === "Na"
+            ? 0.115
+            : 0.165;
 
           this.ionLayers.push({
             mesh,
@@ -757,7 +815,6 @@
             points,
             radius,
             level,
-            minimumLocal: Infinity,
             originalColor: new T.Color(color)
           });
 
@@ -767,8 +824,16 @@
                 this.labelMaterials[type]
               );
 
-              const width = type === "Na" ? 0.19 : 0.25;
-              sprite.scale.set(width, width / 2, 1);
+              const width = type === "Na"
+                ? 0.19
+                : 0.25;
+
+              sprite.scale.set(
+                width,
+                width / 2,
+                1
+              );
+
               this.atomic.add(sprite);
 
               this.labels.push({
@@ -793,44 +858,71 @@
             const v = bounds.min + b;
 
             vertices.push(
-              bounds.min, u, v, bounds.max, u, v,
-              u, bounds.min, v, u, bounds.max, v,
-              u, v, bounds.min, u, v, bounds.max
+              bounds.min, u, v,
+              bounds.max, u, v,
+
+              u, bounds.min, v,
+              u, bounds.max, v,
+
+              u, v, bounds.min,
+              u, v, bounds.max
             );
           }
         }
 
-        const geometry = this.ownGeometry(new T.BufferGeometry());
+        const geometry = this.ownGeometry(
+          new T.BufferGeometry()
+        );
 
         geometry.setAttribute(
           "position",
           new T.Float32BufferAttribute(vertices, 3)
         );
 
-        const material = this.lineMaterial("#93b3c5", 0.94);
-        const frame = new T.LineSegments(geometry, material);
+        const material = this.lineMaterial(
+          "#93b3c5",
+          0.94
+        );
+
+        const frame = new T.LineSegments(
+          geometry,
+          material
+        );
 
         this.atomic.add(frame);
-        this.frames.push({n, bounds, frame, material});
+
+        this.frames.push({
+          n,
+          bounds,
+          frame,
+          material
+        });
       });
 
-      const cube = this.ownGeometry(new T.BoxGeometry(1, 1, 1));
-      const edges = this.ownGeometry(new T.EdgesGeometry(cube));
+      const cube = this.ownGeometry(
+        new T.BoxGeometry(1, 1, 1)
+      );
 
-      this.originMaterial = this.lineMaterial(COLORS.gold, 1);
+      const edges = this.ownGeometry(
+        new T.EdgesGeometry(cube)
+      );
+
+      this.originMaterial = this.lineMaterial(
+        COLORS.gold,
+        1
+      );
 
       this.originFrame = new T.LineSegments(
         edges,
         this.originMaterial
       );
+
       this.atomic.add(this.originFrame);
 
-      /*
-       * Nur eine leichte Markierung:
-       * Eine starke goldene Vollfläche würde das Innere
-       * der Ausgangszelle verdecken.
-       */
-      this.originTintMaterial = this.basic(COLORS.gold, 0.10);
+      this.originTintMaterial = this.basic(
+        COLORS.gold,
+        0.10
+      );
 
       this.originTint = this.mesh(
         cube,
@@ -840,7 +932,11 @@
     },
 
     updateIonGeometry: function (t) {
-      const boxAmount = ramp(t, BOX_START, BOX_END);
+      const boxAmount = ramp(
+        t,
+        BOX_START,
+        BOX_END
+      );
 
       if (boxAmount === this.lastBoxAmount) return;
 
@@ -848,38 +944,28 @@
 
       const attr = this.ionGeometry.attributes.position;
       const source = this.ionBoxPositions;
-      const ry = this.rotationY;
-
-      let ySupport = 0;
 
       for (let i = 0; i < attr.count; i++) {
         const x = source[i * 3];
         const y = source[i * 3 + 1];
         const z = source[i * 3 + 2];
 
-        const length = Math.sqrt(x * x + y * y + z * z);
+        const length = Math.sqrt(
+          x * x + y * y + z * z
+        );
 
-        const px = lerp(x / length, x, boxAmount);
-        const py = lerp(y / length, y, boxAmount);
-        const pz = lerp(z / length, z, boxAmount);
-
-        attr.setXYZ(i, px, py, pz);
-
-        ySupport = Math.max(
-          ySupport,
-          Math.abs(ry[0] * px + ry[1] * py + ry[2] * pz)
+        attr.setXYZ(
+          i,
+          lerp(x / length, x, boxAmount),
+          lerp(y / length, y, boxAmount),
+          lerp(z / length, z, boxAmount)
         );
       }
 
       attr.needsUpdate = true;
+
       this.ionGeometry.computeVertexNormals();
       this.ionGeometry.computeBoundingSphere();
-
-      /*
-       * Unterste Ausdehnung der tatsächlich verwendeten
-       * Kugel-/Boxgeometrie nach ihrer Rotation.
-       */
-      this.ionGeometryYSupport = ySupport;
     },
 
     makeCoordination: function () {
@@ -909,7 +995,11 @@
 
         const neighbors = DIRECTIONS.map(d =>
           center.clone().add(
-            new V(d[0] / 2, d[1] / 2, d[2] / 2)
+            new V(
+              d[0] / 2,
+              d[1] / 2,
+              d[2] / 2
+            )
           )
         );
 
@@ -924,20 +1014,33 @@
 
         octEdges.forEach(([a, b]) => {
           vertices.push(
-            neighbors[a].x, neighbors[a].y, neighbors[a].z,
-            neighbors[b].x, neighbors[b].y, neighbors[b].z
+            neighbors[a].x,
+            neighbors[a].y,
+            neighbors[a].z,
+            neighbors[b].x,
+            neighbors[b].y,
+            neighbors[b].z
           );
         });
 
-        const geometry = this.ownGeometry(new T.BufferGeometry());
+        const geometry = this.ownGeometry(
+          new T.BufferGeometry()
+        );
 
         geometry.setAttribute(
           "position",
           new T.Float32BufferAttribute(vertices, 3)
         );
 
-        const material = this.lineMaterial(example.color, 1);
-        const lines = new T.LineSegments(geometry, material);
+        const material = this.lineMaterial(
+          example.color,
+          1
+        );
+
+        const lines = new T.LineSegments(
+          geometry,
+          material
+        );
 
         this.atomic.add(lines);
 
@@ -950,13 +1053,26 @@
     },
 
     makeSpecimen: function () {
-      const cube = this.ownGeometry(new T.BoxGeometry(1, 1, 1));
-      const edges = this.ownGeometry(new T.EdgesGeometry(cube));
+      const cube = this.ownGeometry(
+        new T.BoxGeometry(1, 1, 1)
+      );
 
-      this.selectedPosition = new V(0, -0.72, 0.18);
+      const edges = this.ownGeometry(
+        new T.EdgesGeometry(cube)
+      );
+
+      this.selectedPosition = new V(
+        0,
+        -0.72,
+        0.18
+      );
+
       this.selectedSize = SELECTED_SIZE;
 
-      this.selectedMaterial = this.lit(COLORS.white);
+      this.selectedMaterial = this.lit(
+        COLORS.white
+      );
+
       this.selectedMaterial.roughness = 0.4;
       this.selectedMaterial.emissive.set("#ffffff");
       this.selectedMaterial.emissiveIntensity = 0.08;
@@ -967,16 +1083,28 @@
         this.specimen
       );
 
-      this.selectedCrystal.position.copy(this.selectedPosition);
-      this.selectedCrystal.rotation.copy(this.atomic.rotation);
-      this.selectedCrystal.scale.setScalar(this.selectedSize);
+      this.selectedCrystal.position.copy(
+        this.selectedPosition
+      );
 
-      this.selectedGoldMaterial = this.lineMaterial(COLORS.gold, 1);
+      this.selectedCrystal.rotation.copy(
+        this.atomic.rotation
+      );
+
+      this.selectedCrystal.scale.setScalar(
+        this.selectedSize
+      );
+
+      this.selectedGoldMaterial = this.lineMaterial(
+        COLORS.gold,
+        1
+      );
 
       this.selectedGold = new T.LineSegments(
         edges,
         this.selectedGoldMaterial
       );
+
       this.selectedCrystal.add(this.selectedGold);
 
       let seed = 745219;
@@ -992,6 +1120,7 @@
         for (let iz = -5; iz <= 5; iz++) {
           const x = ix * 0.165;
           const z = iz * 0.165;
+
           const r = Math.sqrt(x * x + z * z);
 
           if (r > 0.83) continue;
@@ -1005,25 +1134,29 @@
               z + (random() - 0.5) * 0.025
             );
 
-            if (position.distanceTo(this.selectedPosition) < 0.20) {
+            if (
+              position.distanceTo(this.selectedPosition) <
+              0.20
+            ) {
               continue;
             }
 
-            const rotation = new T.Quaternion().setFromEuler(
-              new T.Euler(
-                random() * Math.PI,
-                random() * Math.PI,
-                random() * Math.PI
-              )
-            );
+            const rotation =
+              new T.Quaternion().setFromEuler(
+                new T.Euler(
+                  random() * Math.PI,
+                  random() * Math.PI,
+                  random() * Math.PI
+                )
+              );
 
-            const size = 0.115 + random() * 0.035;
+            const size =
+              0.115 + random() * 0.035;
 
             this.grains.push({
               position,
               rotation,
-              size,
-              halfHeight: cubeHalfHeight(rotation, size)
+              size
             });
           }
         }
@@ -1038,14 +1171,19 @@
         this.grains.length
       );
 
-      this.grainMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+      this.grainMesh.instanceMatrix.setUsage(
+        T.DynamicDrawUsage
+      );
+
       this.grainMesh.frustumCulled = false;
       this.specimen.add(this.grainMesh);
 
       for (let i = 0; i < this.grains.length; i++) {
         this.grainMesh.setColorAt(
           i,
-          new T.Color().setScalar(0.91 + random() * 0.09)
+          new T.Color().setScalar(
+            0.91 + random() * 0.09
+          )
         );
       }
 
@@ -1080,12 +1218,18 @@
         );
 
         return Math.exp(
-          -(delta * delta) / (2 * 0.15 * 0.15)
+          -(delta * delta) /
+          (2 * 0.15 * 0.15)
         );
       }
 
       const wallGeometry = new T.CylinderGeometry(
-        1.02, 0.98, 2.2, 64, 5, true
+        1.02,
+        0.98,
+        2.2,
+        64,
+        5,
+        true
       );
 
       const positions = wallGeometry.attributes.position;
@@ -1095,7 +1239,10 @@
         const y = positions.getY(i);
         const z = positions.getZ(i);
 
-        const weight = spoutWeight(Math.atan2(x, z));
+        const weight = spoutWeight(
+          Math.atan2(x, z)
+        );
+
         const top = ramp(y, 0.65, 1.1);
         const radial = Math.sqrt(x * x + z * z);
 
@@ -1118,6 +1265,7 @@
         this.glassMaterial,
         this.beaker
       );
+
       wall.renderOrder = 3;
 
       this.baseGlassMaterial = this.ownMaterial(
@@ -1134,15 +1282,24 @@
 
       const bottom = this.mesh(
         this.ownGeometry(
-          new T.CylinderGeometry(0.98, 0.98, 0.065, 64)
+          new T.CylinderGeometry(
+            0.98,
+            0.98,
+            0.065,
+            64
+          )
         ),
         this.baseGlassMaterial,
         this.beaker
       );
+
       bottom.position.y = -1.1;
       bottom.renderOrder = 3;
 
-      this.glassEdgeMaterial = this.basic("#c6e7f5", 1);
+      this.glassEdgeMaterial = this.basic(
+        "#c6e7f5",
+        1
+      );
 
       const lipPoints = [];
 
@@ -1166,16 +1323,28 @@
 
       const lip = this.mesh(
         this.ownGeometry(
-          new T.TubeGeometry(lipCurve, 128, 0.022, 6, true)
+          new T.TubeGeometry(
+            lipCurve,
+            128,
+            0.022,
+            6,
+            true
+          )
         ),
         this.glassEdgeMaterial,
         this.beaker
       );
+
       lip.renderOrder = 4;
 
       const baseRing = this.mesh(
         this.ownGeometry(
-          new T.TorusGeometry(0.98, 0.018, 6, 64)
+          new T.TorusGeometry(
+            0.98,
+            0.018,
+            6,
+            64
+          )
         ),
         this.glassEdgeMaterial,
         this.beaker
@@ -1188,12 +1357,14 @@
       const scaleTexture = this.makeTexture(
         384, 1024, (ctx, w, h) => {
           ctx.clearRect(0, 0, w, h);
+
           ctx.fillStyle = "#f2fbff";
           ctx.strokeStyle = "#f2fbff";
           ctx.lineWidth = 8;
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
           ctx.font = "bold 62px Arial";
+
           ctx.fillText("mL", 168, 62);
 
           for (let i = 0; i <= 8; i++) {
@@ -1206,7 +1377,11 @@
             ctx.stroke();
 
             if (major) {
-              ctx.fillText(String(500 - i * 50), 165, y);
+              ctx.fillText(
+                String(500 - i * 50),
+                165,
+                y
+              );
             }
           }
 
@@ -1225,12 +1400,19 @@
       );
 
       this.scaleBoard = this.mesh(
-        this.ownGeometry(new T.PlaneGeometry(0.59, 1.57)),
+        this.ownGeometry(
+          new T.PlaneGeometry(0.59, 1.57)
+        ),
         this.scaleMaterial,
         this.beaker
       );
 
-      this.scaleBoard.position.set(0.18, 0.06, 1.035);
+      this.scaleBoard.position.set(
+        0.18,
+        0.06,
+        1.035
+      );
+
       this.scaleBoard.renderOrder = 5;
 
       this.glassMaterials = [
@@ -1253,19 +1435,18 @@
 
     atomicScale: function (t) {
       /*
-       * Eine einzige Kurve für sämtliche Zoomstufen.
-       *
-       * Keine einzelnen smoothstep-Segmente:
-       * log(scale) ändert sich während des Zooms linear.
-       * Damit bleibt die relative Zoomgeschwindigkeit konstant.
+       * Unveränderte durchgehende logarithmische Zoomkurve.
+       * Keine Stopps zwischen den Detailstufen.
        */
       const progress = clamp(
-        (t - ZOOM_START) / (ZOOM_END - ZOOM_START),
+        (t - ZOOM_START) /
+        (ZOOM_END - ZOOM_START),
         0,
         1
       );
 
-      const finalScale = SELECTED_SIZE / FILLED_SPAN;
+      const finalScale =
+        SELECTED_SIZE / FILLED_SPAN;
 
       return Math.exp(
         lerp(
@@ -1277,7 +1458,93 @@
     },
 
     focusProgress: function (t) {
-      return ramp(t, 26, 34);
+      return ramp(
+        t,
+        DESCENT_START,
+        DESCENT_END
+      );
+    },
+
+    updateModelPositions: function (t, scale, zoom) {
+      /*
+       * Fester Mittelpunkt für sämtliche atomaren Stufen.
+       * Keine Abhängigkeit von Bounding-Box, Deckkraft,
+       * Instanzzahl oder aktuell sichtbarer Geometrie.
+       */
+      this.visual.position.set(0, 0, 0);
+
+      this.atomic.position.copy(
+        this.presentationCenter
+      );
+
+      this.atomic.scale.setScalar(scale);
+
+      const progress = this.focusProgress(t);
+
+      if (t <= DESCENT_START) {
+        /*
+         * Bis zum fertigen Einkristall bleibt auch dessen
+         * geometrisch passende Ersatzdarstellung exakt
+         * am Mittelpunkt des Gitters.
+         */
+        this.selectedCenter.copy(
+          this.presentationCenter
+        );
+      } else {
+        /*
+         * Eine einzige kontinuierliche Absenkbewegung.
+         *
+         * Der Zielwert berücksichtigt den laufenden Zoom.
+         * Dadurch bleibt der spätere Glasboden oberhalb
+         * der Podestplatte, ohne separate Höhenkorrektur.
+         *
+         * Am Ende:
+         * Becherglas-Unterkante = TABLE_TOP + SURFACE_GAP.
+         */
+        const restingCenterY =
+          TABLE_TOP +
+          SURFACE_GAP +
+          (
+            this.selectedPosition.y -
+            BEAKER_BOTTOM_Y
+          ) * zoom;
+
+        this.selectedCenter.set(
+          lerp(
+            this.presentationCenter.x,
+            this.selectedPosition.x,
+            progress
+          ),
+          lerp(
+            this.presentationCenter.y,
+            restingCenterY,
+            progress
+          ),
+          lerp(
+            this.presentationCenter.z,
+            this.selectedPosition.z,
+            progress
+          )
+        );
+      }
+
+      /*
+       * Mittelpunkt des ausgewählten Kristalls:
+       *
+       * specimen.position + selectedPosition * zoom
+       * = selectedCenter
+       *
+       * Diese Gleichung gilt jederzeit, auch am Übergang
+       * zwischen gefülltem Gitter und einfachem Würfel.
+       */
+      this.specimen.position
+        .copy(this.selectedCenter)
+        .addScaledVector(
+          this.selectedPosition,
+          -zoom
+        );
+
+      this.specimen.scale.setScalar(zoom);
     },
 
     setShown: function (shown) {
@@ -1293,6 +1560,7 @@
       this.playDirection = 1;
       this.paused = true;
       this.lastPhase = -1;
+
       this.updateAnimation(true);
     },
 
@@ -1307,13 +1575,20 @@
           value => value > this.time + 0.1
         );
 
-        this.time = next === undefined ? END : next;
+        this.time = next === undefined
+          ? END
+          : next;
       } else {
-        const previous = PHASE_TIMES.slice().reverse().find(
-          value => value < this.time - 0.1
-        );
+        const previous = PHASE_TIMES
+          .slice()
+          .reverse()
+          .find(
+            value => value < this.time - 0.1
+          );
 
-        this.time = previous === undefined ? 0 : previous;
+        this.time = previous === undefined
+          ? 0
+          : previous;
       }
 
       this.paused = true;
@@ -1321,19 +1596,16 @@
     },
 
     updateIonInstances: function (scale, t) {
-      const ry = this.rotationY;
-      const fill = ramp(t, FILL_START, FILL_END);
+      const fill = ramp(
+        t,
+        FILL_START,
+        FILL_END
+      );
 
-      /*
-       * Die zusätzlichen äußeren Koordinationsnachbarn
-       * gehören nicht zum geschlossenen 9er-Block.
-       * Sie treten vor dessen vollständigem Schließen zurück.
-       */
-      const outerNeighborFactor = 1 - ramp(t, 20, 24.5);
+      const outerNeighborFactor =
+        1 - ramp(t, 20, 24.5);
 
       this.ionLayers.forEach(layer => {
-        let minimum = Infinity;
-
         const targetRadius = lerp(
           layer.radius,
           FILLED_HALF_TILE,
@@ -1350,7 +1622,8 @@
           const available = BOUND / scale - edge;
 
           const reveal = clamp(
-            available / Math.max(targetRadius, 0.00001),
+            available /
+            Math.max(targetRadius, 0.00001),
             0,
             1
           );
@@ -1363,27 +1636,21 @@
             : 1;
 
           const radius =
-            targetRadius * reveal * neighborFactor;
+            targetRadius *
+            reveal *
+            neighborFactor;
 
           this.dummy.position.copy(point);
           this.dummy.quaternion.identity();
           this.dummy.scale.setScalar(radius);
           this.dummy.updateMatrix();
 
-          layer.mesh.setMatrixAt(index, this.dummy.matrix);
-
-          if (radius > 0.00001) {
-            const y =
-              ry[0] * point.x +
-              ry[1] * point.y +
-              ry[2] * point.z -
-              radius * this.ionGeometryYSupport;
-
-            minimum = Math.min(minimum, y);
-          }
+          layer.mesh.setMatrixAt(
+            index,
+            this.dummy.matrix
+          );
         });
 
-        layer.minimumLocal = minimum;
         layer.mesh.instanceMatrix.needsUpdate = true;
       });
     },
@@ -1395,8 +1662,6 @@
         .copy(this.selectedPosition)
         .multiplyScalar(1 - progress);
 
-      let minimum = Infinity;
-
       this.grains.forEach((grain, index) => {
         const distance =
           grain.position.distanceTo(focus) * zoom;
@@ -1405,136 +1670,27 @@
           grain.size * zoom * Math.sqrt(3) / 2;
 
         const reveal = clamp(
-          (1.65 - distance) / Math.max(radius, 0.0001),
+          (1.65 - distance) /
+          Math.max(radius, 0.0001),
           0,
           1
         );
 
         this.dummy.position.copy(grain.position);
         this.dummy.quaternion.copy(grain.rotation);
-        this.dummy.scale.setScalar(grain.size * reveal);
+        this.dummy.scale.setScalar(
+          grain.size * reveal
+        );
+
         this.dummy.updateMatrix();
 
-        this.grainMesh.setMatrixAt(index, this.dummy.matrix);
-
-        if (reveal > 0.00001) {
-          minimum = Math.min(
-            minimum,
-            grain.position.y - grain.halfHeight * reveal
-          );
-        }
+        this.grainMesh.setMatrixAt(
+          index,
+          this.dummy.matrix
+        );
       });
 
-      this.grainMinimumLocal = minimum;
       this.grainMesh.instanceMatrix.needsUpdate = true;
-    },
-
-    placeAbovePodium: function (t, scale, zoom) {
-      let minimum = Infinity;
-
-      if (this.atomic.visible) {
-        this.ionLayers.forEach(layer => {
-          if (
-            layer.mesh.visible &&
-            Number.isFinite(layer.minimumLocal)
-          ) {
-            minimum = Math.min(
-              minimum,
-              this.atomic.position.y +
-              layer.minimumLocal * scale
-            );
-          }
-        });
-
-        if (
-          this.originMaterial.visible ||
-          this.originTintMaterial.visible
-        ) {
-          minimum = Math.min(
-            minimum,
-            this.atomic.position.y -
-            this.unitCubeHalfHeight * scale
-          );
-        }
-
-        const ry = this.rotationY;
-
-        this.frames.forEach(entry => {
-          if (!entry.frame.visible) return;
-
-          let y = 0;
-
-          ry.forEach(coefficient => {
-            y += coefficient * (
-              coefficient >= 0
-                ? entry.bounds.min
-                : entry.bounds.max
-            );
-          });
-
-          minimum = Math.min(
-            minimum,
-            this.atomic.position.y + y * scale
-          );
-        });
-      }
-
-      /*
-       * Derselbe Mittelpunkt und dieselbe Außenkontur
-       * wie beim vollständig gefüllten Gitter.
-       */
-      if (this.selectedCrystal.visible) {
-        const crystalMinimum =
-          this.specimen.position.y +
-          this.selectedPosition.y * zoom -
-          this.unitCubeHalfHeight * this.selectedSize * zoom;
-
-        minimum = Math.min(minimum, crystalMinimum);
-      }
-
-      if (
-        this.grainMesh.visible &&
-        Number.isFinite(this.grainMinimumLocal)
-      ) {
-        minimum = Math.min(
-          minimum,
-          this.specimen.position.y +
-          this.grainMinimumLocal * zoom
-        );
-      }
-
-      const glassMinimum =
-        this.specimen.position.y - 1.1325 * zoom;
-
-      /*
-       * Den Platz für den Glasboden kontinuierlich
-       * vorbereiten, bevor die Glaswand deutlich sichtbar ist.
-       */
-      if (t >= 32.5 && Number.isFinite(minimum)) {
-        minimum = lerp(
-          minimum,
-          Math.min(minimum, glassMinimum),
-          ramp(t, 32.5, 34)
-        );
-      }
-
-      if (this.beaker.visible) {
-        minimum = Math.min(minimum, glassMinimum);
-      }
-
-      if (!Number.isFinite(minimum)) minimum = 0;
-
-      /*
-       * Kontinuierlicher Sicherheitsabstand:
-       * keine sprunghaften Änderungen an den Zeitgrenzen.
-       */
-      const instanceMargin =
-        0.035 *
-        ramp(t, 6, 6.5) *
-        (1 - ramp(t, 34, 34.5));
-
-      this.visual.position.y =
-        TABLE_TOP + SURFACE_GAP + instanceMargin - minimum;
     },
 
     updateAnimation: function (updateInstances) {
@@ -1542,28 +1698,20 @@
       const scale = this.atomicScale(t);
 
       /*
-       * Der Kristallmaßstab wird direkt aus dem Gittermaßstab
-       * berechnet. Deshalb entsteht beim Darstellungswechsel
-       * kein unabhängiger zweiter Zoom.
+       * Gleicher Maßstab auf beiden Seiten des
+       * Darstellungswechsels:
        *
-       * selectedSize * specimenZoom = FILLED_SPAN * scale
+       * selectedSize * specimenZoom
+       * = FILLED_SPAN * scale
        */
       const specimenZoom =
         FILLED_SPAN * scale / this.selectedSize;
 
-      const progress = this.focusProgress(t);
-
-      this.atomic.scale.setScalar(scale);
-
-      this.atomic.position
-        .copy(this.selectedPosition)
-        .multiplyScalar(progress * specimenZoom);
-
-      this.specimen.position
-        .copy(this.selectedPosition)
-        .multiplyScalar(-(1 - progress) * specimenZoom);
-
-      this.specimen.scale.setScalar(specimenZoom);
+      this.updateModelPositions(
+        t,
+        scale,
+        specimenZoom
+      );
 
       const whitening = ramp(t, 18.5, 22);
 
@@ -1575,11 +1723,6 @@
         ramp(t, 16, 18)
       ];
 
-      /*
-       * Das Gitter bleibt beim Füllen deckend.
-       * Es wird nicht ausgeblendet, während ein anderer
-       * Kugelwürfel erscheint.
-       */
       this.ionLayers.forEach(layer => {
         layer.material.color
           .copy(layer.originalColor)
@@ -1597,7 +1740,8 @@
           levelAlpha[layer.level]
         );
 
-        layer.mesh.visible = layer.material.visible;
+        layer.mesh.visible =
+          layer.material.visible;
       });
 
       this.frames.forEach(entry => {
@@ -1625,13 +1769,23 @@
         if (extent * scale > BOUND) alpha = 0;
 
         this.setAlpha(entry.material, alpha);
-        entry.frame.visible = entry.material.visible;
+
+        entry.frame.visible =
+          entry.material.visible;
       });
 
-      const originAlpha = 1 - ramp(t, 24, 26);
+      const originAlpha =
+        1 - ramp(t, 24, 26);
 
-      this.setAlpha(this.originMaterial, originAlpha);
-      this.setAlpha(this.originTintMaterial, originAlpha);
+      this.setAlpha(
+        this.originMaterial,
+        originAlpha
+      );
+
+      this.setAlpha(
+        this.originTintMaterial,
+        originAlpha
+      );
 
       const sodiumCoord =
         ramp(t, 0.7, 1.2) *
@@ -1649,33 +1803,43 @@
             : chlorideCoord
         );
 
-        entry.lines.visible = entry.material.visible;
+        entry.lines.visible =
+          entry.material.visible;
       });
 
-      const labelAlpha = 1 - ramp(t, 7, 10);
+      const labelAlpha =
+        1 - ramp(t, 7, 10);
 
-      Object.values(this.labelMaterials).forEach(material => {
-        this.setAlpha(material, labelAlpha);
-      });
+      Object.values(this.labelMaterials)
+        .forEach(material => {
+          this.setAlpha(
+            material,
+            labelAlpha
+          );
+        });
 
       this.labels.forEach(label => {
-        label.sprite.visible = labelAlpha > 0.001;
+        label.sprite.visible =
+          labelAlpha > 0.001;
       });
 
       /*
-       * Die Kacheln sind bereits ab t = 25.5 lückenlos.
+       * Die Kacheln sind ab t = 25.5 geschlossen.
+       * Bei t = 26 übernimmt der einfache Würfel.
        *
-       * Bei t = 26 übernimmt ein einfacher Würfel mit
-       * identischer Position, Rotation und Außenkontur.
-       *
-       * Keine Transparenzüberblendung zwischen zwei
-       * verschieden großen Würfeln.
+       * Mittelpunkt, Rotation und Außenmaß stimmen
+       * exakt überein.
        */
-      this.atomic.visible = t < SOLID_SWITCH;
+      this.atomic.visible =
+        t < SOLID_SWITCH;
 
-      this.setAlpha(this.selectedMaterial, 1);
+      this.setAlpha(
+        this.selectedMaterial,
+        1
+      );
 
-      this.selectedCrystal.visible = t >= SOLID_SWITCH;
+      this.selectedCrystal.visible =
+        t >= SOLID_SWITCH;
 
       this.setAlpha(
         this.selectedGoldMaterial,
@@ -1691,17 +1855,18 @@
         ramp(t, 27, 30)
       );
 
-      this.grainMesh.visible = this.grainMaterial.visible;
+      this.grainMesh.visible =
+        this.grainMaterial.visible;
+
+      const progress = this.focusProgress(t);
 
       const focusLength =
-        this.selectedPosition.length() * (1 - progress);
+        this.selectedPosition.length() *
+        (1 - progress);
 
-      /*
-       * Auch die Freigabe des Becherglases erfolgt weich,
-       * statt bei einer Größenbedingung plötzlich umzuschalten.
-       */
       const fitClearance =
-        1.68 - specimenZoom * (1.63 + focusLength);
+        1.68 -
+        specimenZoom * (1.63 + focusLength);
 
       const glassFitAlpha = ramp(
         fitClearance,
@@ -1710,36 +1875,46 @@
       );
 
       const glassAlpha =
-        ramp(t, 32.5, 34.5) * glassFitAlpha;
+        ramp(t, 32.5, 34.5) *
+        glassFitAlpha;
 
       this.glassMaterials.forEach(material => {
-        this.setAlpha(material, glassAlpha);
+        this.setAlpha(
+          material,
+          glassAlpha
+        );
       });
 
-      this.beaker.visible = glassAlpha > 0.001;
+      this.beaker.visible =
+        glassAlpha > 0.001;
 
-      if (updateInstances && this.lastGeometryTime !== t) {
-        /*
-         * Die Ionenmatrizen werden nur benötigt, solange
-         * das Gitter tatsächlich sichtbar ist.
-         *
-         * Nach einem Phasensprung oder auf dem Rückweg
-         * werden sie vor der Darstellung wieder aktualisiert.
-         */
+      if (
+        updateInstances &&
+        this.lastGeometryTime !== t
+      ) {
         if (t < SOLID_SWITCH) {
           this.updateIonGeometry(t);
-          this.updateIonInstances(scale, t);
+
+          this.updateIonInstances(
+            scale,
+            t
+          );
         }
 
         if (t >= 26) {
-          this.updateGrainInstances(specimenZoom, t);
+          this.updateGrainInstances(
+            specimenZoom,
+            t
+          );
         }
 
         this.lastGeometryTime = t;
       }
 
-      this.placeAbovePodium(t, scale, specimenZoom);
-
+      /*
+       * Keine placeAbovePodium()-Berechnung mehr.
+       * Sichtbarkeitswechsel verändern keine Position.
+       */
       this.visual.visible = this.shown;
 
       const phase = this.phaseIndex();
@@ -1757,6 +1932,7 @@
       ) {
         this.lastPhase = phase;
         this.lastState = state;
+
         this.drawPhase(phase);
       }
     },
@@ -1800,11 +1976,6 @@
         this.direction.normalize();
       }
 
-      /*
-       * Die Erklärung bleibt auf der Nutzerseite,
-       * aber unterhalb der Tischplatte.
-       * Nur horizontale Ausrichtung, keine Kopfneigung.
-       */
       this.phaseBoard.position.set(
         this.direction.x * INFO_DISTANCE,
         INFO_Y,
@@ -1813,7 +1984,12 @@
 
       this.faceViewer(this.phaseBoard);
 
-      if (!this.shown || this.storyTime() >= 10) return;
+      if (
+        !this.shown ||
+        this.storyTime() >= 10
+      ) {
+        return;
+      }
 
       this.atomic.updateWorldMatrix(true, false);
 
@@ -1821,9 +1997,13 @@
       this.atomic.worldToLocal(this.localEye);
 
       this.labels.forEach(label => {
-        this.direction.copy(this.localEye).sub(label.center);
+        this.direction
+          .copy(this.localEye)
+          .sub(label.center);
 
-        if (this.direction.lengthSq() < 0.00001) {
+        if (
+          this.direction.lengthSq() < 0.00001
+        ) {
           this.direction.set(0, 0, 1);
         } else {
           this.direction.normalize();
@@ -1839,18 +2019,31 @@
     },
 
     tick: function (time, delta) {
-      const menuOpen = F.Menu && F.Menu.opened;
+      const menuOpen =
+        F.Menu && F.Menu.opened;
 
-      if (!this.paused && this.shown && !menuOpen) {
+      if (
+        !this.paused &&
+        this.shown &&
+        !menuOpen
+      ) {
         const seconds = Math.min(
-          Math.max((delta || 0) / 1000, 0),
+          Math.max(
+            (delta || 0) / 1000,
+            0
+          ),
           0.05
         );
 
         this.time +=
-          seconds * this.data.speed * this.playDirection;
+          seconds *
+          this.data.speed *
+          this.playDirection;
 
-        if (this.playDirection > 0 && this.time >= END) {
+        if (
+          this.playDirection > 0 &&
+          this.time >= END
+        ) {
           this.time = END;
           this.playDirection = -1;
         } else if (
@@ -1860,21 +2053,26 @@
           this.time = 0;
           this.playDirection = 1;
 
-          if (!this.loop) this.paused = true;
+          if (!this.loop) {
+            this.paused = true;
+          }
         }
       }
 
       let updateInstances =
         time - this.lastInstanceUpdate >= 40;
 
-      /*
-       * Beim Rückwechsel vom einfachen Kristall zum Gitter
-       * keine veralteten Instanzmatrizen kurz anzeigen.
-       */
       const shouldShowAtomic =
         this.storyTime() < SOLID_SWITCH;
 
-      if (shouldShowAtomic && !this.atomic.visible) {
+      /*
+       * Vor dem Rückwechsel zum Gitter dessen
+       * Instanzmatrizen sofort aktualisieren.
+       */
+      if (
+        shouldShowAtomic &&
+        !this.atomic.visible
+      ) {
         updateInstances = true;
       }
 
@@ -1889,9 +2087,17 @@
     remove: function () {
       this.el.removeObject3D("welcome-demo");
 
-      this.geometries.forEach(geometry => geometry.dispose());
-      this.materials.forEach(material => material.dispose());
-      this.textures.forEach(texture => texture.dispose());
+      this.geometries.forEach(
+        geometry => geometry.dispose()
+      );
+
+      this.materials.forEach(
+        material => material.dispose()
+      );
+
+      this.textures.forEach(
+        texture => texture.dispose()
+      );
 
       this.geometries.clear();
       this.materials.clear();
@@ -1904,7 +2110,7 @@
    * ============================================================
    * BEGRÜSSUNGSRAUM ERGÄNZEN
    *
-   * Vorhandener Raumaufbau und Röntgenwrapper bleiben erhalten.
+   * Bestehender Raumaufbau und Röntgenwrapper bleiben erhalten.
    * ============================================================
    */
 
@@ -1918,43 +2124,64 @@
       rooms
     );
 
-    if (config.kind !== "welcome") return result;
+    if (config.kind !== "welcome") {
+      return result;
+    }
 
     /*
-     * Vorhandene optionale Anknüpfung aus Willkommen-5.
-     * Ob diese ID im Raumaufbau verwendet wird, hängt von
-     * room-builder.js ab.
+     * Vorhandene optionale Anknüpfung beibehalten.
+     * Die ID muss im Raumaufbau tatsächlich existieren.
      */
     const floorDiamond = parent.querySelector(
       "#welcome-floor-diamond"
     );
 
-    if (floorDiamond) floorDiamond.remove();
+    if (floorDiamond) {
+      floorDiamond.remove();
+    }
 
-    const experiment = document.createElement("a-entity");
+    const experiment =
+      document.createElement("a-entity");
 
     experiment.id = "fkc-welcome-experiment";
-    experiment.setAttribute("fkc-welcome-demo", "");
+
+    experiment.setAttribute(
+      "fkc-welcome-demo",
+      ""
+    );
 
     parent.appendChild(experiment);
 
     /*
-     * Vorhandene optionale Navigationsanbindung beibehalten.
-     * Sie greift nur, wenn der Builder isWalkable(x, z)
-     * tatsächlich bereitstellt.
+     * Vorhandene optionale Navigationsanbindung.
+     * Greift nur, wenn der Builder isWalkable(x, z)
+     * bereitstellt.
      *
-     * Dies betrifft Software-Navigation, nicht reales Gehen.
+     * Software-Navigation, nicht reales Gehen.
      */
-    if (result && typeof result.isWalkable === "function") {
-      const previousWalkable = result.isWalkable;
-      const clearanceRadius = TABLE_RADIUS + 0.28;
+    if (
+      result &&
+      typeof result.isWalkable === "function"
+    ) {
+      const previousWalkable =
+        result.isWalkable;
+
+      const clearanceRadius =
+        TABLE_RADIUS + 0.28;
 
       result.isWalkable = function (x, z) {
-        if (x * x + z * z < clearanceRadius * clearanceRadius) {
+        if (
+          x * x + z * z <
+          clearanceRadius * clearanceRadius
+        ) {
           return false;
         }
 
-        return previousWalkable.call(this, x, z);
+        return previousWalkable.call(
+          this,
+          x,
+          z
+        );
       };
     }
 
@@ -1973,7 +2200,9 @@
     menu.blockDrawing();
     menu.notify(message);
 
-    if (F.setStatus) F.setStatus(message);
+    if (F.setStatus) {
+      F.setStatus(message);
+    }
   }
 
   F.Menu.render = function () {
@@ -1990,10 +2219,15 @@
       ) {
         const item = this.buttons[3];
 
-        item.label = "Begrüßungsanimation & Bedienhilfe";
-        item.action = () => this.navigate("welcome-demo");
+        item.label =
+          "Begrüßungsanimation & Bedienhilfe";
 
-        const pressed = this.pressedIndex === 3;
+        item.action = () =>
+          this.navigate("welcome-demo");
+
+        const pressed =
+          this.pressedIndex === 3;
+
         const offset = pressed ? 5 : 0;
         const ctx = this.ctx;
 
@@ -2006,7 +2240,9 @@
           item.h
         );
 
-        ctx.fillStyle = pressed ? "#bba466" : "#efe0b8";
+        ctx.fillStyle = pressed
+          ? "#bba466"
+          : "#efe0b8";
 
         ctx.fillRect(
           item.x,
@@ -2060,14 +2296,18 @@
 
     ctx.fillText(
       "Vom Ionengitter zur Salzprobe",
-      55, 75, 914
+      55,
+      75,
+      914
     );
 
     ctx.font = "27px Arial";
 
     ctx.fillText(
       "Hin und zurück · NaCl · Koordination 6 : 6",
-      55, 125, 914
+      55,
+      125,
+      914
     );
 
     let y = 160;
@@ -2078,7 +2318,10 @@
       const h = 64;
 
       const index = this.buttons.length;
-      const pressed = index === this.pressedIndex;
+
+      const pressed =
+        index === this.pressedIndex;
+
       const offset = pressed ? 5 : 0;
 
       ctx.fillStyle = "#a9bcae";
@@ -2088,11 +2331,22 @@
         ? "#b8c7bd"
         : color || "#dfe9e2";
 
-      ctx.fillRect(x, y + offset, w, h);
+      ctx.fillRect(
+        x,
+        y + offset,
+        w,
+        h
+      );
 
       ctx.strokeStyle = "#a9bcae";
       ctx.lineWidth = 2;
-      ctx.strokeRect(x, y + offset, w, h);
+
+      ctx.strokeRect(
+        x,
+        y + offset,
+        w,
+        h
+      );
 
       ctx.fillStyle = "#263f33";
       ctx.font = "29px Arial";
@@ -2105,7 +2359,12 @@
       );
 
       this.buttons.push({
-        x, y, w, h, label, action
+        x,
+        y,
+        w,
+        h,
+        label,
+        action
       });
 
       y += 76;
@@ -2116,7 +2375,9 @@
         ? "Animation starten / fortsetzen"
         : "Animation pausieren",
       () => {
-        if (!demo.shown) demo.setShown(true);
+        if (!demo.shown) {
+          demo.setShown(true);
+        }
 
         demo.paused = !demo.paused;
         demo.updateAnimation(true);
@@ -2159,9 +2420,11 @@
 
     button(
       "Richtung: " +
-      (demo.playDirection > 0
-        ? "Herauszoomen"
-        : "Hineinzoomen") +
+      (
+        demo.playDirection > 0
+          ? "Herauszoomen"
+          : "Hineinzoomen"
+      ) +
       " — wechseln",
       () => {
         demo.reverseDirection();
@@ -2180,8 +2443,14 @@
       "Geschwindigkeit: " + demo.data.speed + "×",
       () => {
         const speeds = [0.5, 1, 2];
-        const index = speeds.indexOf(demo.data.speed);
-        const next = speeds[(index + 1) % speeds.length];
+
+        const index = speeds.indexOf(
+          demo.data.speed
+        );
+
+        const next = speeds[
+          (index + 1) % speeds.length
+        ];
 
         demo.el.setAttribute(
           "fkc-welcome-demo",
@@ -2243,40 +2512,55 @@
 
     ctx.fillText(
       "Automatisch: Elementarzelle → Salzprobe → Elementarzelle",
-      55, 904, 914
+      55,
+      904,
+      914
     );
 
     ctx.fillText(
       "Darstellungswechsel vereinfacht · kein Wachstum oder Auflösen",
-      55, 948, 914
+      55,
+      948,
+      914
     );
 
     ctx.fillText(
       "Während das Menü offen ist, hält die Animation an.",
-      55, 992, 914
+      55,
+      992,
+      914
     );
 
     ctx.fillStyle = this.message
       ? "#dcefe2"
       : "#edf2ee";
 
-    ctx.fillRect(35, 1078, 954, 53);
+    ctx.fillRect(
+      35,
+      1078,
+      954,
+      53
+    );
 
     ctx.fillStyle = "#244d35";
     ctx.font = "bold 25px Arial";
 
     ctx.fillText(
       this.message ||
-      "Buttons mit Laser + Trigger auswählen",
-      55, 1113, 910
+        "Buttons mit Laser + Trigger auswählen",
+      55,
+      1113,
+      910
     );
 
     ctx.fillStyle = "#607668";
     ctx.font = "23px Arial";
 
     ctx.fillText(
-      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-6",
-      55, 1160, 914
+      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-7",
+      55,
+      1160,
+      914
     );
 
     this.texture.needsUpdate = true;
