@@ -3,19 +3,22 @@
 (function (F) {
   /*
    * ============================================================
-   * APP — RAUMWECHSEL UND AR-STEUERUNG — XR-FIX-2
+   * APP — XR-FIX-2 + LASER-FIX-1
    * ============================================================
    *
    * Vollständiger Ersatz für js/app.js.
    *
-   * Bestehende Dateien bleiben unverändert.
+   * Bestehende Navigation, Raumwechsel und AR-Unterstützung
+   * bleiben erhalten.
    *
-   * Korrekturen:
-   * - Kopfposition bevorzugt direkt aus WebXR lesen.
-   * - Beim Raumwechsel Position UND Blickrichtung ausrichten.
-   * - Navigation ausdrücklich für VR und AR unterstützen.
-   * - Controllerlaser und Aktionen auch in AR unterstützen.
-   * - PC-Auswahl während immersiver Sitzungen deaktivieren.
+   * LASER-FIX-1:
+   * - Den von vr-tools.js eingesetzten Laserzylinder auch nach
+   *   Installation des XR-Controllerablaufs aktualisieren.
+   * - Trefferpunkt leicht vor der Oberfläche darstellen.
+   * - Trefferpunkt auf dem VR-Menü nach dessen Fläche zeichnen.
+   * - tools.line, tools.hit und tools.source erhalten.
+   *
+   * Keine Änderungen am Raumaufbau oder an Demonstrationen.
    */
 
   const T = AFRAME.THREE;
@@ -292,6 +295,186 @@
   }
 
   /*
+   * ============================================================
+   * LASER-FIX-1 — SICHTBARE LASERGEOMETRIE
+   * ============================================================
+   *
+   * vr-tools.js ersetzt tools.line durch einen Einheitszylinder.
+   * Der XR-Controllerablauf unten ersetzt dessen tick-Wrapper.
+   *
+   * Deshalb aktualisieren wir die sichtbare Geometrie hier
+   * ausdrücklich nach dem Controllerablauf.
+   *
+   * Die alte BufferGeometry wird weiterhin aktualisiert.
+   * Sie ist zugleich der Rückfall, falls noch kein breiter
+   * Laser installiert wurde.
+   */
+  function createLaserUpdater() {
+    const axis = new T.Vector3(0, 1, 0);
+    const start = new T.Vector3();
+    const end = new T.Vector3();
+    const direction = new T.Vector3();
+    const parentScale = new T.Vector3();
+
+    return function (tools) {
+      const line = tools.line;
+
+      if (!line || !line.visible) return;
+
+      /*
+       * Nur den von vr-tools.js eingesetzten Zylinder behandeln.
+       * Die ursprüngliche THREE.Line benötigt keine Mesh-Skalierung.
+       */
+      if (
+        !line.isMesh ||
+        !line.geometry ||
+        line.geometry.type !== "CylinderGeometry"
+      ) return;
+
+      start.copy(tools.origin);
+      end.copy(tools.endpoint);
+
+      /*
+       * Ursprung und Endpunkt liegen in Weltkoordinaten.
+       * Das Laser-Mesh liegt unter seiner eigenen Szenenentity.
+       */
+      const parent = line.parent;
+
+      if (parent) {
+        parent.updateWorldMatrix(true, false);
+        parent.worldToLocal(start);
+        parent.worldToLocal(end);
+      }
+
+      direction.copy(end).sub(start);
+      const length = direction.length();
+
+      if (!Number.isFinite(length) || length < 0.0001) {
+        line.visible = false;
+        return;
+      }
+
+      direction.multiplyScalar(1 / length);
+
+      line.position.copy(start).add(end).multiplyScalar(0.5);
+      line.quaternion.setFromUnitVectors(axis, direction);
+
+      const configuredDiameter = F.Settings
+        ? Number(F.Settings.laserDiameter)
+        : 0.003;
+
+      const diameter =
+        Number.isFinite(configuredDiameter) && configuredDiameter > 0
+          ? configuredDiameter
+          : 0.003;
+
+      /*
+       * Im bestehenden Projekt ist die Laserentity unskaliert.
+       * Eine gleichmäßige Elternskalierung wird ebenfalls
+       * berücksichtigt, damit die Breite in Metern erhalten bleibt.
+       */
+      let scaleFactor = 1;
+
+      if (parent) {
+        parent.getWorldScale(parentScale);
+        scaleFactor = Math.max(0.0001, Math.abs(parentScale.x));
+      }
+
+      const radius = diameter / (2 * scaleFactor);
+
+      line.scale.set(radius, length, radius);
+
+      /*
+       * Der transparente Laser soll nicht selbst die Tiefe
+       * anderer transparenter Objekte blockieren.
+       * Der normale Tiefentest gegen die Raumgeometrie bleibt an.
+       */
+      if (line.material) {
+        line.material.depthWrite = false;
+      }
+
+      line.frustumCulled = false;
+      line.updateWorldMatrix(true, false);
+    };
+  }
+
+  /*
+   * ============================================================
+   * LASER-FIX-1 — TREFFERPUNKT
+   * ============================================================
+   *
+   * Trefferberechnung und Laserendpunkt bleiben unverändert.
+   * Nur die sichtbare Kugel erhält einen Oberflächenversatz.
+   *
+   * Das Menü verwendet renderOrder 100 und depthTest false.
+   * Ein Menütrefferpunkt wird deshalb danach gezeichnet.
+   * Auf normalen Raumflächen bleibt der Tiefentest aktiv.
+   */
+  function installPointerFix(tools) {
+    if (tools.fkcPointerFixInstalled) return;
+
+    tools.fkcPointerFixInstalled = true;
+
+    const previousUpdateHit = tools.updateHit;
+    const pointerPosition = new T.Vector3();
+
+    tools.updateHit = function () {
+      previousUpdateHit.call(this);
+
+      const pointer = this.pointer;
+      const hit = this.hit;
+
+      if (!pointer || !pointer.object3D || !hit) return;
+
+      pointerPosition.copy(hit.point);
+
+      if (hit.normal) {
+        pointerPosition.addScaledVector(hit.normal, 0.012);
+      } else {
+        pointerPosition.addScaledVector(this.direction, -0.012);
+      }
+
+      const parent = pointer.object3D.parent;
+
+      if (parent) {
+        parent.updateWorldMatrix(true, false);
+        parent.worldToLocal(pointerPosition);
+      }
+
+      pointer.object3D.position.copy(pointerPosition);
+
+      const mesh = pointer.getObject3D("mesh");
+
+      if (mesh) {
+        const menuHit = !!(
+          F.Menu &&
+          F.Menu.opened &&
+          hit.type === "action" &&
+          hit.el &&
+          hit.el.dataset.fkcMenu === "true"
+        );
+
+        mesh.frustumCulled = false;
+        mesh.renderOrder = menuHit ? 110 : 1;
+
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+
+        materials.forEach(material => {
+          if (!material) return;
+
+          material.depthTest = !menuHit;
+          material.depthWrite = false;
+          material.toneMapped = false;
+        });
+      }
+
+      pointer.object3D.updateWorldMatrix(true, false);
+    };
+  }
+
+  /*
    * Die vorhandenen Controllerfunktionen weiterverwenden.
    * Nur die VR-exklusiven Einstiegspunkte ersetzen.
    */
@@ -302,6 +485,10 @@
       if (!tools || tools.fkcXRFixInstalled) return;
 
       tools.fkcXRFixInstalled = true;
+
+      const updateVisibleLaser = createLaserUpdater();
+
+      installPointerFix(tools);
 
       tools.activate = function () {
         if (!immersive(this.el.sceneEl)) return;
@@ -398,6 +585,13 @@
         ]);
 
         this.geometry.attributes.position.needsUpdate = true;
+
+        /*
+         * Entscheidend: Nicht nur die alte Liniengeometrie,
+         * sondern auch den tatsächlich sichtbaren Zylinder
+         * positionieren, ausrichten und skalieren.
+         */
+        updateVisibleLaser(this);
       };
     });
   }
@@ -435,6 +629,11 @@
       installControllerFix(this.scene);
 
       this.scene.setAttribute("fkc-spawn-sync", "");
+
+      console.info(
+        "FKC-VR LASER-FIX-1 geladen: " +
+        "Laserzylinder und Trefferpunktdarstellung korrigiert."
+      );
 
       /*
        * Auch beim ersten Wechsel vom PC in XR die reale
