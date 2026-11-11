@@ -1,27 +1,34 @@
 "use strict";
 
 (function (F) {
+  /*
+   * ============================================================
+   * RAUMAUFBAU — GALERIE-3
+   * ============================================================
+   *
+   * - Begrüßungsmodelle aus den zentralen Raumdaten.
+   * - Podestbeschriftungen innerhalb der goldenen Rahmen.
+   * - Automatische Schriftanpassung und Zeilenumbrüche.
+   * - Ablauf.jpg vollständig in das mittlere Wandfeld eingepasst.
+   * - Begrüßungsmodelle auf die Podestoberkante setzen.
+   *
+   * Die bestehende fkc-normalize-Komponente bleibt zuständig
+   * für Modellskalierung und Hitboxen.
+   *
+   * Builder-Schnittstelle, Raumpositionen und Museumsgestaltung
+   * bleiben erhalten.
+   */
+
+  const THREE = AFRAME.THREE;
   const create = F.create;
   const V = THREE.Vector3;
 
-  /*
-   * ============================================================
-   * RAUMAUFBAU — GALERIE-2
-   * ============================================================
-   *
-   * Änderungen:
-   * - Goldenes Rautenmuster im Begrüßungsraum.
-   * - Größere Podestbeschriftungen im Begrüßungsraum.
-   * - Keine schwebenden Modelllabels.
-   * - Vorlesung 1 und 3 tauschen ihre Plätze.
-   * - Vereinfachte Raumtafeln mit vollständigen Titeln.
-   *
-   * Steuerung und GLB-Aufbau bleiben unverändert.
-   */
+  const WELCOME_PEDESTAL_TOP = 0.9625;
+  const WELCOME_MODEL_GAP = 0.015;
 
   /*
    * ============================================================
-   * GRUNDGEOMETRIE UND CANVAS-TEXTUREN
+   * GRUNDGEOMETRIE
    * ============================================================
    */
 
@@ -56,113 +63,207 @@
     return canvas.toDataURL("image/png");
   }
 
+  /*
+   * Zeilenumbruch ohne horizontales Stauchen.
+   * Auch ungewöhnlich lange Einzelwörter werden bei Bedarf geteilt.
+   */
   function wrapCanvasText(ctx, value, maxWidth) {
-    const lines = [];
+    const result = [];
 
     String(value || "").split("\n").forEach(paragraph => {
+      const words = paragraph.split(/\s+/).filter(Boolean);
       let line = "";
 
-      paragraph.split(/\s+/).filter(Boolean).forEach(word => {
+      words.forEach(word => {
         const candidate = line ? line + " " + word : word;
 
-        if (line && ctx.measureText(candidate).width > maxWidth) {
-          lines.push(line);
-          line = word;
-        } else {
+        if (ctx.measureText(candidate).width <= maxWidth) {
           line = candidate;
+          return;
         }
+
+        if (line) {
+          result.push(line);
+          line = "";
+        }
+
+        if (ctx.measureText(word).width <= maxWidth) {
+          line = word;
+          return;
+        }
+
+        let piece = "";
+
+        Array.from(word).forEach(character => {
+          const next = piece + character;
+
+          if (piece && ctx.measureText(next).width > maxWidth) {
+            result.push(piece);
+            piece = character;
+          } else {
+            piece = next;
+          }
+        });
+
+        line = piece;
       });
 
-      lines.push(line);
+      result.push(line);
     });
 
-    return lines;
+    return result;
   }
 
+  /*
+   * Text in einen festgelegten Innenbereich einpassen.
+   * Keine fillText-maxWidth-Stauchung.
+   */
+  function fittedText(
+    ctx, value, x, y, width, height, options
+  ) {
+    const o = Object.assign({
+      maxSize: 80,
+      minSize: 10,
+      weight: "bold",
+      family: "Arial, sans-serif",
+      lineHeight: 1.15,
+      color: "#222222"
+    }, options || {});
+
+    let size = o.maxSize;
+    let lines = [];
+
+    while (size >= o.minSize) {
+      ctx.font = o.weight + " " + size + "px " + o.family;
+      lines = wrapCanvasText(ctx, value, width);
+
+      const fitsWidth = lines.every(
+        line => ctx.measureText(line).width <= width
+      );
+
+      const fitsHeight =
+        lines.length * size * o.lineHeight <= height;
+
+      if (fitsWidth && fitsHeight) break;
+      size -= 1;
+    }
+
+    size = Math.max(o.minSize, size);
+    ctx.font = o.weight + " " + size + "px " + o.family;
+    lines = wrapCanvasText(ctx, value, width);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, width, height);
+    ctx.clip();
+
+    ctx.fillStyle = o.color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const lineHeight = size * o.lineHeight;
+    const startY =
+      y + height / 2 - (lines.length - 1) * lineHeight / 2;
+
+    lines.forEach((line, index) => {
+      ctx.fillText(
+        line,
+        x + width / 2,
+        startY + index * lineHeight
+      );
+    });
+
+    ctx.restore();
+  }
+
+  /*
+   * Allgemeine Tafeln:
+   * Alle Textzeilen werden innerhalb der Canvasfläche angeordnet.
+   */
   function textBoard(lines, background, color) {
     return image((ctx, w, h) => {
       ctx.fillStyle = background || "#f8faf8";
       ctx.fillRect(0, 0, w, h);
 
-      ctx.fillStyle = color || "#304c3d";
-      ctx.textAlign = "center";
+      if (!lines.length) return;
 
-      lines.forEach((line, index) => {
-        ctx.font = index === 0
-          ? "bold 56px Arial"
-          : "32px Arial";
+      const ink = color || "#304c3d";
 
-        ctx.fillText(line, w / 2, 105 + index * 72, w - 80);
+      if (lines.length === 1) {
+        fittedText(
+          ctx, lines[0],
+          54, 44, w - 108, h - 88,
+          {maxSize: 100, color: ink}
+        );
+        return;
+      }
+
+      fittedText(
+        ctx, lines[0],
+        54, 30, w - 108, 128,
+        {maxSize: 60, color: ink}
+      );
+
+      const bodyTop = 178;
+      const bodyBottom = h - 38;
+      const rowHeight = (bodyBottom - bodyTop) / (lines.length - 1);
+
+      lines.slice(1).forEach((line, index) => {
+        fittedText(
+          ctx, line,
+          58,
+          bodyTop + index * rowHeight + 3,
+          w - 116,
+          rowHeight - 6,
+          {
+            maxSize: 36,
+            weight: "normal",
+            color: ink
+          }
+        );
       });
     });
   }
 
   const nameImages = new Map();
 
-  /*
-   * Größere schwarze Schrift auf einer hellen Podesttafel.
-   * Lange Namen werden umgebrochen, nicht einfach gestaucht.
-   *
-   * Diese Textur wird nur für die Begrüßungspodeste verwendet.
-   */
   function nameImage(title) {
-    const key = "plaque-large:" + title;
-
+    const key = "galerie-3-plaque:" + title;
     if (nameImages.has(key)) return nameImages.get(key);
 
     const src = image((ctx, w, h) => {
       ctx.fillStyle = "#fffdf8";
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = "#c5a052";
-      ctx.lineWidth = 9;
-      ctx.strokeRect(8, 8, w - 16, h - 16);
-
+      /*
+       * Feiner Innenrand der Tafel.
+       * Der räumliche goldene Podestrahmen liegt außerhalb.
+       */
       ctx.strokeStyle = "#e4ca83";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(23, 23, w - 46, h - 46);
+      ctx.lineWidth = 4;
+      ctx.strokeRect(14, 14, w - 28, h - 28);
 
-      const maxWidth = w - 100;
-      const maxHeight = h - 90;
-
-      let size = 120;
-      let lines = [];
-
-      while (size >= 32) {
-        ctx.font = "bold " + size + "px Arial";
-        lines = wrapCanvasText(ctx, title, maxWidth);
-
-        const fitsWidth = lines.every(
-          line => ctx.measureText(line).width <= maxWidth
-        );
-
-        const fitsHeight = lines.length * size * 1.12 <= maxHeight;
-
-        if (fitsWidth && fitsHeight && lines.length <= 4) break;
-
-        size -= 2;
-      }
-
-      ctx.fillStyle = "#000000";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const lineHeight = size * 1.12;
-      const startY = h / 2 - (lines.length - 1) * lineHeight / 2;
-
-      lines.forEach((line, index) => {
-        ctx.fillText(
-          line,
-          w / 2,
-          startY + index * lineHeight,
-          maxWidth
-        );
-      });
+      fittedText(
+        ctx, title,
+        56, 42, w - 112, h - 84,
+        {
+          maxSize: 120,
+          minSize: 18,
+          lineHeight: 1.12,
+          color: "#000000"
+        }
+      );
     }, 1024, 480);
 
     nameImages.set(key, src);
     return src;
   }
+
+  /*
+   * ============================================================
+   * GERAHMTE FLÄCHEN
+   * ============================================================
+   */
 
   function panel(parent, position, rotation, width, height, src, roomId) {
     const group = create("a-entity", {position, rotation}, parent);
@@ -221,6 +322,207 @@
     return group;
   }
 
+  /*
+   * ============================================================
+   * BILD OHNE BESCHNEIDEN IN EINEN RAHMEN EINPASSEN
+   * ============================================================
+   *
+   * Das Bild wird in eine Canvasfläche mit dem Seitenverhältnis
+   * der tatsächlichen a-plane gezeichnet.
+   *
+   * Dadurch bleibt es unverzerrt und vollständig sichtbar.
+   */
+
+  if (!AFRAME.components["fkc-gallery-contained-image"]) {
+    AFRAME.registerComponent("fkc-gallery-contained-image", {
+      schema: {
+        src: {type: "string", default: ""},
+        width: {type: "number", default: 3.72},
+        height: {type: "number", default: 2.55},
+        background: {type: "color", default: "#fffdf8"}
+      },
+
+      init: function () {
+        this.requestId = 0;
+        this.imageElement = null;
+      },
+
+      update: function () {
+        const data = this.data;
+        const requestId = ++this.requestId;
+
+        if (this.imageElement) {
+          this.imageElement.onload = null;
+          this.imageElement.onerror = null;
+        }
+
+        if (!data.src) return;
+
+        const img = new Image();
+        this.imageElement = img;
+        img.crossOrigin = "anonymous";
+
+        img.onload = () => {
+          if (requestId !== this.requestId) return;
+
+          try {
+            const width = 2048;
+            const height = Math.round(
+              width * data.height / data.width
+            );
+
+            const src = image((ctx, w, h) => {
+              ctx.fillStyle = data.background;
+              ctx.fillRect(0, 0, w, h);
+
+              const margin = 32;
+              const availableW = w - margin * 2;
+              const availableH = h - margin * 2;
+
+              const scale = Math.min(
+                availableW / img.naturalWidth,
+                availableH / img.naturalHeight
+              );
+
+              const drawW = img.naturalWidth * scale;
+              const drawH = img.naturalHeight * scale;
+
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = "high";
+
+              ctx.drawImage(
+                img,
+                (w - drawW) / 2,
+                (h - drawH) / 2,
+                drawW,
+                drawH
+              );
+            }, width, height);
+
+            this.el.setAttribute("material", "src", src);
+            this.el.emit("fkc-gallery-image-ready", {
+              src: data.src
+            });
+          } catch (error) {
+            this.showError(data.src, error);
+          }
+        };
+
+        img.onerror = () => {
+          if (requestId !== this.requestId) return;
+          this.showError(
+            data.src,
+            new Error("Bild konnte nicht geladen werden.")
+          );
+        };
+
+        img.src = data.src;
+      },
+
+      showError: function (src, error) {
+        console.error(
+          "GALERIE-3: Poster konnte nicht geladen werden:",
+          src,
+          error
+        );
+
+        this.el.setAttribute("material", "src", textBoard([
+          "Poster nicht geladen",
+          "Bitte Dateipfad und Schreibweise prüfen:",
+          src
+        ], "#fffdf8", "#222222"));
+      },
+
+      remove: function () {
+        this.requestId++;
+
+        if (this.imageElement) {
+          this.imageElement.onload = null;
+          this.imageElement.onerror = null;
+          this.imageElement = null;
+        }
+      }
+    });
+  }
+
+  /*
+   * ============================================================
+   * BEGRÜSSUNGSMODELLE AUF DAS PODEST SETZEN
+   * ============================================================
+   *
+   * Erst nach der vorhandenen Normalisierung aktiv.
+   * Es wird nur die Anfangshöhe des gesamten Modellroots geändert.
+   * Visual, Hitbox und Manipulationskörper bleiben zusammen.
+   */
+
+  if (!AFRAME.components["fkc-gallery-seat-model"]) {
+    AFRAME.registerComponent("fkc-gallery-seat-model", {
+      schema: {
+        top: {type: "number", default: WELCOME_PEDESTAL_TOP},
+        gap: {type: "number", default: WELCOME_MODEL_GAP}
+      },
+
+      init: function () {
+        this.finished = false;
+        this.readyFrames = 0;
+        this.bounds = new THREE.Box3();
+        this.inverseParent = new THREE.Matrix4();
+      },
+
+      tick: function () {
+        if (this.finished || !this.el.modelReady) return;
+
+        /*
+         * Zwei zusätzliche Frames lassen vorhandenen
+         * model-loaded-Handlern Zeit für ihre Anpassungen.
+         */
+        this.readyFrames++;
+        if (this.readyFrames < 3) return;
+
+        const visual = this.el.querySelector(".model-visual");
+        const parent = this.el.object3D.parent;
+
+        if (!visual || !parent) return;
+        if (!visual.getObject3D("mesh")) return;
+
+        parent.updateWorldMatrix(true, true);
+
+        this.bounds.setFromObject(visual.object3D);
+        if (this.bounds.isEmpty()) return;
+
+        this.inverseParent.copy(parent.matrixWorld).invert();
+        this.bounds.applyMatrix4(this.inverseParent);
+
+        const adjustment =
+          this.data.top + this.data.gap - this.bounds.min.y;
+
+        if (!Number.isFinite(adjustment)) return;
+
+        const position = this.el.object3D.position.clone();
+        position.y += adjustment;
+
+        this.el.setAttribute("position", {
+          x: position.x,
+          y: position.y,
+          z: position.z
+        });
+
+        if (this.el.homePosition) {
+          this.el.homePosition.copy(position);
+        }
+
+        this.finished = true;
+        this.el.emit("fkc-gallery-model-seated");
+      }
+    });
+  }
+
+  /*
+   * ============================================================
+   * NAVIGATION UND LICHT
+   * ============================================================
+   */
+
   function makeWalkable(config, obstacles) {
     return function (x, z) {
       if (
@@ -267,9 +569,6 @@
    * ============================================================
    * MODELLE
    * ============================================================
-   *
-   * Keine fkc-model-label-Komponente mehr.
-   * Modellnamen bleiben in dataset.title und im Modellmenü.
    */
 
   function makeModel(parent, s, index, c, position, placeholderColor) {
@@ -280,14 +579,18 @@
     }, parent);
 
     root.dataset.title = s.title;
-
-    root.homePosition = new V(
-      position.x, position.y, position.z
-    );
-
+    root.homePosition = new V(position.x, position.y, position.z);
     root.modelReady = false;
     root.fkcInfo = s.info || "";
     root.fkcModelSize = c.modelSize;
+
+    /*
+     * Begrüßungsmodelle erhalten dieselbe horizontale Ausrichtung
+     * wie das jeweilige Podest.
+     */
+    if (c.kind === "welcome" && s.presentationRotation) {
+      root.setAttribute("rotation", s.presentationRotation);
+    }
 
     const body = create("a-entity", {
       class: "manip-body"
@@ -310,6 +613,14 @@
         }
       }, body);
 
+      visual.addEventListener("model-error", event => {
+        console.error(
+          "GALERIE-3: Modell konnte nicht geladen werden:",
+          s.model,
+          event.detail
+        );
+      });
+
       visual.setAttribute("gltf-model", "url(" + s.model + ")");
     } else {
       create("a-sphere", {
@@ -328,6 +639,13 @@
     }
 
     root.setAttribute("fkc-manipulable", "");
+
+    if (c.kind === "welcome") {
+      root.setAttribute("fkc-gallery-seat-model", {
+        top: WELCOME_PEDESTAL_TOP,
+        gap: WELCOME_MODEL_GAP
+      });
+    }
 
     return root;
   }
@@ -373,14 +691,19 @@
 
             const y = p * plank;
             const v = Math.floor(random() * 26);
-            const gradient = ctx.createLinearGradient(0, y, 0, y + plank);
+            const gradient = ctx.createLinearGradient(
+              0, y, 0, y + plank
+            );
 
-            gradient.addColorStop(0,
-              `rgb(${169 + v},${115 + v},${65 + v})`);
-            gradient.addColorStop(0.5,
-              `rgb(${189 + v},${134 + v},${79 + v})`);
-            gradient.addColorStop(1,
-              `rgb(${153 + v},${101 + v},${55 + v})`);
+            gradient.addColorStop(
+              0, `rgb(${169 + v},${115 + v},${65 + v})`
+            );
+            gradient.addColorStop(
+              0.5, `rgb(${189 + v},${134 + v},${79 + v})`
+            );
+            gradient.addColorStop(
+              1, `rgb(${153 + v},${101 + v},${55 + v})`
+            );
 
             ctx.fillStyle = gradient;
             ctx.fillRect(1, y + 1, cell - 2, plank - 2);
@@ -470,10 +793,11 @@
   }
 
   /*
-   * Goldenes Bodendekor aus sehr flachen Streifen.
-   * Kein Hindernis für die Navigation.
-   * Keine Spiegelungen, keine zusätzlichen Lichtquellen.
+   * ============================================================
+   * GOLDENES BODENDEKOR
+   * ============================================================
    */
+
   function floorGoldLine(parent, x1, z1, x2, z2, width, color) {
     const dx = x2 - x1;
     const dz = z2 - z1;
@@ -524,13 +848,8 @@
       });
     }
 
-    // Außenrahmen: etwa 5,2 × 6 Meter.
     outline(2.6, 3.0, 0.065, c.colors.gold);
-
-    // Zweiter, feiner Innenrahmen.
     outline(2.35, 2.71, 0.025, c.colors.goldLight);
-
-    // Innere Raute als stilisierte Diamantfacette.
     outline(1.02, 1.18, 0.035, c.colors.gold);
 
     const outer = [
@@ -561,7 +880,7 @@
 
   /*
    * ============================================================
-   * WEISS-GOLDENER BEGRÜSSUNGSRAUM
+   * BEGRÜSSUNGSRAUM: RAUMTAFELN UND WÄNDE
    * ============================================================
    */
 
@@ -578,46 +897,12 @@
       ctx.lineWidth = 2;
       ctx.strokeRect(36, 36, w - 72, h - 72);
 
-      /*
-       * Nur der vollständige Raumtitel.
-       * Kein FKC-VR-Code, kein Modellname, kein Vorschauhinweis.
-       */
-      const title = room.posterTitle || room.title;
-      const maxWidth = w - 130;
-
-      let size = 62;
-      let lines = [];
-
-      while (size >= 34) {
-        ctx.font = "bold " + size + "px Arial";
-        lines = wrapCanvasText(ctx, title, maxWidth);
-
-        const fitsWidth = lines.every(
-          line => ctx.measureText(line).width <= maxWidth
-        );
-
-        if (fitsWidth && lines.length <= 3) break;
-
-        size -= 2;
-      }
-
-      ctx.fillStyle = "#222222";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const lineHeight = size * 1.18;
-      const titleCenterY = 195;
-      const startY = titleCenterY -
-        (lines.length - 1) * lineHeight / 2;
-
-      lines.forEach((line, index) => {
-        ctx.fillText(
-          line,
-          w / 2,
-          startY + index * lineHeight,
-          maxWidth
-        );
-      });
+      fittedText(
+        ctx,
+        room.posterTitle || room.title,
+        65, 70, w - 130, 240,
+        {maxSize: 62, color: "#222222"}
+      );
 
       ctx.strokeStyle = "#c5a052";
       ctx.lineWidth = 3;
@@ -626,13 +911,15 @@
       ctx.lineTo(w - 220, 345);
       ctx.stroke();
 
-      ctx.fillStyle = "#6f6757";
-      ctx.font = "32px Arial";
-      ctx.fillText(
+      fittedText(
+        ctx,
         "Mit Laser + Trigger betreten",
-        w / 2,
-        510,
-        w - 130
+        65, 435, w - 130, 75,
+        {
+          maxSize: 32,
+          weight: "normal",
+          color: "#6f6757"
+        }
       );
     });
   }
@@ -676,8 +963,12 @@
         posterHeight: 3.35
       };
 
-      frameLayer(frame, fc, 0, 0.022, 0.025, 0.025, c.colors.gold);
-      frameLayer(frame, fc, 0.055, 0.012, 0.018, 0.019, c.colors.goldLight);
+      frameLayer(
+        frame, fc, 0, 0.022, 0.025, 0.025, c.colors.gold
+      );
+      frameLayer(
+        frame, fc, 0.055, 0.012, 0.018, 0.019, c.colors.goldLight
+      );
 
       [-1, 1].forEach(sign => {
         create("a-sphere", {
@@ -712,6 +1003,12 @@
       {x: 0, y: 0, z: c.depth / 2},
       "0 180 0", c.width, [-5, 0, 5], 4.1);
   }
+
+  /*
+   * ============================================================
+   * BEGRÜSSUNGSRAUM: LEUCHTEN
+   * ============================================================
+   */
 
   function ring(parent, radius, tube, color, extra) {
     return create("a-torus", {
@@ -756,6 +1053,7 @@
 
     for (let i = 0; i < 6; i++) {
       const angle = i * Math.PI / 3;
+
       const arm = create("a-entity", {
         rotation: {x: 0, y: i * 60, z: 0}
       }, group);
@@ -808,6 +1106,12 @@
       0.24, 0.022, 0.24, c.colors.goldLight);
   }
 
+  /*
+   * ============================================================
+   * BEGRÜSSUNGSPODESTE
+   * ============================================================
+   */
+
   function welcomePedestal(parent, exhibit, p, c) {
     const group = create("a-entity", {
       position: {x: p.model.x, y: 0, z: p.model.z},
@@ -852,14 +1156,14 @@
       });
 
     /*
-     * Größere Tafel:
-     * bisher 0,70 × 0,22 m, jetzt 0,76 × 0,35625 m.
-     * Seitenverhältnis entspricht der Canvastextur.
+     * Goldrahmen-Innenbreite: ca. 0.685 m.
+     * Neue Tafel: 0.64 m breit, also sicher innerhalb.
+     * Seitenverhältnis 0.64 / 0.30 = 1024 / 480.
      */
     create("a-plane", {
-      position: "0 0.55 0.445",
-      width: 0.76,
-      height: 0.35625,
+      position: "0 0.52 0.445",
+      width: 0.64,
+      height: 0.30,
       material: {
         shader: "flat",
         color: "#ffffff",
@@ -872,9 +1176,7 @@
     const result = [];
 
     /*
-     * Linke Wand:
-     * Vorlesung 1 und 3 tauschen ihre bisherigen Positionen.
-     * Poster, Podest und Modell benutzen dieselbe Platzierung.
+     * Bisherige Reihenfolge und Positionen bleiben erhalten.
      */
     [4, 0, -4].forEach(z => {
       result.push({
@@ -907,9 +1209,8 @@
     const obstacles = [];
 
     /*
-     * Wichtig für die vorhandene vr-tools.js:
-     * Die erste nicht bedienbare a-plane ist die Bedienungstafel.
-     * Deshalb wird sie bewusst zuerst erzeugt.
+     * Wichtig für vorhandene Menüwrapper:
+     * Die erste nicht bedienbare a-plane bleibt die Bedienungstafel.
      */
     framedPanel(parent,
       {x: 5, y: 2.65, z: c.depth / 2 - 0.28},
@@ -929,36 +1230,54 @@
       {x: -5, y: 2.65, z: c.depth / 2 - 0.28},
       "0 180 0", 3.3, 3.3 * 9 / 16,
       textBoard([
-        "Willkommen bei FKC-VR",
+        "Willkommen",
+        "Festkörperchemie · Universität Potsdam",
         "8 Räume für die Vorlesung",
         "2 Räume für die Teamarbeit",
         "Raumtafeln mit Trigger auswählen",
-        "Vorschau-Modelle: zunächst Platzhalter",
         "Mehrspielerbetrieb folgt später"
       ], "#fffdf8", "#222222"),
       null, c.colors
     );
 
-    framedPanel(parent,
-      {x: 0, y: 2.85, z: c.depth / 2 - 0.28},
-      "0 180 0", 4.3, 4.3 * 9 / 16,
-      textBoard([
-        "FKC-VR",
-        "Virtuelle Festkörperchemie",
-        "Universität Potsdam",
-        "Wähle eine der zehn Raumtafeln",
-        "mit dem VR-Laser oder am Computer"
-      ], "#fffdf8", "#222222"),
-      null, c.colors
+    /*
+     * Mittleres Wandfeld:
+     * Dekorativer Rahmen 4.1 × 3.35 m.
+     *
+     * Neue Bildfläche 3.72 × 2.55 m.
+     * Einschließlich äußerem Bilderrahmen ca. 3.965 × 2.795 m.
+     * Damit bleibt die gesamte Tafel innerhalb des Wandfeldes.
+     */
+    const posterWidth = 3.72;
+    const posterHeight = 2.55;
+
+    const poster = framedPanel(parent,
+      {x: 0, y: 2.95, z: c.depth / 2 - 0.28},
+      "0 180 0",
+      posterWidth,
+      posterHeight,
+      image((ctx, w, h) => {
+        ctx.fillStyle = "#fffdf8";
+        ctx.fillRect(0, 0, w, h);
+      }),
+      null,
+      c.colors
     );
+
+    poster.id = "welcome-ablauf-poster";
+
+    const posterScreen = poster.querySelector("a-plane");
+
+    posterScreen.setAttribute("fkc-gallery-contained-image", {
+      src: c.welcomePoster || "assets/Bilder/Ablauf.jpg",
+      width: posterWidth,
+      height: posterHeight,
+      background: "#fffdf8"
+    });
 
     box(parent, 0, -0.08, 0,
       c.width, 0.16, c.depth, "#eee9de");
 
-    /*
-     * Dünner Steinboden als Box:
-     * keine zusätzliche a-plane vor der Bedienungstafel.
-     */
     box(parent, 0, 0.003, 0,
       c.width - 0.30, 0.006, c.depth - 0.30, "#ffffff", {
         src: marble(),
@@ -976,7 +1295,6 @@
     });
 
     floorDiamond(parent, c);
-
     welcomeWalls(parent, c);
 
     box(parent, 0, c.height + 0.08, 0,
@@ -1009,10 +1327,13 @@
       const p = placements[index];
 
       framedPanel(parent,
-        p.poster, p.rotation,
-        c.posterWidth, c.posterHeight,
+        p.poster,
+        p.rotation,
+        c.posterWidth,
+        c.posterHeight,
         welcomeCard(room),
-        room.id, c.colors
+        room.id,
+        c.colors
       );
 
       welcomePedestal(parent, exhibit, p, c);
@@ -1025,17 +1346,21 @@
       });
 
       const modelData = Object.assign({}, exhibit, {
+        presentationRotation:
+          exhibit.presentationRotation || p.rotation,
+
         info: exhibit.info || (
           exhibit.model
             ? "Vorschau für " + room.title + ": " + exhibit.title
             : exhibit.title + "\n\n" +
               "Vorschau für " + room.title + ".\n" +
-              "Die Kugel ist ein neutraler Platzhalter. " +
-              "Das eigentliche Strukturmodell wird später ergänzt."
+              "Die Kugel ist ein neutraler Platzhalter."
         )
       });
 
-      makeModel(parent, modelData, index, c, p.model, "#ded7c3");
+      makeModel(
+        parent, modelData, index, c, p.model, "#ded7c3"
+      );
 
       welcomeSconce(parent, {
         x: p.poster.x,
@@ -1052,7 +1377,7 @@
 
   /*
    * ============================================================
-   * BISHERIGE MUSEUMSRÄUME
+   * MUSEUMSRÄUME — BESTEHENDE GESTALTUNG
    * ============================================================
    */
 
@@ -1201,8 +1526,10 @@
         0.07, 0.065, c.depth - 3, "#343d38");
 
       [-8.1, -2.7, 2.7, 8.1].forEach(z => {
-        lamp(parent, x, c.height - 0.83, z,
-          0, x < 0 ? -55 : 55);
+        lamp(
+          parent, x, c.height - 0.83, z,
+          0, x < 0 ? -55 : 55
+        );
       });
     });
 
@@ -1211,8 +1538,10 @@
         c.width - 5, 0.065, 0.07, "#343d38");
 
       [-11, -3.7, 3.7, 11].forEach(x => {
-        lamp(parent, x, c.height - 0.83, z,
-          z < 0 ? 55 : -55, 0);
+        lamp(
+          parent, x, c.height - 0.83, z,
+          z < 0 ? 55 : -55, 0
+        );
       });
     });
   }
@@ -1262,63 +1591,75 @@
     box(door, 0, 3.17, 0.04,
       2.9, 0.1, 0.27, c.colors.creamDark);
 
-    panel(door, {x: 0, y: 1.75, z: 0.17},
+    panel(door,
+      {x: 0, y: 1.75, z: 0.17},
       "0 0 0", 1.8, 1.8 * 9 / 16,
       textBoard([
         "Zurück",
         "zum Begrüßungsraum",
         "Laser + Trigger"
-      ], "#eee7d5"), "welcome");
+      ], "#eee7d5"),
+      "welcome"
+    );
 
-    panel(door, {x: 0, y: 3.65, z: 0.10},
+    panel(door,
+      {x: 0, y: 3.65, z: 0.10},
       "0 0 0", 2.8, 2.8 * 9 / 16,
-      textBoard([c.title, "FKC-VR"], "#eee7d5"), null);
+      textBoard([c.title, "FKC-VR"], "#eee7d5"),
+      null
+    );
   }
 
   function placement(s, c) {
     const inset = 0.205;
 
-    if (s.wall === "left") return {
-      poster: {
-        x: -c.width / 2 + inset,
-        y: c.posterY,
-        z: s.along
-      },
-      model: {
-        x: -c.width / 2 + c.modelDistance,
-        y: c.modelY,
-        z: s.along
-      },
-      rotation: "0 90 0"
-    };
+    if (s.wall === "left") {
+      return {
+        poster: {
+          x: -c.width / 2 + inset,
+          y: c.posterY,
+          z: s.along
+        },
+        model: {
+          x: -c.width / 2 + c.modelDistance,
+          y: c.modelY,
+          z: s.along
+        },
+        rotation: "0 90 0"
+      };
+    }
 
-    if (s.wall === "right") return {
-      poster: {
-        x: c.width / 2 - inset,
-        y: c.posterY,
-        z: s.along
-      },
-      model: {
-        x: c.width / 2 - c.modelDistance,
-        y: c.modelY,
-        z: s.along
-      },
-      rotation: "0 -90 0"
-    };
+    if (s.wall === "right") {
+      return {
+        poster: {
+          x: c.width / 2 - inset,
+          y: c.posterY,
+          z: s.along
+        },
+        model: {
+          x: c.width / 2 - c.modelDistance,
+          y: c.modelY,
+          z: s.along
+        },
+        rotation: "0 -90 0"
+      };
+    }
 
-    if (s.wall === "front") return {
-      poster: {
-        x: s.along,
-        y: c.posterY,
-        z: -c.depth / 2 + inset
-      },
-      model: {
-        x: s.along,
-        y: c.modelY,
-        z: -c.depth / 2 + c.modelDistance
-      },
-      rotation: "0 0 0"
-    };
+    if (s.wall === "front") {
+      return {
+        poster: {
+          x: s.along,
+          y: c.posterY,
+          z: -c.depth / 2 + inset
+        },
+        model: {
+          x: s.along,
+          y: c.modelY,
+          z: -c.depth / 2 + c.modelDistance
+        },
+        rotation: "0 0 0"
+      };
+    }
 
     return {
       poster: {
@@ -1401,7 +1742,9 @@
     box(frame, 0, 0, 0,
       c.posterWidth + 0.36,
       c.posterHeight + 0.36,
-      0.055, c.colors.goldDark);
+      0.055,
+      c.colors.goldDark
+    );
 
     create("a-plane", {
       position: "0 0 0.04",
@@ -1418,10 +1761,18 @@
       }
     }, frame);
 
-    frameLayer(frame, c, 0.025, 0.045, 0.075, 0.065, c.colors.goldLight);
-    frameLayer(frame, c, 0.075, 0.07, 0.095, 0.063, c.colors.gold);
-    frameLayer(frame, c, 0.13, 0.04, 0.065, 0.04, c.colors.goldDark);
-    frameLayer(frame, c, 0.165, 0.045, 0.075, 0.06, c.colors.goldLight);
+    frameLayer(
+      frame, c, 0.025, 0.045, 0.075, 0.065, c.colors.goldLight
+    );
+    frameLayer(
+      frame, c, 0.075, 0.07, 0.095, 0.063, c.colors.gold
+    );
+    frameLayer(
+      frame, c, 0.13, 0.04, 0.065, 0.04, c.colors.goldDark
+    );
+    frameLayer(
+      frame, c, 0.165, 0.045, 0.075, 0.06, c.colors.goldLight
+    );
 
     pedestal(parent, s, p, c);
 
