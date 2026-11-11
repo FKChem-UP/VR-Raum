@@ -3,17 +3,14 @@
 (function (F) {
   /*
    * ============================================================
-   * ZENTRALE RAUMDATEN — GALERIE-2
+   * ZENTRALE RAUMDATEN — GALERIE-3
    * ============================================================
    *
-   * Modell- und Folienpfade beziehen sich auf index.html.
+   * Neue Begrüßungsmodelle: assets/model/
+   * Bestehende Vorlesungsmodelle: assets/models/
+   *
+   * Die unterschiedlichen Ordnernamen sind beabsichtigt.
    * Groß-/Kleinschreibung der Dateinamen beachten.
-   *
-   * title:
-   *   Kurzer Raumname für die bisherige Oberfläche.
-   *
-   * posterTitle:
-   *   Vollständiger Titel auf der Raumtafel im Begrüßungsraum.
    */
 
   const museumColors = {
@@ -85,16 +82,17 @@
 
   /*
    * ============================================================
-   * BEGRÜSSUNGSRAUM: WEISS-GOLDENE GALERIE
+   * BEGRÜSSUNGSRAUM
    * ============================================================
+   *
+   * welcomePoster:
+   *   Bild an der bisherigen Position der mittleren FKC-VR-Tafel.
    *
    * exhibits:
    *   roomId = Ziel der Raumtafel
-   *   title  = Beschriftung am Podest und Name im Modellmenü
-   *   model  = späterer GLB-Pfad
-   *
-   * Ein leerer Modellpfad erzeugt eine neutrale Platzhalterkugel.
-   * Vorschau-Modelle und Vorlesungsmodelle sind unabhängig.
+   *   title = Beschriftung am Podest und Name im Modellmenü
+   *   model = GLB-Pfad
+   *   info = Beschreibung im vorhandenen Modellmenü
    */
 
   F.welcomeRoom = {
@@ -116,6 +114,8 @@
     modelSize: 0.65,
     modelDistance: 1.85,
 
+    welcomePoster: "assets/Bilder/Ablauf.jpg",
+
     colors: {
       wall: "#fffdf8",
       cream: "#fffdf9",
@@ -128,53 +128,92 @@
     exhibits: [
       {
         roomId: "vorlesung-1",
-        title: "Fulleren",
-        model: ""
+        title: "C₆₀-Buckminsterfulleren",
+        model: "assets/model/C60-Fulleren.glb",
+        info:
+          "Vorschau für Vorlesung 1.\n\n" +
+          "C₆₀-Buckminsterfulleren: ein Molekül aus 60 " +
+          "Kohlenstoffatomen."
       },
       {
         roomId: "vorlesung-2",
-        title: "Eis",
-        model: ""
+        title: "Wasserstoffbrücken in Eis",
+        model: "assets/model/Eis2.glb",
+        info:
+          "Vorschau für Vorlesung 2.\n\n" +
+          "Wasserstoffbrücken zwischen Wassermolekülen in Eis."
       },
       {
         roomId: "vorlesung-3",
-        title: "YBa2Cu3O7-x",
-        model: ""
+        title: "YBa₂Cu₃O₇₋ₓ – Hochtemperatursupraleiter",
+        model: "assets/model/YBa2Cu3O7-x.glb",
+        info:
+          "Vorschau für Vorlesung 3.\n\n" +
+          "YBa₂Cu₃O₇₋ₓ – Hochtemperatursupraleiter. " +
+          "Der Sauerstoffgehalt beeinflusst die Eigenschaften."
       },
       {
         roomId: "vorlesung-4",
-        title: "tetragonal innenzentriertes Bravaisgitter",
-        model: ""
+        title: "Tetragonal innenzentriertes Bravaisgitter",
+        model: "assets/model/Tetragonal-I.glb",
+        info:
+          "Vorschau für Vorlesung 4.\n\n" +
+          "Tetragonal innenzentriertes Bravaisgitter, tI.\n" +
+          "a = b ≠ c; α = β = γ = 90°.\n" +
+          "Zwei Gitterpunkte pro konventioneller Elementarzelle."
       },
       {
         roomId: "vorlesung-5",
-        title: "Platzhalter",
-        model: ""
+        title: "Beugung am Einkristall",
+        model: "assets/model/Roentgenbeugung.glb",
+        info:
+          "Vorschau für Vorlesung 5.\n\n" +
+          "Schematischer Röntgenbeugungsversuch mit Kristall, " +
+          "Primärstrahl, gebeugten Strahlen und Detektor.\n\n" +
+          "Die dargestellten Reflexpositionen sind illustrativ."
       },
       {
         roomId: "vorlesung-6",
-        title: "Kubisch dichte Packung",
-        model: ""
+        title: "Kupfer – kubisch dichteste Packung",
+        model: "assets/model/Cu.glb",
+        info:
+          "Vorschau für Vorlesung 6.\n\n" +
+          "Kupfer – kubisch dichteste Packung, " +
+          "kubisch flächenzentrierte Struktur."
       },
       {
         roomId: "vorlesung-7",
-        title: "Zinkblende ZnS",
-        model: ""
+        title: "Zinkblende",
+        model: "assets/model/ZnS.glb",
+        info:
+          "Vorschau für Vorlesung 7.\n\n" +
+          "Zinkblende: ZnS mit tetraedrischer Koordination " +
+          "beider Ionensorten."
       },
       {
         roomId: "vorlesung-8",
-        title: "Schwefel S8",
-        model: ""
+        title: "S₈-Molekül in elementarem Schwefel",
+        model: "assets/model/S8.glb",
+        info:
+          "Vorschau für Vorlesung 8.\n\n" +
+          "S₈-Molekül in elementarem Schwefel."
       },
       {
         roomId: "team-a",
-        title: "HKUST-1",
-        model: ""
+        title: "Metallorganische Gerüstverbindung HKUST-1",
+        model: "assets/model/HKUST-1_Pores.glb",
+        info:
+          "Vorschau für Team A.\n\n" +
+          "Metallorganische Gerüstverbindung HKUST-1 " +
+          "mit einer porösen Gerüststruktur."
       },
       {
         roomId: "team-b",
-        title: "Co-Komplex",
-        model: ""
+        title: "Cobalt-Komplex aus einer Einkristall-Umwandlung",
+        model: "assets/model/Co-Komplex.glb",
+        info:
+          "Vorschau für Team B.\n\n" +
+          "Cobalt-Komplex aus einer Einkristall-Umwandlung."
       }
     ]
   };
@@ -236,7 +275,7 @@
 
   /*
    * ============================================================
-   * VORLESUNG 1: BISHERIGE MODELLE — UNVERÄNDERT
+   * VORLESUNG 1: BESTEHENDE MODELLE — UNVERÄNDERT
    * ============================================================
    */
 
@@ -277,14 +316,4 @@
     model: "assets/models/BODIPY.glb",
     slide: ""
   });
-
-  /*
-   * Später ein Vorschau-Modell ergänzen:
-   *
-   * F.welcomeRoom.exhibits[0].model =
-   *   "assets/models/Fulleren.glb";
-   *
-   * Dies ist nur ein Beispielpfad.
-   * Die Datei muss tatsächlich vorhanden sein.
-   */
 })(window.FKCVR);
