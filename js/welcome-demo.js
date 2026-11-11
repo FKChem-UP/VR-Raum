@@ -3,49 +3,37 @@
 (function (F) {
   /*
    * ============================================================
-   * WILLKOMMEN-9
+   * WILLKOMMEN-10 — STABILERE VR-BESCHRIFTUNGEN
+   * ============================================================
    *
-   * Große einzelne NaCl-Elementarzelle -> Nachbarionen
-   * -> periodisches Gitter -> Einkristallit -> Salzprobe
-   * und vollständig rückwärts.
+   * Gegenüber Willkommen-9:
+   * - Mipmaps für Na/Cl, Zellparameter und Ursprung O.
+   * - Kräftigere kleine Schrift.
+   * - Eindeutige Zeichenreihenfolge der Beschriftungen.
+   * - Ionenschrift als erklärende Überlagerung:
+   *   keine wechselnde Verdeckung durch Kugeloberflächen.
+   * - Etwas größerer Abstand der Ionenschrift zur Kugel.
    *
-   * Anfang:
-   * - 10 Sekunden ausschließlich die 27 dargestellten
-   *   Positionen innerhalb und auf dem Rand der Zelle.
-   * - Größere Anfangszelle, keine äußeren Nachbarionen.
-   * - Drei Zellparameter an drei gemeinsamen Ursprungskanten.
-   * - Pfeile vom Eckpunkt O in die Richtungen a, b und c.
-   * - a = b = c ungefähr 5.64 Angström bei Raumtemperatur.
-   * - Kräftigere Zellkanten als dreidimensionale Stäbe.
-   *
-   * Beibehalten:
-   * - Durchgehender logarithmischer Zoom.
-   * - Fester Mittelpunkt bis zum fertigen Einkristall.
-   * - Anschließend langsame Absenkung zur Salzprobe.
-   * - Füllen derselben Gitterdarstellung.
-   * - Deckende Festkörper.
-   * - Erklärungstafel unter der Podestoberkante.
+   * Unverändert:
+   * - Animationszeiten und durchgehender logarithmischer Zoom.
+   * - Fester Präsentationsmittelpunkt.
+   * - Absenkung des geschlossenen Einkristalliten.
+   * - Gitter, Füllung, Salzprobe und Becherglas.
+   * - Podest, Tafeln, Menü und Raumgrenzen.
    *
    * Fachlich:
    * NaCl, Fm-3m, Nr. 225, konventionelle Zelle Z = 4.
    * Cl auf 4a; Na auf 4b; beide sechsfach koordiniert.
-   *
-   * 27 sichtbare Positionen bedeuten nicht 27 ganze Ionen
-   * pro Zelle: Randpositionen werden zwischen Zellen geteilt.
-   *
-   * Koordinationslinien sind Hilfen, keine Molekülbindungen.
-   * Weißwerden und Schließen der Zwischenräume sind
-   * Darstellungswechsel, keine physikalische Ionenverformung.
-   *
-   * Die Geometrie ist schematisch, insbesondere die Ionenradien.
-   * Der Zellparameter ist ein gerundeter Raumtemperaturwert,
+   * 27 dargestellte Positionen sind nicht 27 ganze Ionen
+   * pro Elementarzelle.
+   * Zellparameter: gerundeter Raumtemperatur-Richtwert,
    * keine Messung an einer bestimmten Probe.
    * ============================================================
    */
 
   if (!F || !F.RoomBuilder || !F.Menu || !window.AFRAME) {
     console.error(
-      "Willkommen-9: A-Frame, room-builder.js und vr-tools.js " +
+      "Willkommen-10: A-Frame, room-builder.js und vr-tools.js " +
       "müssen vorher geladen sein."
     );
     return;
@@ -70,17 +58,8 @@
   const FILLED_SPAN = 9.5;
   const SELECTED_SIZE = 0.16;
 
-  /*
-   * Neuer erster Zoomabschnitt vor dem bisherigen Ablauf.
-   *
-   * stageTime:
-   * -4 ... 2: zehn Sekunden große Anfangszelle.
-   *  2 ... 6: erster Zoom, Nachbarionen erscheinen.
-   *  ab 6: bisheriger Gitterablauf.
-   */
   const ZOOM_START = 2;
   const ZOOM_END = 34;
-
   const PREVIOUS_START_SCALE = 1.10;
   const FINAL_SCALE = SELECTED_SIZE / FILLED_SPAN;
 
@@ -96,19 +75,22 @@
   const BOX_START = 22.5;
   const BOX_END = 25.5;
   const SOLID_SWITCH = 26;
-
   const DESCENT_START = 26;
   const DESCENT_END = 34;
-
   const BEAKER_BOTTOM_Y = -1.1325;
 
   const ORIGIN_EDGE_RADIUS = 0.008;
   const GRID_EDGE_RADIUS = 0.0045;
 
   /*
-   * Gerundeter typischer Raumtemperaturwert.
-   * Keine temperaturabhängige Berechnung oder Probenmessung.
+   * Kleine Schrift ist eine erklärende Überlagerung.
+   * Feste renderOrder-Werte verhindern wechselnde
+   * Sortierung, wenn sich Beschriftungen überdecken.
    */
+  const ION_TEXT_ORDER = 20;
+  const PARAMETER_TEXT_ORDER = 60;
+  const ION_TEXT_SURFACE_GAP = 0.025;
+
   const CELL_PARAMETER_TEXT = "≈ 5,64 Å";
 
   const COLORS = {
@@ -261,10 +243,6 @@
       }
     }
 
-    /*
-     * Deduplizierte Nachbarn vervollständigen
-     * später die Randkoordination.
-     */
     Array.from(map.values()).forEach(([i, j, k]) => {
       DIRECTIONS.forEach(([di, dj, dk]) => {
         const p = [i + di, j + dj, k + dk];
@@ -317,8 +295,7 @@
       this.atomic.rotation.set(0.18, 0.42, -0.04);
       this.visual.add(this.atomic);
 
-      this.atomicQuaternion =
-        this.atomic.quaternion.clone();
+      this.atomicQuaternion = this.atomic.quaternion.clone();
 
       const matrix = new T.Matrix4()
         .makeRotationFromQuaternion(this.atomicQuaternion);
@@ -331,9 +308,6 @@
         Math.abs(e[9])
       );
 
-      /*
-       * Derselbe feste Mittelpunkt wie in Willkommen-7.
-       */
       this.presentationCenter = new V(
         0,
         TABLE_TOP +
@@ -343,9 +317,7 @@
         0
       );
 
-      this.atomic.position.copy(
-        this.presentationCenter
-      );
+      this.atomic.position.copy(this.presentationCenter);
 
       this.specimen = new T.Group();
       this.visual.add(this.specimen);
@@ -391,7 +363,14 @@
       return material;
     },
 
-    makeTexture: function (width, height, draw) {
+    /*
+     * Große Tafeln behalten ihre bisherigen Einstellungen.
+     * Kleine statische Schrift bekommt eine vollständige
+     * Mipmap-Kette und trilineare Minifizierung.
+     *
+     * Alle dafür verwendeten Texturen haben Zweierpotenzmaße.
+     */
+    makeTexture: function (width, height, draw, smallText) {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -399,13 +378,42 @@
       draw(canvas.getContext("2d"), width, height);
 
       const texture = new T.CanvasTexture(canvas);
-      texture.minFilter = T.LinearFilter;
+
       texture.magFilter = T.LinearFilter;
-      texture.generateMipmaps = false;
+      texture.minFilter = smallText
+        ? T.LinearMipmapLinearFilter
+        : T.LinearFilter;
+
+      texture.generateMipmaps = !!smallText;
+      texture.wrapS = T.ClampToEdgeWrapping;
+      texture.wrapT = T.ClampToEdgeWrapping;
+      texture.anisotropy = 1;
 
       this.textures.add(texture);
 
       return {canvas, texture};
+    },
+
+    /*
+     * Einheitliche stabile Einstellungen für kleine Schrift.
+     * Kein Tiefenschreiben und keine Tiefenprüfung:
+     * Beschriftungen sind erklärende Überlagerungen.
+     *
+     * Kein alphaTest: Die bestehende weiche Ausblendung
+     * soll auch an feinen Buchstabenkanten weich bleiben.
+     */
+    textSpriteMaterial: function (texture) {
+      return this.ownMaterial(
+        new T.SpriteMaterial({
+          map: texture,
+          color: "#ffffff",
+          transparent: true,
+          opacity: 1,
+          depthTest: false,
+          depthWrite: false,
+          toneMapped: false
+        })
+      );
     },
 
     mesh: function (geometry, material, parent) {
@@ -445,7 +453,6 @@
       );
 
       material.userData.welcomeSolid = true;
-
       return material;
     },
 
@@ -482,15 +489,8 @@
       }
     },
 
-    /*
-     * Viele Kanten mit einer einzigen InstancedMesh zeichnen.
-     * Dadurch bleiben dickere Gitterkanten relativ sparsam.
-     */
     makeRodSegments: function (
-      segments,
-      radius,
-      material,
-      parent
+      segments, radius, material, parent
     ) {
       const mesh = new T.InstancedMesh(
         this.edgeRodGeometry,
@@ -509,18 +509,10 @@
         midpoint.copy(start).add(end).multiplyScalar(0.5);
 
         this.dummy.position.copy(midpoint);
-
         this.dummy.quaternion.setFromUnitVectors(
-          up,
-          delta.normalize()
+          up, delta.normalize()
         );
-
-        this.dummy.scale.set(
-          radius,
-          length,
-          radius
-        );
-
+        this.dummy.scale.set(radius, length, radius);
         this.dummy.updateMatrix();
 
         mesh.setMatrixAt(index, this.dummy.matrix);
@@ -528,7 +520,6 @@
 
       mesh.instanceMatrix.needsUpdate = true;
       mesh.frustumCulled = false;
-
       parent.add(mesh);
 
       return mesh;
@@ -606,7 +597,6 @@
         topMaterial,
         this.podium
       );
-
       top.position.y = TABLE_TOP - 0.085 / 2;
     },
 
@@ -629,7 +619,6 @@
             "„Dass ich erkenne, was die Welt",
             w / 2, 133, w - 120
           );
-
           ctx.fillText(
             "im Innersten zusammenhält“",
             w / 2, 256, w - 120
@@ -637,7 +626,6 @@
 
           ctx.fillStyle = "#746544";
           ctx.font = "42px Arial";
-
           ctx.fillText(
             "Johann Wolfgang von Goethe · Faust I",
             w / 2, 370, w - 120
@@ -653,13 +641,10 @@
       );
 
       this.quote = this.mesh(
-        this.ownGeometry(
-          new T.PlaneGeometry(5.4, 1.16)
-        ),
+        this.ownGeometry(new T.PlaneGeometry(5.4, 1.16)),
         this.quoteMaterial,
         this.root
       );
-
       this.quote.position.set(0, 4.43, 0);
 
       this.phaseTexture = this.makeTexture(
@@ -674,18 +659,11 @@
       );
 
       this.phaseBoard = this.mesh(
-        this.ownGeometry(
-          new T.PlaneGeometry(3.4, 0.664)
-        ),
+        this.ownGeometry(new T.PlaneGeometry(3.4, 0.664)),
         this.phaseMaterial,
         this.root
       );
-
-      this.phaseBoard.position.set(
-        0,
-        INFO_Y,
-        INFO_DISTANCE
-      );
+      this.phaseBoard.position.set(0, INFO_Y, INFO_DISTANCE);
 
       this.labelMaterials = {};
 
@@ -694,25 +672,30 @@
         ["Cl", "Cl⁻"]
       ].forEach(([id, text]) => {
         const texture = this.makeTexture(
-          256, 128, (ctx, w, h) => {
+          512, 256, (ctx, w, h) => {
             ctx.clearRect(0, 0, w, h);
             ctx.fillStyle = "#000000";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.font = "bold 88px Arial";
-            ctx.fillText(text, w / 2, h / 2 + 3);
-          }
+
+            /*
+             * Doppelte Texturauflösung, gleiche physische Größe.
+             * Ein dezenter schwarzer Konturstrich stärkt
+             * besonders die kleinen Ladungszeichen.
+             */
+            ctx.font = "bold 176px Arial";
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = "round";
+
+            ctx.strokeText(text, w / 2, h / 2 + 6);
+            ctx.fillText(text, w / 2, h / 2 + 6);
+          },
+          true
         );
 
-        this.labelMaterials[id] = this.ownMaterial(
-          new T.SpriteMaterial({
-            map: texture.texture,
-            color: "#ffffff",
-            transparent: true,
-            depthTest: true,
-            depthWrite: false
-          })
-        );
+        this.labelMaterials[id] =
+          this.textSpriteMaterial(texture.texture);
       });
     },
 
@@ -746,18 +729,12 @@
 
       ctx.font = "35px Arial";
 
-      const text = backward
-        ? entry.reverse
-        : entry.forward;
-
+      const text = backward ? entry.reverse : entry.forward;
       const lines = wrap(ctx, text, w - 100);
 
       lines.slice(0, 2).forEach((line, index) => {
         ctx.fillText(
-          line,
-          w / 2,
-          124 + index * 43,
-          w - 80
+          line, w / 2, 124 + index * 43, w - 80
         );
       });
 
@@ -769,7 +746,6 @@
 
       ctx.fillStyle = "#776441";
       ctx.font = "29px Arial";
-
       ctx.fillText(
         state + " · " +
         (backward ? "Hineinzoomen" : "Herauszoomen") +
@@ -799,7 +775,6 @@
 
         latticePositions(n).forEach((position, id) => {
           if (seen.has(id)) return;
-
           seen.add(id);
           next.push(position);
         });
@@ -807,10 +782,6 @@
         levels.push(next);
       });
 
-      /*
-       * Dieselbe Gittergeometrie wird von Kugeln
-       * zu lückenlosen Boxkacheln überführt.
-       */
       this.ionGeometry = this.ownGeometry(
         new T.BoxGeometry(2, 2, 2, 4, 4, 4)
       );
@@ -826,12 +797,8 @@
         ["Na", "Cl"].forEach(type => {
           const points = positions
             .filter(([i, j, k]) => {
-              const sodium =
-                Math.abs((i + j + k) % 2) === 1;
-
-              return type === "Na"
-                ? sodium
-                : !sodium;
+              const sodium = Math.abs((i + j + k) % 2) === 1;
+              return type === "Na" ? sodium : !sodium;
             })
             .map(([i, j, k]) => new V(
               (i - 1) / 2,
@@ -855,16 +822,11 @@
             points.length
           );
 
-          mesh.instanceMatrix.setUsage(
-            T.DynamicDrawUsage
-          );
-
+          mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
           mesh.frustumCulled = false;
           this.atomic.add(mesh);
 
-          const radius = type === "Na"
-            ? 0.115
-            : 0.165;
+          const radius = type === "Na" ? 0.115 : 0.165;
 
           this.ionLayers.push({
             mesh,
@@ -881,11 +843,17 @@
                 this.labelMaterials[type]
               );
 
-              const width = type === "Na"
-                ? 0.19
-                : 0.25;
+              const width = type === "Na" ? 0.19 : 0.25;
 
               sprite.scale.set(width, width / 2, 1);
+
+              /*
+               * Jede der 27 Beschriftungen hat eine eigene,
+               * unveränderliche Sortierposition.
+               */
+              sprite.renderOrder =
+                ION_TEXT_ORDER + this.labels.length;
+
               this.atomic.add(sprite);
 
               this.labels.push({
@@ -935,12 +903,7 @@
           this.atomic
         );
 
-        this.frames.push({
-          n,
-          bounds,
-          frame,
-          material
-        });
+        this.frames.push({n, bounds, frame, material});
       });
 
       const originSegments = [];
@@ -977,10 +940,7 @@
         new T.BoxGeometry(1, 1, 1)
       );
 
-      this.originTintMaterial = this.basic(
-        COLORS.gold,
-        0.10
-      );
+      this.originTintMaterial = this.basic(COLORS.gold, 0.10);
 
       this.originTint = this.mesh(
         cube,
@@ -989,48 +949,41 @@
       );
     },
 
-    /*
-     * Schwarze zweizeilige Zellparameter ohne Hintergrund.
-     * Sprites bleiben beim Umrunden lesbar.
-     */
     makeParameterSprite: function (
-      letter,
-      position,
-      width
+      letter, position, width, order
     ) {
       const texture = this.makeTexture(
-        512, 256, (ctx, w, h) => {
+        1024, 512, (ctx, w, h) => {
           ctx.clearRect(0, 0, w, h);
           ctx.fillStyle = "#000000";
+          ctx.strokeStyle = "#000000";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
+          ctx.lineJoin = "round";
+          ctx.lineWidth = 3;
 
-          ctx.font = "bold italic 108px Georgia";
-          ctx.fillText(letter, w / 2, 75);
+          ctx.font = "bold italic 216px Georgia";
+          ctx.strokeText(letter, w / 2, 150);
+          ctx.fillText(letter, w / 2, 150);
 
-          ctx.font = "bold 66px Arial";
-          ctx.fillText(
-            CELL_PARAMETER_TEXT,
-            w / 2,
-            181
+          ctx.font = "bold 132px Arial";
+          ctx.strokeText(
+            CELL_PARAMETER_TEXT, w / 2, 362
           );
-        }
+          ctx.fillText(
+            CELL_PARAMETER_TEXT, w / 2, 362
+          );
+        },
+        true
       );
 
-      const material = this.ownMaterial(
-        new T.SpriteMaterial({
-          map: texture.texture,
-          color: "#ffffff",
-          transparent: true,
-          depthTest: false,
-          depthWrite: false
-        })
-      );
+      const material =
+        this.textSpriteMaterial(texture.texture);
 
       const sprite = new T.Sprite(material);
       sprite.position.copy(position);
       sprite.scale.set(width, width / 2, 1);
-      sprite.renderOrder = 12;
+      sprite.renderOrder = order;
 
       this.cellParameters.add(sprite);
       this.parameterMaterials.push(material);
@@ -1044,11 +997,6 @@
 
       this.parameterMaterials = [];
 
-      /*
-       * Gemeinsamer Eckpunkt O:
-       * im Zellkoordinatensystem (0, 0, 0),
-       * in der zentrierten Darstellung (-0.5,-0.5,-0.5).
-       */
       const origin = new V(-0.5, -0.5, -0.5);
 
       const definitions = [
@@ -1069,13 +1017,7 @@
         }
       ];
 
-      definitions.forEach(definition => {
-        /*
-         * Pfeile liegen auf den drei Ursprungskanten.
-         * Als Erklärungsgrafik werden sie über der Geometrie
-         * gezeichnet, damit Randionen die Pfeilspitzen
-         * nicht vollständig verdecken.
-         */
+      definitions.forEach((definition, index) => {
         const arrow = new T.ArrowHelper(
           definition.direction,
           origin,
@@ -1085,6 +1027,11 @@
           0.075
         );
 
+        /*
+         * ArrowHelper erzeugt pro Instanz eigene Materialien.
+         * Sie werden direkt verwaltet und später freigegeben.
+         * Seine gemeinsam genutzten Geometrien bleiben unangetastet.
+         */
         arrow.line.material.transparent = true;
         arrow.line.material.depthTest = false;
         arrow.line.material.depthWrite = false;
@@ -1093,18 +1040,8 @@
         arrow.cone.material.depthTest = false;
         arrow.cone.material.depthWrite = false;
 
-        arrow.line.renderOrder = 10;
-        arrow.cone.renderOrder = 11;
-
-        /*
-         * Eigene Materialkopien vermeiden gegenseitige
-         * Änderungen zwischen mehreren ArrowHelpers.
-         */
-        arrow.line.material =
-          arrow.line.material.clone();
-
-        arrow.cone.material =
-          arrow.cone.material.clone();
+        arrow.line.renderOrder = 10 + index * 2;
+        arrow.cone.renderOrder = 11 + index * 2;
 
         this.ownMaterial(arrow.line.material);
         this.ownMaterial(arrow.cone.material);
@@ -1114,80 +1051,58 @@
           arrow.cone.material
         );
 
-        /*
-         * ArrowHelper verwendet gemeinsam genutzte
-         * interne Geometrien. Diese werden hier bewusst
-         * nicht in die eigenen Dispose-Sets aufgenommen.
-         */
         this.cellParameters.add(arrow);
 
         this.makeParameterSprite(
           definition.letter,
           definition.label,
-          0.39
+          0.39,
+          PARAMETER_TEXT_ORDER + index
         );
       });
 
       const originTexture = this.makeTexture(
-        256, 128, (ctx, w, h) => {
+        512, 256, (ctx, w, h) => {
           ctx.clearRect(0, 0, w, h);
           ctx.fillStyle = "#000000";
+          ctx.strokeStyle = "#000000";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.font = "bold 78px Arial";
+          ctx.font = "bold 156px Arial";
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = "round";
+          ctx.strokeText("O", w / 2, h / 2);
           ctx.fillText("O", w / 2, h / 2);
-        }
+        },
+        true
       );
 
-      const originMaterial = this.ownMaterial(
-        new T.SpriteMaterial({
-          map: originTexture.texture,
-          color: "#ffffff",
-          transparent: true,
-          depthTest: false,
-          depthWrite: false
-        })
-      );
+      const originMaterial =
+        this.textSpriteMaterial(originTexture.texture);
 
       const originLabel = new T.Sprite(originMaterial);
-
-      originLabel.position.set(
-        -0.70,
-        -0.73,
-        -0.70
-      );
-
+      originLabel.position.set(-0.70, -0.73, -0.70);
       originLabel.scale.set(0.16, 0.08, 1);
-      originLabel.renderOrder = 12;
+      originLabel.renderOrder = PARAMETER_TEXT_ORDER + 3;
 
       this.cellParameters.add(originLabel);
       this.parameterMaterials.push(originMaterial);
     },
 
     updateIonGeometry: function (t) {
-      const boxAmount = ramp(
-        t,
-        BOX_START,
-        BOX_END
-      );
-
+      const boxAmount = ramp(t, BOX_START, BOX_END);
       if (boxAmount === this.lastBoxAmount) return;
 
       this.lastBoxAmount = boxAmount;
 
-      const attr =
-        this.ionGeometry.attributes.position;
-
+      const attr = this.ionGeometry.attributes.position;
       const source = this.ionBoxPositions;
 
       for (let i = 0; i < attr.count; i++) {
         const x = source[i * 3];
         const y = source[i * 3 + 1];
         const z = source[i * 3 + 2];
-
-        const length = Math.sqrt(
-          x * x + y * y + z * z
-        );
+        const length = Math.sqrt(x * x + y * y + z * z);
 
         attr.setXYZ(
           i,
@@ -1198,7 +1113,6 @@
       }
 
       attr.needsUpdate = true;
-
       this.ionGeometry.computeVertexNormals();
       this.ionGeometry.computeBoundingSphere();
     },
@@ -1263,16 +1177,8 @@
           new T.Float32BufferAttribute(vertices, 3)
         );
 
-        const material = this.lineMaterial(
-          example.color,
-          1
-        );
-
-        const lines = new T.LineSegments(
-          geometry,
-          material
-        );
-
+        const material = this.lineMaterial(example.color, 1);
+        const lines = new T.LineSegments(geometry, material);
         this.atomic.add(lines);
 
         this.coordination.push({
@@ -1287,23 +1193,14 @@
       const cube = this.ownGeometry(
         new T.BoxGeometry(1, 1, 1)
       );
-
       const edges = this.ownGeometry(
         new T.EdgesGeometry(cube)
       );
 
-      this.selectedPosition = new V(
-        0,
-        -0.72,
-        0.18
-      );
-
+      this.selectedPosition = new V(0, -0.72, 0.18);
       this.selectedSize = SELECTED_SIZE;
 
-      this.selectedMaterial = this.lit(
-        COLORS.white
-      );
-
+      this.selectedMaterial = this.lit(COLORS.white);
       this.selectedMaterial.roughness = 0.4;
       this.selectedMaterial.emissive.set("#ffffff");
       this.selectedMaterial.emissiveIntensity = 0.08;
@@ -1314,28 +1211,17 @@
         this.specimen
       );
 
-      this.selectedCrystal.position.copy(
-        this.selectedPosition
-      );
+      this.selectedCrystal.position.copy(this.selectedPosition);
+      this.selectedCrystal.rotation.copy(this.atomic.rotation);
+      this.selectedCrystal.scale.setScalar(this.selectedSize);
 
-      this.selectedCrystal.rotation.copy(
-        this.atomic.rotation
-      );
-
-      this.selectedCrystal.scale.setScalar(
-        this.selectedSize
-      );
-
-      this.selectedGoldMaterial = this.lineMaterial(
-        COLORS.gold,
-        1
-      );
+      this.selectedGoldMaterial =
+        this.lineMaterial(COLORS.gold, 1);
 
       this.selectedGold = new T.LineSegments(
         edges,
         this.selectedGoldMaterial
       );
-
       this.selectedCrystal.add(this.selectedGold);
 
       let seed = 745219;
@@ -1351,7 +1237,6 @@
         for (let iz = -5; iz <= 5; iz++) {
           const x = ix * 0.165;
           const z = iz * 0.165;
-
           const r = Math.sqrt(x * x + z * z);
 
           if (r > 0.83) continue;
@@ -1366,20 +1251,16 @@
             );
 
             if (
-              position.distanceTo(this.selectedPosition) <
-              0.20
-            ) {
-              continue;
-            }
+              position.distanceTo(this.selectedPosition) < 0.20
+            ) continue;
 
-            const rotation =
-              new T.Quaternion().setFromEuler(
-                new T.Euler(
-                  random() * Math.PI,
-                  random() * Math.PI,
-                  random() * Math.PI
-                )
-              );
+            const rotation = new T.Quaternion().setFromEuler(
+              new T.Euler(
+                random() * Math.PI,
+                random() * Math.PI,
+                random() * Math.PI
+              )
+            );
 
             this.grains.push({
               position,
@@ -1398,25 +1279,18 @@
         this.grainMaterial,
         this.grains.length
       );
-
-      this.grainMesh.instanceMatrix.setUsage(
-        T.DynamicDrawUsage
-      );
-
+      this.grainMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
       this.grainMesh.frustumCulled = false;
       this.specimen.add(this.grainMesh);
 
       for (let i = 0; i < this.grains.length; i++) {
         this.grainMesh.setColorAt(
           i,
-          new T.Color().setScalar(
-            0.91 + random() * 0.09
-          )
+          new T.Color().setScalar(0.91 + random() * 0.09)
         );
       }
 
       this.grainMesh.instanceColor.needsUpdate = true;
-
       this.makeBeaker();
     },
 
@@ -1446,30 +1320,23 @@
         );
 
         return Math.exp(
-          -(delta * delta) /
-          (2 * 0.15 * 0.15)
+          -(delta * delta) / (2 * 0.15 * 0.15)
         );
       }
 
       const wallGeometry = new T.CylinderGeometry(
         1.02, 0.98, 2.2, 64, 5, true
       );
-
-      const positions =
-        wallGeometry.attributes.position;
+      const positions = wallGeometry.attributes.position;
 
       for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
 
-        const weight = spoutWeight(
-          Math.atan2(x, z)
-        );
-
+        const weight = spoutWeight(Math.atan2(x, z));
         const top = ramp(y, 0.65, 1.1);
         const radial = Math.sqrt(x * x + z * z);
-
         const factor =
           (radial + 0.23 * weight * top) / radial;
 
@@ -1489,7 +1356,6 @@
         this.glassMaterial,
         this.beaker
       );
-
       wall.renderOrder = 3;
 
       this.baseGlassMaterial = this.ownMaterial(
@@ -1506,21 +1372,15 @@
 
       const bottom = this.mesh(
         this.ownGeometry(
-          new T.CylinderGeometry(
-            0.98, 0.98, 0.065, 64
-          )
+          new T.CylinderGeometry(0.98, 0.98, 0.065, 64)
         ),
         this.baseGlassMaterial,
         this.beaker
       );
-
       bottom.position.y = -1.1;
       bottom.renderOrder = 3;
 
-      this.glassEdgeMaterial = this.basic(
-        "#c6e7f5",
-        1
-      );
+      this.glassEdgeMaterial = this.basic("#c6e7f5", 1);
 
       const lipPoints = [];
 
@@ -1537,33 +1397,25 @@
       }
 
       const lipCurve = new T.CatmullRomCurve3(
-        lipPoints,
-        true,
-        "centripetal"
+        lipPoints, true, "centripetal"
       );
 
       const lip = this.mesh(
         this.ownGeometry(
-          new T.TubeGeometry(
-            lipCurve, 128, 0.022, 6, true
-          )
+          new T.TubeGeometry(lipCurve, 128, 0.022, 6, true)
         ),
         this.glassEdgeMaterial,
         this.beaker
       );
-
       lip.renderOrder = 4;
 
       const baseRing = this.mesh(
         this.ownGeometry(
-          new T.TorusGeometry(
-            0.98, 0.018, 6, 64
-          )
+          new T.TorusGeometry(0.98, 0.018, 6, 64)
         ),
         this.glassEdgeMaterial,
         this.beaker
       );
-
       baseRing.rotation.x = Math.PI / 2;
       baseRing.position.y = -1.08;
       baseRing.renderOrder = 4;
@@ -1571,7 +1423,6 @@
       const scaleTexture = this.makeTexture(
         384, 1024, (ctx, w, h) => {
           ctx.clearRect(0, 0, w, h);
-
           ctx.fillStyle = "#f2fbff";
           ctx.strokeStyle = "#f2fbff";
           ctx.lineWidth = 8;
@@ -1591,11 +1442,7 @@
             ctx.stroke();
 
             if (major) {
-              ctx.fillText(
-                String(500 - i * 50),
-                165,
-                y
-              );
+              ctx.fillText(String(500 - i * 50), 165, y);
             }
           }
 
@@ -1614,17 +1461,11 @@
       );
 
       this.scaleBoard = this.mesh(
-        this.ownGeometry(
-          new T.PlaneGeometry(0.59, 1.57)
-        ),
+        this.ownGeometry(new T.PlaneGeometry(0.59, 1.57)),
         this.scaleMaterial,
         this.beaker
       );
-
-      this.scaleBoard.position.set(
-        0.18, 0.06, 1.035
-      );
-
+      this.scaleBoard.position.set(0.18, 0.06, 1.035);
       this.scaleBoard.renderOrder = 5;
 
       this.glassMaterials = [
@@ -1646,51 +1487,34 @@
     },
 
     atomicScale: function (t) {
-      /*
-       * Eine einzige logarithmische Zoomkurve.
-       * Der neue Anfang geht ohne Geschwindigkeitswechsel
-       * in den bisherigen Zoom über.
-       */
       const elapsed = clamp(
         t - ZOOM_START,
         0,
         ZOOM_END - ZOOM_START
       );
 
-      return START_SCALE *
-        Math.exp(-ZOOM_RATE * elapsed);
+      return START_SCALE * Math.exp(-ZOOM_RATE * elapsed);
     },
 
     focusProgress: function (t) {
-      return ramp(
-        t,
-        DESCENT_START,
-        DESCENT_END
-      );
+      return ramp(t, DESCENT_START, DESCENT_END);
     },
 
     updateModelPositions: function (t, scale, zoom) {
       this.visual.position.set(0, 0, 0);
-
-      this.atomic.position.copy(
-        this.presentationCenter
-      );
-
+      this.atomic.position.copy(this.presentationCenter);
       this.atomic.scale.setScalar(scale);
 
       const progress = this.focusProgress(t);
 
       if (t <= DESCENT_START) {
-        this.selectedCenter.copy(
-          this.presentationCenter
-        );
+        this.selectedCenter.copy(this.presentationCenter);
       } else {
         const restingCenterY =
           TABLE_TOP +
           SURFACE_GAP +
           (
-            this.selectedPosition.y -
-            BEAKER_BOTTOM_Y
+            this.selectedPosition.y - BEAKER_BOTTOM_Y
           ) * zoom;
 
         this.selectedCenter.set(
@@ -1712,25 +1536,16 @@
         );
       }
 
-      /*
-       * selectedCrystal-Mittelpunkt = selectedCenter.
-       * Keine Reset-Position beim Darstellungswechsel.
-       */
       this.specimen.position
         .copy(this.selectedCenter)
-        .addScaledVector(
-          this.selectedPosition,
-          -zoom
-        );
+        .addScaledVector(this.selectedPosition, -zoom);
 
       this.specimen.scale.setScalar(zoom);
     },
 
     setShown: function (shown) {
       this.shown = !!shown;
-
       if (!this.shown) this.paused = true;
-
       this.updateAnimation(true);
     },
 
@@ -1739,7 +1554,6 @@
       this.playDirection = 1;
       this.paused = true;
       this.lastPhase = -1;
-
       this.updateAnimation(true);
     },
 
@@ -1753,21 +1567,14 @@
         const next = PHASE_TIMES.find(
           value => value > this.time + 0.1
         );
-
-        this.time = next === undefined
-          ? END
-          : next;
+        this.time = next === undefined ? END : next;
       } else {
         const previous = PHASE_TIMES
           .slice()
           .reverse()
-          .find(
-            value => value < this.time - 0.1
-          );
+          .find(value => value < this.time - 0.1);
 
-        this.time = previous === undefined
-          ? 0
-          : previous;
+        this.time = previous === undefined ? 0 : previous;
       }
 
       this.paused = true;
@@ -1775,14 +1582,8 @@
     },
 
     updateIonInstances: function (scale, t) {
-      const fill = ramp(
-        t,
-        FILL_START,
-        FILL_END
-      );
-
-      const outerNeighborFactor =
-        1 - ramp(t, 20, 24.5);
+      const fill = ramp(t, FILL_START, FILL_END);
+      const outerNeighborFactor = 1 - ramp(t, 20, 24.5);
 
       this.ionLayers.forEach(layer => {
         const targetRadius = lerp(
@@ -1801,8 +1602,7 @@
           const available = BOUND / scale - edge;
 
           const reveal = clamp(
-            available /
-            Math.max(targetRadius, 0.00001),
+            available / Math.max(targetRadius, 0.00001),
             0,
             1
           );
@@ -1815,19 +1615,14 @@
             : 1;
 
           const radius =
-            targetRadius *
-            reveal *
-            neighborFactor;
+            targetRadius * reveal * neighborFactor;
 
           this.dummy.position.copy(point);
           this.dummy.quaternion.identity();
           this.dummy.scale.setScalar(radius);
           this.dummy.updateMatrix();
 
-          layer.mesh.setMatrixAt(
-            index,
-            this.dummy.matrix
-          );
+          layer.mesh.setMatrixAt(index, this.dummy.matrix);
         });
 
         layer.mesh.instanceMatrix.needsUpdate = true;
@@ -1849,25 +1644,17 @@
           grain.size * zoom * Math.sqrt(3) / 2;
 
         const reveal = clamp(
-          (1.65 - distance) /
-          Math.max(radius, 0.0001),
+          (1.65 - distance) / Math.max(radius, 0.0001),
           0,
           1
         );
 
         this.dummy.position.copy(grain.position);
         this.dummy.quaternion.copy(grain.rotation);
-
-        this.dummy.scale.setScalar(
-          grain.size * reveal
-        );
-
+        this.dummy.scale.setScalar(grain.size * reveal);
         this.dummy.updateMatrix();
 
-        this.grainMesh.setMatrixAt(
-          index,
-          this.dummy.matrix
-        );
+        this.grainMesh.setMatrixAt(index, this.dummy.matrix);
       });
 
       this.grainMesh.instanceMatrix.needsUpdate = true;
@@ -1876,22 +1663,13 @@
     updateAnimation: function (updateInstances) {
       const t = this.stageTime();
       const scale = this.atomicScale(t);
-
       const specimenZoom =
         FILLED_SPAN * scale / this.selectedSize;
 
-      this.updateModelPositions(
-        t,
-        scale,
-        specimenZoom
-      );
+      this.updateModelPositions(t, scale, specimenZoom);
 
       const whitening = ramp(t, 18.5, 22);
 
-      /*
-       * Anfangs ausschließlich level 0.
-       * Äußere Nachbarn erscheinen erst nach Beginn des Zooms.
-       */
       const levelAlpha = [
         1,
         ramp(t, 2, 4),
@@ -1917,8 +1695,7 @@
           levelAlpha[layer.level]
         );
 
-        layer.mesh.visible =
-          layer.material.visible;
+        layer.mesh.visible = layer.material.visible;
       });
 
       this.frames.forEach(entry => {
@@ -1944,58 +1721,28 @@
         );
 
         if (
-          (extent + GRID_EDGE_RADIUS) * scale >
-          BOUND
-        ) {
-          alpha = 0;
-        }
+          (extent + GRID_EDGE_RADIUS) * scale > BOUND
+        ) alpha = 0;
 
         this.setAlpha(entry.material, alpha);
-
-        entry.frame.visible =
-          entry.material.visible;
+        entry.frame.visible = entry.material.visible;
       });
 
-      const originAlpha =
-        1 - ramp(t, 24, 26);
+      const originAlpha = 1 - ramp(t, 24, 26);
 
-      this.setAlpha(
-        this.originMaterial,
-        originAlpha
-      );
+      this.setAlpha(this.originMaterial, originAlpha);
+      this.setAlpha(this.originTintMaterial, originAlpha);
 
-      this.setAlpha(
-        this.originTintMaterial,
-        originAlpha
-      );
+      this.originFrame.visible = this.originMaterial.visible;
+      this.originTint.visible = this.originTintMaterial.visible;
 
-      this.originFrame.visible =
-        this.originMaterial.visible;
-
-      this.originTint.visible =
-        this.originTintMaterial.visible;
-
-      /*
-       * Zellparameter bleiben während der zehn Sekunden
-       * vollständig sichtbar und verschwinden im ersten Zoom.
-       */
-      const parameterAlpha =
-        1 - ramp(t, 2, 4);
+      const parameterAlpha = 1 - ramp(t, 2, 4);
 
       this.parameterMaterials.forEach(material => {
-        this.setAlpha(
-          material,
-          parameterAlpha
-        );
+        this.setAlpha(material, parameterAlpha);
       });
+      this.cellParameters.visible = parameterAlpha > 0.001;
 
-      this.cellParameters.visible =
-        parameterAlpha > 0.001;
-
-      /*
-       * Koordinationshilfen erst nach der Anfangsstufe.
-       * Cl-Beispiel wartet auf den äußeren Nachbarn.
-       */
       const sodiumCoord =
         ramp(t, 2.3, 2.8) *
         (1 - ramp(t, 3.4, 3.8));
@@ -2007,85 +1754,53 @@
       this.coordination.forEach(entry => {
         this.setAlpha(
           entry.material,
-          entry.type === "Na"
-            ? sodiumCoord
-            : chlorideCoord
+          entry.type === "Na" ? sodiumCoord : chlorideCoord
         );
 
-        entry.lines.visible =
-          entry.material.visible;
+        entry.lines.visible = entry.material.visible;
       });
 
-      const labelAlpha =
-        1 - ramp(t, 7, 10);
+      const labelAlpha = 1 - ramp(t, 7, 10);
 
-      Object.values(this.labelMaterials)
-        .forEach(material => {
-          this.setAlpha(material, labelAlpha);
-        });
+      Object.values(this.labelMaterials).forEach(material => {
+        this.setAlpha(material, labelAlpha);
+      });
 
       this.labels.forEach(label => {
-        label.sprite.visible =
-          labelAlpha > 0.001;
+        label.sprite.visible = labelAlpha > 0.001;
       });
 
-      /*
-       * Geometrisch passender Wechsel zum einfachen Würfel.
-       */
-      this.atomic.visible =
-        t < SOLID_SWITCH;
+      this.atomic.visible = t < SOLID_SWITCH;
 
-      this.setAlpha(
-        this.selectedMaterial,
-        1
-      );
-
-      this.selectedCrystal.visible =
-        t >= SOLID_SWITCH;
+      this.setAlpha(this.selectedMaterial, 1);
+      this.selectedCrystal.visible = t >= SOLID_SWITCH;
 
       this.setAlpha(
         this.selectedGoldMaterial,
         ramp(t, 26, 27) *
         (1 - ramp(t, 31.5, 34))
       );
-
       this.selectedGold.visible =
         this.selectedGoldMaterial.visible;
 
-      this.setAlpha(
-        this.grainMaterial,
-        ramp(t, 27, 30)
-      );
-
-      this.grainMesh.visible =
-        this.grainMaterial.visible;
+      this.setAlpha(this.grainMaterial, ramp(t, 27, 30));
+      this.grainMesh.visible = this.grainMaterial.visible;
 
       const progress = this.focusProgress(t);
-
       const focusLength =
-        this.selectedPosition.length() *
-        (1 - progress);
+        this.selectedPosition.length() * (1 - progress);
 
       const fitClearance =
-        1.68 -
-        specimenZoom * (1.63 + focusLength);
+        1.68 - specimenZoom * (1.63 + focusLength);
 
-      const glassFitAlpha = ramp(
-        fitClearance,
-        0,
-        0.05
-      );
-
+      const glassFitAlpha = ramp(fitClearance, 0, 0.05);
       const glassAlpha =
-        ramp(t, 32.5, 34.5) *
-        glassFitAlpha;
+        ramp(t, 32.5, 34.5) * glassFitAlpha;
 
       this.glassMaterials.forEach(material => {
         this.setAlpha(material, glassAlpha);
       });
-
-      this.beaker.visible =
-        glassAlpha > 0.001;
+      this.beaker.visible = glassAlpha > 0.001;
 
       if (
         updateInstances &&
@@ -2097,10 +1812,7 @@
         }
 
         if (t >= 26) {
-          this.updateGrainInstances(
-            specimenZoom,
-            t
-          );
+          this.updateGrainInstances(specimenZoom, t);
         }
 
         this.lastGeometryTime = t;
@@ -2109,7 +1821,6 @@
       this.visual.visible = this.shown;
 
       const phase = this.phaseIndex();
-
       const state = [
         this.paused,
         this.shown,
@@ -2123,7 +1834,6 @@
       ) {
         this.lastPhase = phase;
         this.lastState = state;
-
         this.drawPhase(phase);
       }
     },
@@ -2144,7 +1854,6 @@
 
     updateBillboards: function () {
       const scene = this.el.sceneEl;
-
       if (!scene || !scene.camera) return;
 
       scene.camera.getWorldPosition(this.eye);
@@ -2156,9 +1865,7 @@
       this.root.worldToLocal(this.localEye);
 
       this.direction.set(
-        this.localEye.x,
-        0,
-        this.localEye.z
+        this.localEye.x, 0, this.localEye.z
       );
 
       if (this.direction.lengthSq() < 0.0001) {
@@ -2172,29 +1879,27 @@
         INFO_Y,
         this.direction.z * INFO_DISTANCE
       );
-
       this.faceViewer(this.phaseBoard);
 
-      if (
-        !this.shown ||
-        this.stageTime() >= 10
-      ) {
-        return;
-      }
+      if (!this.shown || this.stageTime() >= 10) return;
 
       this.atomic.updateWorldMatrix(true, false);
-
       this.localEye.copy(this.eye);
       this.atomic.worldToLocal(this.localEye);
 
+      /*
+       * Beschriftungen bleiben der jeweiligen Kugel zugeordnet.
+       * Ihre Ausrichtung selbst übernimmt THREE.Sprite
+       * für die gerenderte Kamera, auch in WebXR.
+       *
+       * Die Tiefenprüfung ist für die Schrift ausgeschaltet:
+       * kleine Unterschiede zwischen den beiden Augen
+       * schneiden daher keine Buchstabenteile mehr ab.
+       */
       this.labels.forEach(label => {
-        this.direction
-          .copy(this.localEye)
-          .sub(label.center);
+        this.direction.copy(this.localEye).sub(label.center);
 
-        if (
-          this.direction.lengthSq() < 0.00001
-        ) {
+        if (this.direction.lengthSq() < 0.00001) {
           this.direction.set(0, 0, 1);
         } else {
           this.direction.normalize();
@@ -2204,43 +1909,31 @@
           .copy(label.center)
           .addScaledVector(
             this.direction,
-            label.radius + 0.008
+            label.radius + ION_TEXT_SURFACE_GAP
           );
       });
     },
 
     tick: function (time, delta) {
-      const menuOpen =
-        F.Menu && F.Menu.opened;
+      const menuOpen = F.Menu && F.Menu.opened;
 
-      if (
-        !this.paused &&
-        this.shown &&
-        !menuOpen
-      ) {
+      if (!this.paused && this.shown && !menuOpen) {
         const seconds = Math.min(
           Math.max((delta || 0) / 1000, 0),
           0.05
         );
 
         this.time +=
-          seconds *
-          this.data.speed *
-          this.playDirection;
+          seconds * this.data.speed * this.playDirection;
 
-        if (
-          this.playDirection > 0 &&
-          this.time >= END
-        ) {
+        if (this.playDirection > 0 && this.time >= END) {
           this.time = END;
           this.playDirection = -1;
         } else if (
-          this.playDirection < 0 &&
-          this.time <= 0
+          this.playDirection < 0 && this.time <= 0
         ) {
           this.time = 0;
           this.playDirection = 1;
-
           if (!this.loop) this.paused = true;
         }
       }
@@ -2251,10 +1944,7 @@
       const shouldShowAtomic =
         this.stageTime() < SOLID_SWITCH;
 
-      if (
-        shouldShowAtomic &&
-        !this.atomic.visible
-      ) {
+      if (shouldShowAtomic && !this.atomic.visible) {
         updateInstances = true;
       }
 
@@ -2269,17 +1959,9 @@
     remove: function () {
       this.el.removeObject3D("welcome-demo");
 
-      this.geometries.forEach(
-        geometry => geometry.dispose()
-      );
-
-      this.materials.forEach(
-        material => material.dispose()
-      );
-
-      this.textures.forEach(
-        texture => texture.dispose()
-      );
+      this.geometries.forEach(geometry => geometry.dispose());
+      this.materials.forEach(material => material.dispose());
+      this.textures.forEach(texture => texture.dispose());
 
       this.geometries.clear();
       this.materials.clear();
@@ -2298,58 +1980,30 @@
 
   F.RoomBuilder.build = function (parent, config, rooms) {
     const result = previousBuild.call(
-      this,
-      parent,
-      config,
-      rooms
+      this, parent, config, rooms
     );
 
     if (config.kind !== "welcome") return result;
 
-    /*
-     * Vorhandene optionale Anknüpfung beibehalten.
-     * Die ID muss im Raumaufbau tatsächlich existieren.
-     */
     const floorDiamond = parent.querySelector(
       "#welcome-floor-diamond"
     );
-
     if (floorDiamond) floorDiamond.remove();
 
-    const experiment =
-      document.createElement("a-entity");
-
+    const experiment = document.createElement("a-entity");
     experiment.id = "fkc-welcome-experiment";
-
-    experiment.setAttribute(
-      "fkc-welcome-demo",
-      ""
-    );
-
+    experiment.setAttribute("fkc-welcome-demo", "");
     parent.appendChild(experiment);
 
-    /*
-     * Vorhandene optionale Navigationsanbindung.
-     * Nur wirksam, wenn isWalkable(x, z) bereitgestellt wird.
-     * Betrifft Software-Navigation, nicht reales Gehen.
-     */
-    if (
-      result &&
-      typeof result.isWalkable === "function"
-    ) {
-      const previousWalkable =
-        result.isWalkable;
-
-      const clearanceRadius =
-        TABLE_RADIUS + 0.28;
+    if (result && typeof result.isWalkable === "function") {
+      const previousWalkable = result.isWalkable;
+      const clearanceRadius = TABLE_RADIUS + 0.28;
 
       result.isWalkable = function (x, z) {
         if (
           x * x + z * z <
           clearanceRadius * clearanceRadius
-        ) {
-          return false;
-        }
+        ) return false;
 
         return previousWalkable.call(this, x, z);
       };
@@ -2369,7 +2023,6 @@
   function feedback(menu, message) {
     menu.blockDrawing();
     menu.notify(message);
-
     if (F.setStatus) F.setStatus(message);
   }
 
@@ -2387,51 +2040,31 @@
       ) {
         const item = this.buttons[3];
 
-        item.label =
-          "Begrüßungsanimation & Bedienhilfe";
+        item.label = "Begrüßungsanimation & Bedienhilfe";
+        item.action = () => this.navigate("welcome-demo");
 
-        item.action = () =>
-          this.navigate("welcome-demo");
-
-        const pressed =
-          this.pressedIndex === 3;
-
+        const pressed = this.pressedIndex === 3;
         const offset = pressed ? 5 : 0;
         const ctx = this.ctx;
 
         ctx.fillStyle = "#a9bcae";
-
         ctx.fillRect(
-          item.x,
-          item.y + 5,
-          item.w,
-          item.h
+          item.x, item.y + 5, item.w, item.h
         );
 
-        ctx.fillStyle = pressed
-          ? "#bba466"
-          : "#efe0b8";
-
+        ctx.fillStyle = pressed ? "#bba466" : "#efe0b8";
         ctx.fillRect(
-          item.x,
-          item.y + offset,
-          item.w,
-          item.h
+          item.x, item.y + offset, item.w, item.h
         );
 
         ctx.strokeStyle = "#a9bcae";
         ctx.lineWidth = 2;
-
         ctx.strokeRect(
-          item.x,
-          item.y + offset,
-          item.w,
-          item.h
+          item.x, item.y + offset, item.w, item.h
         );
 
         ctx.fillStyle = "#263f33";
         ctx.font = "30px Arial";
-
         ctx.fillText(
           item.label,
           item.x + 22,
@@ -2461,14 +2094,11 @@
 
     ctx.fillStyle = "#263f33";
     ctx.font = "bold 43px Arial";
-
     ctx.fillText(
-      "Vom Ionengitter zur Salzprobe",
-      55, 75, 914
+      "Vom Ionengitter zur Salzprobe", 55, 75, 914
     );
 
     ctx.font = "27px Arial";
-
     ctx.fillText(
       "Hin und zurück · NaCl · Koordination 6 : 6",
       55, 125, 914
@@ -2480,11 +2110,8 @@
       const x = 55;
       const w = 914;
       const h = 64;
-
       const index = this.buttons.length;
-      const pressed =
-        index === this.pressedIndex;
-
+      const pressed = index === this.pressedIndex;
       const offset = pressed ? 5 : 0;
 
       ctx.fillStyle = "#a9bcae";
@@ -2502,18 +2129,11 @@
 
       ctx.fillStyle = "#263f33";
       ctx.font = "29px Arial";
-
       ctx.fillText(
-        label,
-        x + 22,
-        y + 41 + offset,
-        w - 44
+        label, x + 22, y + 41 + offset, w - 44
       );
 
-      this.buttons.push({
-        x, y, w, h, label, action
-      });
-
+      this.buttons.push({x, y, w, h, label, action});
       y += 76;
     };
 
@@ -2529,9 +2149,7 @@
 
         feedback(
           this,
-          demo.paused
-            ? "Animation pausiert."
-            : "Animation läuft."
+          demo.paused ? "Animation pausiert." : "Animation läuft."
         );
       },
       "#efe0b8"
@@ -2555,7 +2173,6 @@
         : "Nächste Phase — Richtung Elementarzelle",
       () => {
         demo.nextPhase();
-
         feedback(
           this,
           "Nächste Phase angezeigt. Animation pausiert."
@@ -2565,11 +2182,7 @@
 
     button(
       "Richtung: " +
-      (
-        demo.playDirection > 0
-          ? "Herauszoomen"
-          : "Hineinzoomen"
-      ) +
+      (demo.playDirection > 0 ? "Herauszoomen" : "Hineinzoomen") +
       " — wechseln",
       () => {
         demo.reverseDirection();
@@ -2588,32 +2201,20 @@
       "Geschwindigkeit: " + demo.data.speed + "×",
       () => {
         const speeds = [0.5, 1, 2];
-
-        const index = speeds.indexOf(
-          demo.data.speed
-        );
-
-        const next = speeds[
-          (index + 1) % speeds.length
-        ];
+        const index = speeds.indexOf(demo.data.speed);
+        const next = speeds[(index + 1) % speeds.length];
 
         demo.el.setAttribute(
-          "fkc-welcome-demo",
-          "speed",
-          next
+          "fkc-welcome-demo", "speed", next
         );
 
-        feedback(
-          this,
-          "Geschwindigkeit: " + next + "×"
-        );
+        feedback(this, "Geschwindigkeit: " + next + "×");
       },
       "#cddff3"
     );
 
     button(
-      "Hin und zurück wiederholen: " +
-      (demo.loop ? "an" : "aus"),
+      "Hin und zurück wiederholen: " + (demo.loop ? "an" : "aus"),
       () => {
         demo.loop = !demo.loop;
 
@@ -2627,9 +2228,7 @@
     );
 
     button(
-      demo.shown
-        ? "Animation ausblenden"
-        : "Animation einblenden",
+      demo.shown ? "Animation ausblenden" : "Animation einblenden",
       () => {
         demo.setShown(!demo.shown);
 
@@ -2659,37 +2258,29 @@
       "Automatisch: Elementarzelle → Salzprobe → Elementarzelle",
       55, 904, 914
     );
-
     ctx.fillText(
       "Darstellungswechsel vereinfacht · kein Wachstum oder Auflösen",
       55, 948, 914
     );
-
     ctx.fillText(
       "Während das Menü offen ist, hält die Animation an.",
       55, 992, 914
     );
 
-    ctx.fillStyle = this.message
-      ? "#dcefe2"
-      : "#edf2ee";
-
+    ctx.fillStyle = this.message ? "#dcefe2" : "#edf2ee";
     ctx.fillRect(35, 1078, 954, 53);
 
     ctx.fillStyle = "#244d35";
     ctx.font = "bold 25px Arial";
-
     ctx.fillText(
-      this.message ||
-        "Buttons mit Laser + Trigger auswählen",
+      this.message || "Buttons mit Laser + Trigger auswählen",
       55, 1113, 910
     );
 
     ctx.fillStyle = "#607668";
     ctx.font = "23px Arial";
-
     ctx.fillText(
-      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-9",
+      "B/Y schließt · NaCl-Begrüßungsanimation · Version Willkommen-10",
       55, 1160, 914
     );
 
