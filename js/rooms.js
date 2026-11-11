@@ -3,14 +3,20 @@
 (function (F) {
   /*
    * ============================================================
-   * ZENTRALE RAUMDATEN — GALERIE-3
+   * ZENTRALE RAUMDATEN — GALERIE-4
    * ============================================================
    *
-   * Neue Begrüßungsmodelle: assets/model/
-   * Bestehende Vorlesungsmodelle: assets/models/
+   * Alle Modelle liegen unter assets/models/.
+   * Pfade beziehen sich auf index.html.
+   * Groß-/Kleinschreibung beachten.
    *
-   * Die unterschiedlichen Ordnernamen sind beabsichtigt.
-   * Groß-/Kleinschreibung der Dateinamen beachten.
+   * title:
+   *   Vollständiger Name ohne Trennzeichen.
+   *
+   * plaqueText:
+   *   Für die Podestbeschriftung vorbereiteter Text.
+   *   \u00AD bezeichnet einen bedingten Trennstrich.
+   *   Der Raum-Builder muss diesen ausdrücklich auswerten.
    */
 
   const museumColors = {
@@ -84,15 +90,6 @@
    * ============================================================
    * BEGRÜSSUNGSRAUM
    * ============================================================
-   *
-   * welcomePoster:
-   *   Bild an der bisherigen Position der mittleren FKC-VR-Tafel.
-   *
-   * exhibits:
-   *   roomId = Ziel der Raumtafel
-   *   title = Beschriftung am Podest und Name im Modellmenü
-   *   model = GLB-Pfad
-   *   info = Beschreibung im vorhandenen Modellmenü
    */
 
   F.welcomeRoom = {
@@ -129,16 +126,18 @@
       {
         roomId: "vorlesung-1",
         title: "C₆₀-Buckminsterfulleren",
-        model: "assets/model/C60-Fulleren.glb",
+        plaqueText: "C₆₀-Buckminster\u00ADfulleren",
+        model: "assets/models/C60-Fulleren.glb",
         info:
           "Vorschau für Vorlesung 1.\n\n" +
-          "C₆₀-Buckminsterfulleren: ein Molekül aus 60 " +
-          "Kohlenstoffatomen."
+          "C₆₀-Buckminsterfulleren: ein Molekül aus " +
+          "60 Kohlenstoffatomen."
       },
       {
         roomId: "vorlesung-2",
         title: "Wasserstoffbrücken in Eis",
-        model: "assets/model/Eis2.glb",
+        plaqueText: "Wasserstoff\u00ADbrücken in Eis",
+        model: "assets/models/Eis2.glb",
         info:
           "Vorschau für Vorlesung 2.\n\n" +
           "Wasserstoffbrücken zwischen Wassermolekülen in Eis."
@@ -146,7 +145,9 @@
       {
         roomId: "vorlesung-3",
         title: "YBa₂Cu₃O₇₋ₓ – Hochtemperatursupraleiter",
-        model: "assets/model/YBa2Cu3O7-x.glb",
+        plaqueText:
+          "YBa₂Cu₃O₇₋ₓ – Hoch\u00ADtemperatur\u00ADsupraleiter",
+        model: "assets/models/YBa2Cu3O7-x.glb",
         info:
           "Vorschau für Vorlesung 3.\n\n" +
           "YBa₂Cu₃O₇₋ₓ – Hochtemperatursupraleiter. " +
@@ -155,7 +156,9 @@
       {
         roomId: "vorlesung-4",
         title: "Tetragonal innenzentriertes Bravaisgitter",
-        model: "assets/model/Tetragonal-I.glb",
+        plaqueText:
+          "Tetragonal innen\u00ADzentriertes Bravais\u00ADgitter",
+        model: "assets/models/Tetragonal-I.glb",
         info:
           "Vorschau für Vorlesung 4.\n\n" +
           "Tetragonal innenzentriertes Bravaisgitter, tI.\n" +
@@ -165,17 +168,22 @@
       {
         roomId: "vorlesung-5",
         title: "Beugung am Einkristall",
-        model: "assets/model/Roentgenbeugung.glb",
+        plaqueText: "Beugung am Ein\u00ADkristall",
+        model: "assets/models/Roentgenbeugung.glb",
         info:
           "Vorschau für Vorlesung 5.\n\n" +
-          "Schematischer Röntgenbeugungsversuch mit Kristall, " +
-          "Primärstrahl, gebeugten Strahlen und Detektor.\n\n" +
+          "Schematischer Röntgenbeugungsversuch mit " +
+          "Einkristall, Primärstrahl, gebeugten Strahlen " +
+          "und Detektor.\n\n" +
+          "Beugung entsteht durch die Interferenz der " +
+          "am periodischen Kristall gestreuten Wellen.\n" +
           "Die dargestellten Reflexpositionen sind illustrativ."
       },
       {
         roomId: "vorlesung-6",
         title: "Kupfer – kubisch dichteste Packung",
-        model: "assets/model/Cu.glb",
+        plaqueText: "Kupfer – kubisch dichteste Packung",
+        model: "assets/models/Cu.glb",
         info:
           "Vorschau für Vorlesung 6.\n\n" +
           "Kupfer – kubisch dichteste Packung, " +
@@ -184,16 +192,18 @@
       {
         roomId: "vorlesung-7",
         title: "Zinkblende",
-        model: "assets/model/ZnS.glb",
+        plaqueText: "Zink\u00ADblende",
+        model: "assets/models/ZnS.glb",
         info:
           "Vorschau für Vorlesung 7.\n\n" +
-          "Zinkblende: ZnS mit tetraedrischer Koordination " +
-          "beider Ionensorten."
+          "Zinkblende: ZnS mit tetraedrischer " +
+          "Koordination beider Ionensorten."
       },
       {
         roomId: "vorlesung-8",
         title: "S₈-Molekül in elementarem Schwefel",
-        model: "assets/model/S8.glb",
+        plaqueText: "S₈-Molekül in elementarem Schwefel",
+        model: "assets/models/S8.glb",
         info:
           "Vorschau für Vorlesung 8.\n\n" +
           "S₈-Molekül in elementarem Schwefel."
@@ -201,7 +211,9 @@
       {
         roomId: "team-a",
         title: "Metallorganische Gerüstverbindung HKUST-1",
-        model: "assets/model/HKUST-1_Pores.glb",
+        plaqueText:
+          "Metall\u00ADorganische Gerüst\u00ADverbindung HKUST-1",
+        model: "assets/models/HKUST-1_Pores.glb",
         info:
           "Vorschau für Team A.\n\n" +
           "Metallorganische Gerüstverbindung HKUST-1 " +
@@ -210,7 +222,10 @@
       {
         roomId: "team-b",
         title: "Cobalt-Komplex aus einer Einkristall-Umwandlung",
-        model: "assets/model/Co-Komplex.glb",
+        plaqueText:
+          "Cobalt-Komplex aus einer " +
+          "Ein\u00ADkristall-Umwandlung",
+        model: "assets/models/Co-Komplex.glb",
         info:
           "Vorschau für Team B.\n\n" +
           "Cobalt-Komplex aus einer Einkristall-Umwandlung."
@@ -272,14 +287,13 @@
   ];
 
   const room = id => F.rooms.find(item => item.id === id);
+  const v1 = room("vorlesung-1");
 
   /*
    * ============================================================
    * VORLESUNG 1: BESTEHENDE MODELLE — UNVERÄNDERT
    * ============================================================
    */
-
-  const v1 = room("vorlesung-1");
 
   Object.assign(v1.stations[0], {
     title: "Diamant",
