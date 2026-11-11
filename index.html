@@ -8,31 +8,29 @@
 
   <link rel="stylesheet" href="./styles.css">
 
-  <!-- Diagnose früh laden. -->
-  <script src="./js/xr-debug.js"></script>
-
-  <!-- Bestehende A-Frame-Version beibehalten. -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-  <!-- Grundfunktionen und Raumdaten. -->
   <script defer src="./js/vr-controls.js"></script>
   <script defer src="./js/room-builder.js"></script>
   <script defer src="./js/rooms.js"></script>
   <script defer src="./js/vr-tools.js"></script>
 
-  <!-- Demonstrationen ergänzen Builder und Menü. -->
   <script defer src="./js/xray-demo.js"></script>
   <script defer src="./js/welcome-demo.js"></script>
-
-  <!-- Raumdesigns nach den Demonstrationen, vor dem App-Start. -->
   <script defer src="./js/room-themes.js"></script>
+
+  <!-- Neue Ergänzung nach den Menü- und Raumwrappern. -->
+  <script defer src="./js/browser-xr.js"></script>
 
   <script defer src="./js/app.js"></script>
 </head>
 
 <body>
-  <section id="panel">
-    <h1>FKC-VR</h1>
+  <section id="panel" aria-label="Raumwahl und Werkzeuge">
+    <div class="panel-heading">
+      <h1>FKC-VR</h1>
+      <span class="mode-label">Browser · VR · AR</span>
+    </div>
 
     <p id="current-room">Begrüßungsraum</p>
 
@@ -47,163 +45,177 @@
     </div>
 
     <div class="buttons">
-      <button id="home" type="button">Zum Begrüßungsraum</button>
+      <button id="home" type="button">Begrüßungsraum</button>
 
-      <button id="reset-last" type="button">
-        Ausgewähltes Objekt zurücksetzen
-      </button>
-
-      <button id="open-menu" type="button">
-        Menü öffnen / schließen
-      </button>
-
-      <button id="clear-markers" type="button">
-        Zeichnungen löschen
+      <button id="open-menu" type="button" class="primary-button">
+        Menü &amp; Einstellungen
       </button>
     </div>
 
+    <p class="short-help">
+      <strong>Ohne Brille:</strong>
+      WASD / Pfeiltasten: laufen · Q / E: drehen.<br>
+      Maus ziehen: umsehen · Modell anklicken: auswählen.
+    </p>
+
+    <section id="desktop-model-tools" class="tool-section">
+      <h2>Modell bearbeiten</h2>
+
+      <p id="desktop-model-name" role="status">
+        Klicke im Raum auf ein Modell.
+      </p>
+
+      <fieldset id="desktop-model-controls" disabled>
+        <legend class="sr-only">Werkzeuge für das ausgewählte Modell</legend>
+
+        <p class="control-label">Drehen</p>
+
+        <div class="rotation-buttons">
+          <button id="model-turn-left" type="button"
+                  aria-label="Modell nach links drehen">↶ Links</button>
+          <button id="model-turn-right" type="button"
+                  aria-label="Modell nach rechts drehen">Rechts ↷</button>
+          <button id="model-tilt-up" type="button"
+                  aria-label="Modell nach oben kippen">↑ Kippen</button>
+          <button id="model-tilt-down" type="button"
+                  aria-label="Modell nach unten kippen">↓ Kippen</button>
+        </div>
+
+        <label class="control-label" for="model-scale">
+          Größe: <output id="model-scale-value">100 %</output>
+        </label>
+
+        <div class="scale-controls">
+          <button id="model-smaller" type="button"
+                  aria-label="Modell verkleinern">−</button>
+
+          <input id="model-scale" type="range"
+                 min="-2.302585" max="2.302585"
+                 step="0.01" value="0">
+
+          <button id="model-larger" type="button"
+                  aria-label="Modell vergrößern">+</button>
+        </div>
+      </fieldset>
+
+      <div class="buttons">
+        <button id="reset-last" type="button">
+          Ausgewähltes Objekt zurücksetzen
+        </button>
+
+        <button id="model-info" type="button">
+          Modellinformationen
+        </button>
+      </div>
+    </section>
+
+    <section id="desktop-menu" class="tool-section" hidden
+             aria-label="Anwendungsmenü">
+      <div class="section-heading">
+        <h2>Menü</h2>
+        <button id="desktop-menu-close" type="button">Schließen</button>
+      </div>
+
+      <p id="desktop-menu-message" role="status"></p>
+
+      <div id="desktop-menu-buttons"></div>
+
+      <details>
+        <summary>Erklärungen zur geöffneten Menüseite</summary>
+
+        <div class="menu-preview">
+          <img id="desktop-menu-preview"
+               alt="Erklärungen und Einstellungen der aktuellen Menüseite">
+        </div>
+      </details>
+    </section>
+
+    <section class="tool-section" aria-label="Headset starten">
+      <h2>Mit Brille starten</h2>
+
+      <div class="buttons">
+        <button id="start-vr" type="button" disabled>VR starten</button>
+        <button id="start-ar" type="button" disabled>AR starten</button>
+      </div>
+
+      <p id="xr-availability" role="status">
+        VR- und AR-Unterstützung wird geprüft …
+      </p>
+    </section>
+
     <details>
-      <summary>Bedienung</summary>
+      <summary>Bedienhilfe</summary>
+
+      <p>
+        <strong>Browser:</strong>
+        WASD oder Pfeiltasten zum Laufen, Q/E zum Drehen.
+        Mit gedrückter Maustaste ziehen, um sich umzusehen.
+        Raumtafeln anklicken, um einen Raum zu betreten.
+      </p>
+
+      <p>
+        <strong>Modelle im Browser:</strong>
+        Ein Modell anklicken. Danach oben unter
+        „Modell bearbeiten“ drehen, kippen oder die Größe ändern.
+        „Modellinformationen“ öffnet die vorhandenen Informationen.
+      </p>
+
+      <p>
+        <strong>Menü im Browser:</strong>
+        „Menü &amp; Einstellungen“ öffnet normale Schaltflächen
+        für die vorhandenen Werkzeuge, Raumdesigns und Demonstrationen.
+        Solange das Menü geöffnet ist, pausiert die Raumbewegung.
+        Unter „Erklärungen“ ist die vollständige Menüseite sichtbar.
+      </p>
 
       <p>
         <strong>VR:</strong>
-        Linker Joystick läuft. Rechter Joystick dreht entsprechend
-        der gewählten Komforteinstellung. Teleport ist deaktiviert.
+        Linker Joystick: laufen. Rechter Joystick: drehen.
+        Grip in Modellnähe halten:
+        eine Hand bewegt und dreht, zwei Hände skalieren.
+        B/Y öffnet oder schließt das Menü.
       </p>
 
       <p>
-        <strong>Modelle:</strong>
-        Grip in Modellnähe halten.
-        Eine Hand bewegt und dreht, zwei Hände skalieren.
-      </p>
-
-      <p>
-        <strong>Zeichnen:</strong>
+        <strong>Zeichnen in VR:</strong>
         Trigger kurz drücken für einen Punkt.
         Trigger halten und den Laser bewegen für einen Strich.
+        Laserfarbe und Malfarbe sind identisch.
       </p>
 
       <p>
         <strong>Zurücksetzen:</strong>
-        A/X setzt das gehaltene Modell zurück.
-        Sonst wird das Objekt unter dem Laser zurückgesetzt.
-        Bei Postern und Raumflächen werden nur Zeichnungen gelöscht.
+        A/X setzt das gehaltene oder anvisierte Objekt zurück.
+        Bei Zeichenflächen werden Zeichnungen entfernt.
+        Ein Modellreset entfernt auch seine Zeichnungen.
       </p>
 
       <p>
-        <strong>Menü:</strong>
-        B/Y öffnet oder schließt das Menü.
-        Menü mit Laser und Trigger bedienen.
-        Nach dem Schließen beide Joysticks kurz neutral stellen.
+        <strong>AR:</strong>
+        Falls der Browser WebXR-AR unterstützt, startet „AR starten“
+        die immersive AR-Ansicht. Raumwände, Boden, Decke und
+        Landschaft werden ausgeblendet; Lehrinhalte bleiben sichtbar.
+        Eine automatische Tisch- oder Bodenplatzierung ist noch
+        nicht enthalten.
       </p>
 
       <p>
-        <strong>Raumdesign:</strong>
-        Im Menü „Raumdesign“ auswählen.
-        Verfügbar sind helles Labor, moderne Galerie,
-        futuristisches Labor, Dracula-Schloss,
-        einsame Insel und Dschungel.
-        Die Auswahl gilt zunächst nur für den aktuellen Raum,
-        einschließlich des Begrüßungsraums.
+        <strong>Raumdesigns und Demonstrationen:</strong>
+        Die vorhandenen Menüpunkte für Raumdesign,
+        Begrüßungsanimation und Röntgendemo bleiben erhalten.
+        Designauswahlen werden lokal pro Browser gespeichert.
       </p>
 
       <p>
-        <strong>Design für alle Räume:</strong>
-        Zuerst das gewünschte Design auswählen.
-        Danach „Ausgewähltes Design für alle Räume übernehmen …“
-        wählen und bestätigen.
-        Andere Räume erhalten das Design beim nächsten Betreten.
-        Die Originalgestaltung lässt sich ebenfalls für den aktuellen
-        Raum oder für alle Räume wiederherstellen.
-      </p>
-
-      <p>
-        <strong>Designspeicherung:</strong>
-        Die Auswahl wird lokal in diesem Browser gespeichert.
-        Jede Brille hat ihre eigenen Einstellungen.
-        Es gibt noch keine Synchronisierung zwischen Geräten.
-        Wenn Browserspeicherung nicht verfügbar ist,
-        gelten die Auswahlen nur für die laufende Sitzung.
-      </p>
-
-      <p>
-        <strong>Lehrinhalte beim Designwechsel:</strong>
-        Modelle, Folien, Tafeln, Modellpodeste und Demonstrationen
-        bleiben unverändert an ihren Positionen.
-        Zeichnungen auf Lehrinhalten bleiben erhalten.
-        Zeichnungen auf ausgetauschten Raumflächen werden entfernt.
-        Bei einem Raumwechsel werden weiterhin alle Zeichnungen gelöscht.
-      </p>
-
-      <p>
-        <strong>Insel und Dschungel:</strong>
-        Die bisherigen Laufgrenzen bleiben erhalten.
-        Wasser, Palmen und Dschungelbäume außerhalb der Lehrfläche
-        gehören zur Umgebung und sind nicht begehbar.
-        Landschaftsdekoration ist nicht greifbar oder bemalbar.
-      </p>
-
-      <p>
-        <strong>Begrüßungsanimation:</strong>
-        Die NaCl-Animation startet automatisch.
-        Im Menü „Begrüßungsanimation &amp; Bedienhilfe“ auswählen.
-        Dort sind Start/Pause, Neustart, Phasenwechsel,
-        Geschwindigkeit, Wiederholung und Sichtbarkeit verfügbar.
-        Während das Menü geöffnet ist, hält die Animation an.
-        Die Animation ist nicht greifbar oder bemalbar.
-      </p>
-
-      <p>
-        <strong>Röntgendemonstration in Vorlesung 5:</strong>
-        Im Menü „Röntgendemo &amp; Bedienhilfe“ auswählen.
-        Dort sind Start/Pause, Neustart, Geschwindigkeit,
-        Info-Markierungen und Sichtbarkeit verfügbar.
-        Bauteile oder Info-Markierungen mit dem VR-Laser anvisieren,
-        um Erklärungen anzuzeigen.
-        Die Apparatur ist nicht greifbar oder bemalbar.
-      </p>
-
-      <p>
-        <strong>Raumwahl:</strong>
-        Mit Laser auf eine Raumtafel zeigen und Trigger drücken.
-      </p>
-
-      <p>
-        <strong>Desktop:</strong>
-        WASD/Pfeiltasten laufen, Q/E drehen.
-        Mit der Maus ziehen, um sich umzuschauen.
-        Objekte anklicken, um sie auszuwählen.
-        Demonstrationen und Raumdesigns lassen sich
-        über das vorhandene Menü bedienen.
+        <strong>Komfort:</strong>
+        Nach dem Schließen des VR-Menüs beide Joysticks kurz
+        neutral stellen. Bei Unwohlsein die Brille absetzen.
       </p>
     </details>
 
-    <details open style="margin-top: 16px;">
-      <summary><strong>XR-Fehlerdiagnose</strong></summary>
-
-      <p id="xr-debug-support">XR-Unterstützung wird geprüft …</p>
-
-      <button id="xr-debug-enter" type="button">
-        VR ausdrücklich starten
-      </button>
-
-      <button id="xr-debug-refresh" type="button">
-        Diagnose aktualisieren
-      </button>
-
-      <p>
-        Während einer immersiven Sitzung werden Diagnosewerte gespeichert.
-        Nach dem Verlassen erscheinen sie hier im Bericht.
-      </p>
-
-      <textarea
-        id="xr-debug-output"
-        readonly
-        rows="16"
-        aria-label="XR-Diagnosebericht"
-        style="width: 100%; box-sizing: border-box; font-size: 12px;"
-      ></textarea>
-    </details>
+    <div class="buttons">
+      <button id="clear-markers" type="button">Zeichnungen löschen</button>
+    </div>
 
     <p id="status" role="status">Anwendung wird geladen …</p>
   </section>
@@ -211,11 +223,12 @@
   <a-scene
     id="scene"
     background="color: #edf0ed"
-    renderer="antialias: true; colorManagement: true"
-    vr-mode-ui="enabled: true"
+    renderer="antialias: true; colorManagement: true; alpha: true"
+    vr-mode-ui="enabled: false"
     webxr="referenceSpaceType: local-floor; optionalFeatures: bounded-floor"
     fkc-xr-rays
     fkc-session
+    fkc-browser-xr
   >
     <a-entity id="room-root"></a-entity>
 
