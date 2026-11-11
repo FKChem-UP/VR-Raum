@@ -14,15 +14,18 @@
   <!-- Bestehende A-Frame-Version beibehalten. -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-  <!-- Reihenfolge beibehalten. -->
+  <!-- Grundfunktionen und Raumdaten. -->
   <script defer src="./js/vr-controls.js"></script>
   <script defer src="./js/room-builder.js"></script>
   <script defer src="./js/rooms.js"></script>
   <script defer src="./js/vr-tools.js"></script>
 
-  <!-- Demonstrationen ergänzen Builder und Menü vor dem App-Start. -->
+  <!-- Demonstrationen ergänzen Builder und Menü. -->
   <script defer src="./js/xray-demo.js"></script>
   <script defer src="./js/welcome-demo.js"></script>
+
+  <!-- Raumdesigns nach den Demonstrationen, vor dem App-Start. -->
+  <script defer src="./js/room-themes.js"></script>
 
   <script defer src="./js/app.js"></script>
 </head>
@@ -91,6 +94,53 @@
         <strong>Menü:</strong>
         B/Y öffnet oder schließt das Menü.
         Menü mit Laser und Trigger bedienen.
+        Nach dem Schließen beide Joysticks kurz neutral stellen.
+      </p>
+
+      <p>
+        <strong>Raumdesign:</strong>
+        Im Menü „Raumdesign“ auswählen.
+        Verfügbar sind helles Labor, moderne Galerie,
+        futuristisches Labor, Dracula-Schloss,
+        einsame Insel und Dschungel.
+        Die Auswahl gilt zunächst nur für den aktuellen Raum,
+        einschließlich des Begrüßungsraums.
+      </p>
+
+      <p>
+        <strong>Design für alle Räume:</strong>
+        Zuerst das gewünschte Design auswählen.
+        Danach „Ausgewähltes Design für alle Räume übernehmen …“
+        wählen und bestätigen.
+        Andere Räume erhalten das Design beim nächsten Betreten.
+        Die Originalgestaltung lässt sich ebenfalls für den aktuellen
+        Raum oder für alle Räume wiederherstellen.
+      </p>
+
+      <p>
+        <strong>Designspeicherung:</strong>
+        Die Auswahl wird lokal in diesem Browser gespeichert.
+        Jede Brille hat ihre eigenen Einstellungen.
+        Es gibt noch keine Synchronisierung zwischen Geräten.
+        Wenn Browserspeicherung nicht verfügbar ist,
+        gelten die Auswahlen nur für die laufende Sitzung.
+      </p>
+
+      <p>
+        <strong>Lehrinhalte beim Designwechsel:</strong>
+        Modelle, Folien, Tafeln, Modellpodeste und Demonstrationen
+        bleiben unverändert an ihren Positionen.
+        Zeichnungen auf Lehrinhalten bleiben erhalten.
+        Zeichnungen auf ausgetauschten Raumflächen werden entfernt.
+        Bei einem Raumwechsel werden weiterhin alle Zeichnungen gelöscht.
+      </p>
+
+      <p>
+        <strong>Insel und Dschungel:</strong>
+        Die bisherigen Laufgrenzen bleiben erhalten.
+        Wasser, Palmen und Dschungelbäume außerhalb der Lehrfläche
+        gehören zur Umgebung und sind nicht begehbar.
+        Landschaftsdekoration ist nicht greifbar oder bemalbar.
       </p>
 
       <p>
@@ -123,7 +173,8 @@
         WASD/Pfeiltasten laufen, Q/E drehen.
         Mit der Maus ziehen, um sich umzuschauen.
         Objekte anklicken, um sie auszuwählen.
-        Die Demonstrationen lassen sich über das vorhandene Menü bedienen.
+        Demonstrationen und Raumdesigns lassen sich
+        über das vorhandene Menü bedienen.
       </p>
     </details>
 
