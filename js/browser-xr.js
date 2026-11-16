@@ -281,30 +281,59 @@
     component.fkcPlainHintInstalled = true;
 
     const canvas = document.createElement("canvas");
-    canvas.width = 1024;
-    canvas.height = 192;
+    canvas.width = 768;
+    canvas.height = 256;
 
     const ctx = canvas.getContext("2d");
 
+    // Vollständig transparenter Hintergrund.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    /*
-     * Nur der Hintergrund ist halbtransparent.
-     * Die weiße Schrift bleibt vollständig deckend.
-     */
-    ctx.fillStyle = "rgba(35, 39, 43, 0.65)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function drawSymbol(color, lineWidth) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.beginPath();
+
+      // Türöffnung.
+      ctx.moveTo(68, 202);
+      ctx.lineTo(68, 54);
+      ctx.lineTo(172, 54);
+      ctx.lineTo(172, 202);
+
+      // Geöffnetes Türblatt.
+      ctx.moveTo(68, 54);
+      ctx.lineTo(116, 78);
+      ctx.lineTo(116, 220);
+      ctx.lineTo(68, 202);
+
+      // Pfeil in Richtung Tür.
+      ctx.moveTo(224, 132);
+      ctx.lineTo(140, 132);
+      ctx.moveTo(170, 102);
+      ctx.lineTo(140, 132);
+      ctx.lineTo(170, 162);
+
+      ctx.stroke();
+    }
+
+    // Dunkle Konturen sorgen auf hellen Postern für Kontrast.
+    drawSymbol("#173527", 19);
+    drawSymbol("#ffffff", 10);
+
+    ctx.font = "bold 104px Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+
+    ctx.strokeStyle = "#173527";
+    ctx.lineWidth = 10;
+    ctx.strokeText("Betreten", 268, 138);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 68px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    ctx.fillText(
-      "Mit Trigger betreten",
-      canvas.width / 2,
-      canvas.height / 2
-    );
+    ctx.fillText("Betreten", 268, 138);
 
     const texture = new T.CanvasTexture(canvas);
 
@@ -321,8 +350,18 @@
     component.material.transparent = true;
     component.material.opacity = 1;
     component.material.depthWrite = false;
+    component.material.toneMapped = false;
     component.material.needsUpdate = true;
+
+    // Kürzer als bisher, aber deutlich höher:
+    // sichtbare Fläche 0,90 × 0,30 Meter.
+    component.mesh.scale.set(
+      0.90 / 1.05,
+      0.30 / 0.197,
+      1
+    );
   }
+
 
   scene.addEventListener("componentinitialized", event => {
     if (
