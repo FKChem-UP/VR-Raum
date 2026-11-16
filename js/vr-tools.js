@@ -1181,8 +1181,7 @@
         home: "FKC-VR · Menü",
         settings: "Allgemeine Einstellungen",
         model: "Ausgewähltes 3D-Modell",
-        laser: "Laser",
-        drawings: "Zeichnungen",
+        "laser-drawing": "Laser und Zeichnen",
         colors: "Laser- und Malfarben",
         "color-left": "Farbe · linke Hand",
         "color-right": "Farbe · rechte Hand",
@@ -1358,11 +1357,12 @@
        * ALLGEMEINE EINSTELLUNGEN
        */
       if (this.page === "settings") {
-        button(
-          "Laser",
-          () => this.navigate("laser"),
+                button(
+          "Laser und Zeichnen",
+          () => this.navigate("laser-drawing"),
           "#d2e9ec"
         );
+
 
         button(
           "Bewegung und Komfort",
@@ -1370,11 +1370,6 @@
           "#d8d4f2"
         );
 
-        button(
-          "Zeichnungen",
-          () => this.navigate("drawings"),
-          "#cddff3"
-        );
 
         button(
           "Kompletten Raum zurücksetzen …",
@@ -1441,13 +1436,13 @@
         back("home");
       }
 
-      /*
-       * LASER
+         /*
+       * LASER UND ZEICHNEN
        */
-      if (this.page === "laser") {
+      if (this.page === "laser-drawing") {
         text(
-          "Laserfarbe und Malfarbe bleiben gekoppelt:\n" +
-          "eine gemeinsame Farbe pro Hand."
+          "Eine gemeinsame Laser- und Malfarbe pro Hand.\n" +
+          "Laserbreite und Malstrichstärke sind unabhängig."
         );
 
         button(
@@ -1461,22 +1456,10 @@
           "#d2e9ec"
         );
 
-        back("settings");
-      }
-
-      /*
-       * ZEICHNUNGEN
-       */
-      if (this.page === "drawings") {
         button(
           "Malstrich: " + diameterMm() + " mm – ändern",
           () => this.navigate("paint-size"),
           "#cddff3"
-        );
-
-        button(
-          "Laser- und Malfarben",
-          () => this.navigate("colors")
         );
 
         button(
@@ -1491,11 +1474,11 @@
         back("settings");
 
         text(
-          "Größenänderungen gelten für neue Striche.\n" +
-          "Vorhandene Zeichnungen bleiben unverändert.\n" +
+          "Strichstärkenänderungen gelten für neue Zeichnungen.\n" +
           "Löschen verändert keine Modellpositionen."
         );
       }
+
 
       /*
        * FARBEN
@@ -1518,7 +1501,8 @@
           F.Settings.lasers.right
         );
 
-        back("settings");
+        back("laser-drawing");
+
       }
 
       if (
@@ -1596,7 +1580,7 @@
           );
         });
 
-        back("drawings");
+        back("laser-drawing");
       }
 
       if (this.page === "laser-size") {
@@ -1621,7 +1605,8 @@
           );
         });
 
-        back("laser");
+        back("laser-drawing");
+
       }
 
       /*
