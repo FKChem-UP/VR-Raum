@@ -12,16 +12,15 @@
 
   <script defer src="./js/vr-controls.js"></script>
   <script defer src="./js/room-builder.js"></script>
-<script defer src="./js/welcome-floor.js?v=2"></script>
+  <script defer src="./js/welcome-floor.js?v=2"></script>
   <script defer src="./js/rooms.js"></script>
   <script defer src="./js/vr-tools.js"></script>
 
   <script defer src="./js/xray-demo.js"></script>
   <script defer src="./js/welcome-demo.js"></script>
-  <script defer src="./js/room-themes.js"></script>
 
-  <!-- Neue Ergänzung nach den Menü- und Raumwrappern. -->
-  <script defer src="./js/browser-xr.js"></script>
+  <!-- Browserwerkzeuge und VR-Start; keine auswählbaren Raumthemes. -->
+  <script defer src="./js/browser-xr.js?v=2"></script>
 
   <script defer src="./js/app.js"></script>
 </head>
@@ -30,7 +29,7 @@
   <section id="panel" aria-label="Raumwahl und Werkzeuge">
     <div class="panel-heading">
       <h1>FKC-VR</h1>
-      <span class="mode-label">Browser · VR · AR</span>
+      <span class="mode-label">Browser · VR</span>
     </div>
 
     <p id="current-room">Begrüßungsraum</p>
@@ -136,11 +135,10 @@
 
       <div class="buttons">
         <button id="start-vr" type="button" disabled>VR starten</button>
-        <button id="start-ar" type="button" disabled>AR starten</button>
       </div>
 
       <p id="xr-availability" role="status">
-        VR- und AR-Unterstützung wird geprüft …
+        VR-Unterstützung wird geprüft …
       </p>
     </section>
 
@@ -164,7 +162,7 @@
       <p>
         <strong>Menü im Browser:</strong>
         „Menü &amp; Einstellungen“ öffnet normale Schaltflächen
-        für die vorhandenen Werkzeuge, Raumdesigns und Demonstrationen.
+        für die vorhandenen Werkzeuge und Demonstrationen.
         Solange das Menü geöffnet ist, pausiert die Raumbewegung.
         Unter „Erklärungen“ ist die vollständige Menüseite sichtbar.
       </p>
@@ -192,19 +190,10 @@
       </p>
 
       <p>
-        <strong>AR:</strong>
-        Falls der Browser WebXR-AR unterstützt, startet „AR starten“
-        die immersive AR-Ansicht. Raumwände, Boden, Decke und
-        Landschaft werden ausgeblendet; Lehrinhalte bleiben sichtbar.
-        Eine automatische Tisch- oder Bodenplatzierung ist noch
-        nicht enthalten.
-      </p>
-
-      <p>
-        <strong>Raumdesigns und Demonstrationen:</strong>
-        Die vorhandenen Menüpunkte für Raumdesign,
-        Begrüßungsanimation und Röntgendemo bleiben erhalten.
-        Designauswahlen werden lokal pro Browser gespeichert.
+        <strong>Demonstrationen:</strong>
+        Die Begrüßungsanimation ist im Menü des Begrüßungsraums
+        erreichbar. Die Röntgendemo ist im Menü der
+        fünften Vorlesung erreichbar.
       </p>
 
       <p>
