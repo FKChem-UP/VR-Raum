@@ -217,7 +217,54 @@
     <p id="status" role="status">Anwendung wird geladen …</p>
   </section>
 
+    <button
+    id="quick-vr"
+    type="button"
+    aria-label="VR-Modus starten"
+    title="VR-Modus starten"
+    disabled
+    style="
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 10000;
+      width: 72px;
+      height: 56px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      border-radius: 14px;
+      background: #263f33;
+      color: #ffffff;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+    "
+  >
+    <svg
+      width="48"
+      height="32"
+      viewBox="0 0 48 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M8 7H40C43 7 45 9 45 12V23C45 26 43 28 40 28H31L27 23H21L17 28H8C5 28 3 26 3 23V12C3 9 5 7 8 7Z"
+        stroke="currentColor"
+        stroke-width="3"
+        stroke-linejoin="round"
+      />
+      <circle cx="14" cy="17" r="4" stroke="currentColor" stroke-width="3"/>
+      <circle cx="34" cy="17" r="4" stroke="currentColor" stroke-width="3"/>
+      <path d="M12 7L15 3H33L36 7" stroke="currentColor" stroke-width="3"/>
+    </svg>
+  </button>
+
   <a-scene
+
     id="scene"
     background="color: #edf0ed"
     renderer="antialias: true; colorManagement: true; alpha: true"
