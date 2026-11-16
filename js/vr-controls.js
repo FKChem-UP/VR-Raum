@@ -744,8 +744,17 @@ window.FKCVR = window.FKCVR || {};
       };
 
       this.menuAction = () => {
-        if (F.Menu) F.Menu.toggle(this.el);
+        if (
+          this.states.menu ||
+          !this.el.sceneEl.is("vr-mode") ||
+          !F.Menu
+        ) return;
+
+        // Ereignis und Tastenabfrage teilen denselben Zustand.
+        this.states.menu = true;
+        F.Menu.toggle(this.el);
       };
+
 
       this.resetEvent = () => {
         const source = F.getSource(this.el.sceneEl, this.data.hand);
@@ -761,6 +770,17 @@ window.FKCVR = window.FKCVR || {};
         this.menuAction();
       };
 
+      this.menuRelease = () => {
+        const source = F.getSource(this.el.sceneEl, this.data.hand);
+
+        // Bei xr-standard übernimmt pollButtons das Loslassen.
+        if (source && source.gamepad &&
+            source.gamepad.mapping === "xr-standard") return;
+
+        this.states.menu = false;
+      };
+
+
       this.disconnect = this.disconnect.bind(this);
 
       this.el.addEventListener("triggerdown", this.triggerDown);
@@ -769,6 +789,9 @@ window.FKCVR = window.FKCVR || {};
       this.el.addEventListener("xbuttondown", this.resetEvent);
       this.el.addEventListener("bbuttondown", this.menuEvent);
       this.el.addEventListener("ybuttondown", this.menuEvent);
+      this.el.addEventListener("bbuttonup", this.menuRelease);
+      this.el.addEventListener("ybuttonup", this.menuRelease);
+
       this.el.addEventListener("controllerdisconnected", this.disconnect);
     },
 
@@ -975,7 +998,10 @@ window.FKCVR = window.FKCVR || {};
       this.el.removeEventListener("abuttondown", this.resetEvent);
       this.el.removeEventListener("xbuttondown", this.resetEvent);
       this.el.removeEventListener("bbuttondown", this.menuEvent);
-      this.el.removeEventListener("ybuttondown", this.menuEvent);
+       this.el.removeEventListener("ybuttondown", this.menuEvent);
+      this.el.removeEventListener("bbuttonup", this.menuRelease);
+      this.el.removeEventListener("ybuttonup", this.menuRelease);
+
       this.el.removeEventListener("controllerdisconnected", this.disconnect);
 
       this.geometry.dispose();
