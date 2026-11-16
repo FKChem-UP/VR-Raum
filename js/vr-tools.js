@@ -970,14 +970,18 @@
       mesh.renderOrder = 100;
       mesh.frustumCulled = false;
 
-      this.root = F.create("a-entity", {
+          this.root = F.create("a-entity", {
         id: "fkc-menu",
-        class: "vr-action",
-        visible: false
+        class: "vr-action"
       }, F.getScene());
 
       this.root.dataset.fkcMenu = "true";
       this.root.setObject3D("mesh", mesh);
+
+      // Sichtbarkeit direkt steuern, ohne verzögerte
+      // Anwendung eines visible-Attributs durch A-Frame.
+      this.root.object3D.visible = false;
+
 
       F.invalidateHits();
     },
