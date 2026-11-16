@@ -2651,7 +2651,7 @@
       material: {
         src: parquet(),
         repeat: "8 5.6675",
-        color: "#ffffff",
+        color: "#a0a0a0",
         roughness: 0.65,
         metalness: 0.02
       }
