@@ -775,7 +775,21 @@
 
     parent.querySelectorAll("[fkc-gallery-entry-hint]")
       .forEach(el => {
+        // Falls die Komponente bereits bereit ist:
         updateEntryHint(el.components["fkc-gallery-entry-hint"]);
+
+        // Falls A-Frame sie erst anschließend initialisiert:
+        el.addEventListener("componentinitialized", event => {
+          if (
+            event.target === el &&
+            event.detail &&
+            event.detail.name === "fkc-gallery-entry-hint"
+          ) {
+            updateEntryHint(
+              el.components["fkc-gallery-entry-hint"]
+            );
+          }
+        });
       });
 
     return result;
@@ -853,7 +867,8 @@
   }
 
   console.info(
-    "FKC-VR BROWSER-XR-2 geladen: " +
+        "FKC-VR BROWSER-XR-4 geladen: Türsymbol und transparenter Eintrittshinweis; " +
+
     "Browserwerkzeuge und VR erhalten; " +
     "AR-Steuerung und Theme-Abhängigkeit entfernt."
   );
