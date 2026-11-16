@@ -363,6 +363,8 @@
   }
 
 
+
+
   scene.addEventListener("componentinitialized", event => {
     if (
       event.detail &&
