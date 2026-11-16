@@ -2030,20 +2030,25 @@
     const demo = currentDemo();
 
     if (this.page !== "welcome-demo") {
-      previousRender.call(this);
+          previousRender.call(this);
+
+      const helpIndex = this.buttons.findIndex(
+        item => item.key === "room-help"
+      );
 
       if (
         demo &&
         this.page === "home" &&
         this.root &&
-        this.buttons[3]
+        helpIndex >= 0
       ) {
-        const item = this.buttons[3];
+        const item = this.buttons[helpIndex];
 
         item.label = "Begrüßungsanimation & Bedienhilfe";
         item.action = () => this.navigate("welcome-demo");
 
-        const pressed = this.pressedIndex === 3;
+        const pressed = this.pressedIndex === helpIndex;
+
         const offset = pressed ? 5 : 0;
         const ctx = this.ctx;
 
