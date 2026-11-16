@@ -742,12 +742,14 @@
          * Etwas vor der Posteroberfläche und oberhalb des
          * Laserpunktes, ohne Z-Fighting mit dem Poster.
          */
+             // Weiter zum Beobachter ziehen, damit der Hinweis
+        // auch beim schrägen Anvisieren vor dem Poster liegt.
         this.worldPosition.addScaledVector(
           this.towardCamera,
-          Math.min(0.18, distance * 0.2)
+          Math.min(0.55, distance * 0.45)
         );
 
-        this.worldPosition.y += 0.18;
+        this.worldPosition.y += 0.25;
 
         const parent = this.el.object3D.parent;
 
