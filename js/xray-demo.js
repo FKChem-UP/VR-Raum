@@ -1763,18 +1763,22 @@
     if (this.page !== "xray-demo") {
       previousRender.call(this);
 
+      const helpIndex = this.buttons.findIndex(
+        item => item.key === "room-help"
+      );
+
       if (
         this.page === "home" &&
         getDemo() &&
-        this.buttons &&
-        this.buttons[3]
+        this.root &&
+        helpIndex >= 0
       ) {
-        const entry = this.buttons[3];
+        const entry = this.buttons[helpIndex];
 
         entry.label = "Röntgendemo & Bedienhilfe";
         entry.action = () => this.navigate("xray-demo");
 
-        paintButton(this, entry, 3, false);
+        paintButton(this, entry, helpIndex, false);
         this.texture.needsUpdate = true;
       }
 
