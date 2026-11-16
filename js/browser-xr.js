@@ -658,7 +658,25 @@
 
     const vr = document.getElementById("start-vr");
 
-    if (vr) vr.disabled = !ready || !support.vr;
+       if (vr) vr.disabled = !ready || !support.vr;
+
+    const quickVR = document.getElementById("quick-vr");
+
+    if (quickVR) {
+      quickVR.style.display = immersive() ? "none" : "flex";
+      quickVR.disabled = !ready || !support.checked;
+      quickVR.style.opacity = quickVR.disabled ? "0.5" : "1";
+      quickVR.style.cursor = quickVR.disabled ? "wait" : "pointer";
+
+      quickVR.title = !support.checked
+        ? "VR-Unterstützung wird geprüft …"
+        : support.starting
+          ? "VR wird gestartet …"
+          : support.vr
+            ? "VR-Modus starten"
+            : "VR nicht verfügbar – für Hinweise klicken";
+    }
+
   }
 
   async function checkSupport() {
@@ -727,11 +745,15 @@
     }
 
     if (!support.vr) {
-      availabilityMessage(
-        "Dieser Browser meldet keine WebXR-VR-Unterstützung."
-      );
+      const message =
+        "VR ist hier nicht verfügbar. Bitte die HTTPS-Seite " +
+        "in einem WebXR-fähigen Headset-Browser öffnen.";
+
+      availabilityMessage(message);
+      F.setStatus(message);
       return;
     }
+
 
     support.starting = true;
     refreshStartButtons();
@@ -827,7 +849,9 @@
   function initializeInterface() {
     bindDesktopControls();
 
-    bindButton("start-vr", startVR);
+      bindButton("start-vr", startVR);
+    bindButton("quick-vr", startVR);
+
 
     checkSupport();
     syncDesktopMenu();
