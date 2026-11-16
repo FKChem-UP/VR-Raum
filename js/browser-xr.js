@@ -353,13 +353,13 @@
     component.material.toneMapped = false;
     component.material.needsUpdate = true;
 
-    // Kürzer als bisher, aber deutlich höher:
-    // sichtbare Fläche 0,90 × 0,30 Meter.
+    // Größerer Hinweis: 1,20 × 0,40 Meter.
     component.mesh.scale.set(
-      0.90 / 1.05,
-      0.30 / 0.197,
+      1.20 / 1.05,
+      0.40 / 0.197,
       1
     );
+
   }
 
 
