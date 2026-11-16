@@ -3,12 +3,26 @@
 (function (F) {
   /*
    * ============================================================
-   * BROWSER UND XR — BROWSER-XR-1
+   * BROWSER UND VR — BROWSER-XR-2
    * ============================================================
    *
-   * Laden nach room-themes.js, aber vor app.js.
+   * Laden nach vr-tools.js und den Demo-Erweiterungen,
+   * aber vor app.js.
    *
-   * Bestehende Dateien und Wrapper bleiben erhalten.
+   * Erhalten:
+   * - Browsermenü
+   * - PC-Modellwerkzeuge
+   * - Vorlesungsposter
+   * - Eintrittshinweise
+   * - ausdrücklicher VR-Start
+   *
+   * Entfernt:
+   * - AR-Start und AR-Unterstützungsprüfung
+   * - AR-spezifische Umgebungsausblendung
+   * - Abhängigkeit von F.RoomThemes
+   *
+   * Dateiname und Komponente fkc-browser-xr bleiben erhalten.
+   *
    * Voraussetzung für den Eintrittshinweis:
    * room-builder.js GALERIE-5.
    */
@@ -73,11 +87,8 @@
   const posterCache = new Map();
 
   /*
-   * Hier wird ausschließlich an Leerzeichen umgebrochen.
-   * Keine willkürliche Zeichenzerlegung.
-   *
-   * Lange Einzelwörter bleiben vollständig und werden bei
-   * der Schriftgrößenanpassung berücksichtigt.
+   * Ausschließlich an Leerzeichen umbrechen.
+   * Lange Einzelwörter bleiben vollständig erhalten.
    */
   function wrap(ctx, value, width) {
     const lines = [];
@@ -218,10 +229,6 @@
     ctx.lineTo(w - 310, 342);
     ctx.stroke();
 
-    /*
-     * Mehr nutzbare Fläche als im bisherigen Poster:
-     * Beschreibung beginnt früher und bekommt mehr Höhe.
-     */
     fitted(
       ctx, description,
       110, 364, w - 220, 426,
@@ -335,7 +342,7 @@
    */
 
   function immersive() {
-    return scene.is("vr-mode") || scene.is("ar-mode");
+    return scene.is("vr-mode");
   }
 
   function syncDesktopMenu() {
@@ -371,7 +378,9 @@
       F.Menu.root.object3D.visible = false;
     }
 
-    message.textContent = F.Menu.message || "";
+    if (message) {
+      message.textContent = F.Menu.message || "";
+    }
 
     list.replaceChildren();
 
@@ -583,156 +592,12 @@
 
   /*
    * ============================================================
-   * AR: UMGEBUNG AUSBLENDEN, LEHRINHALTE ERHALTEN
-   * ============================================================
-   */
-
-  const AR = {
-    active: false,
-    hiddenOriginals: new Map(),
-    hiddenThemeMeshes: new Map(),
-    background: null,
-    clearAlpha: 1,
-
-    begin: function () {
-      if (this.active) return;
-
-      this.active = true;
-
-      const background = scene.getAttribute("background");
-
-      this.background = background
-        ? Object.assign({}, background)
-        : null;
-
-      if (scene.renderer) {
-        this.clearAlpha = scene.renderer.getClearAlpha();
-        scene.renderer.setClearAlpha(0);
-      }
-
-      if (F.Comfort) F.Comfort.reset();
-
-      this.update();
-    },
-
-    update: function () {
-      if (!this.active) return;
-
-      /*
-       * Der Hintergrund muss auch dann transparent bleiben,
-       * wenn ein Raumdesign seine Hintergrundfarbe aktualisiert.
-       */
-      scene.object3D.background = null;
-
-      if (scene.renderer) scene.renderer.setClearAlpha(0);
-      if (F.Comfort) F.Comfort.reset();
-
-      const state = F.RoomThemes && F.RoomThemes.state;
-
-      if (!state) return;
-
-      /*
-       * room-themes.js hat die ursprüngliche Raumhülle bereits
-       * von Lehrinhalten getrennt.
-       *
-       * Echte Lichtentities bleiben aktiv.
-       */
-      state.originals.forEach(entry => {
-        const el = entry.el;
-
-        if (!el || !el.isConnected || el.hasAttribute("light")) return;
-
-        if (!this.hiddenOriginals.has(el)) {
-          this.hiddenOriginals.set(el, el.object3D.visible);
-        }
-
-        el.object3D.visible = false;
-      });
-
-      /*
-       * Die neue Designumgebung enthält sowohl Geometrie
-       * als auch Lehrbeleuchtung.
-       *
-       * Nur Geometrie ausblenden, nicht die gesamte Gruppe:
-       * so bleibt ihre Beleuchtung für die Modelle erhalten.
-       */
-      if (state.layer && state.layer.isConnected) {
-        state.layer.object3D.traverse(object => {
-          if (!object.isMesh && !object.isLine && !object.isPoints) return;
-
-          if (!this.hiddenThemeMeshes.has(object)) {
-            this.hiddenThemeMeshes.set(object, object.visible);
-          }
-
-          object.visible = false;
-        });
-      }
-    },
-
-    end: function () {
-      if (!this.active) return;
-
-      this.active = false;
-
-      const state = F.RoomThemes && F.RoomThemes.state;
-
-      this.hiddenOriginals.forEach((visible, el) => {
-        if (!el.isConnected) return;
-
-        const entry = state && state.originals.find(
-          item => item.el === el
-        );
-
-        /*
-         * Den aktuellen Designzustand wiederherstellen,
-         * nicht einen veralteten Zustand vor einem Designwechsel.
-         */
-        el.object3D.visible = entry
-          ? state.theme === "original" && entry.visible
-          : visible;
-      });
-
-      this.hiddenThemeMeshes.forEach((visible, object) => {
-        object.visible = visible;
-      });
-
-      this.hiddenOriginals.clear();
-      this.hiddenThemeMeshes.clear();
-
-      if (scene.renderer) {
-        scene.renderer.setClearAlpha(this.clearAlpha);
-      }
-
-      const currentBackground = scene.getAttribute("background");
-      const restore = currentBackground || this.background;
-
-      if (restore) {
-        scene.setAttribute("background", Object.assign({}, restore));
-
-        /*
-         * Hintergrund erneut anwenden, auch wenn sich der
-         * Attributwert während AR nicht geändert hat.
-         */
-        const component = scene.components.background;
-
-        if (component && typeof component.update === "function") {
-          component.update({});
-        }
-      }
-
-      if (F.invalidateHits) F.invalidateHits();
-    }
-  };
-
-  /*
-   * ============================================================
-   * AUSDRÜCKLICHER VR-/AR-START
+   * AUSDRÜCKLICHER VR-START
    * ============================================================
    */
 
   const support = {
     vr: false,
-    ar: false,
     checked: false,
     starting: false
   };
@@ -751,19 +616,16 @@
     );
 
     const vr = document.getElementById("start-vr");
-    const ar = document.getElementById("start-ar");
 
     if (vr) vr.disabled = !ready || !support.vr;
-    if (ar) ar.disabled = !ready || !support.ar;
   }
 
   async function checkSupport() {
     support.vr = false;
-    support.ar = false;
 
     if (!window.isSecureContext) {
       availabilityMessage(
-        "VR und AR benötigen HTTPS oder localhost. " +
+        "VR benötigt HTTPS oder localhost. " +
         "Die Browseransicht bleibt nutzbar."
       );
 
@@ -784,35 +646,21 @@
     }
 
     try {
-      const results = await Promise.allSettled([
-        navigator.xr.isSessionSupported("immersive-vr"),
-        navigator.xr.isSessionSupported("immersive-ar")
-      ]);
-
       support.vr =
-        results[0].status === "fulfilled" && results[0].value === true;
-
-      support.ar =
-        results[1].status === "fulfilled" && results[1].value === true;
-
-      results.forEach(result => {
-        if (result.status === "rejected") {
-          console.warn("WebXR-Unterstützungstest:", result.reason);
-        }
-      });
-
-      const vrText = support.vr ? "VR verfügbar" : "VR nicht verfügbar";
-      const arText = support.ar ? "AR verfügbar" : "AR nicht verfügbar";
+        await navigator.xr.isSessionSupported("immersive-vr") === true;
 
       availabilityMessage(
-        vrText + " · " + arText +
+        (support.vr ? "VR verfügbar" : "VR nicht verfügbar") +
         ". Ohne Brille bleibt die Browseransicht nutzbar."
       );
     } catch (error) {
-      console.error("WebXR-Unterstützung konnte nicht geprüft werden:", error);
+      console.error(
+        "WebXR-VR-Unterstützung konnte nicht geprüft werden:",
+        error
+      );
 
       availabilityMessage(
-        "VR-/AR-Unterstützung konnte nicht geprüft werden. " +
+        "VR-Unterstützung konnte nicht geprüft werden. " +
         "Die Browseransicht bleibt nutzbar."
       );
     }
@@ -821,7 +669,7 @@
     refreshStartButtons();
   }
 
-  async function startXR(useAR) {
+  async function startVR() {
     if (
       support.starting ||
       !scene.hasLoaded ||
@@ -837,11 +685,9 @@
       return;
     }
 
-    if (useAR ? !support.ar : !support.vr) {
+    if (!support.vr) {
       availabilityMessage(
-        useAR
-          ? "Dieser Browser meldet keine WebXR-AR-Unterstützung."
-          : "Dieser Browser meldet keine WebXR-VR-Unterstützung."
+        "Dieser Browser meldet keine WebXR-VR-Unterstützung."
       );
       return;
     }
@@ -852,39 +698,20 @@
     F.Menu.close();
 
     try {
-      if (useAR) {
-        /*
-         * enterAR nutzen, falls die A-Frame-Version die Methode
-         * anbietet. Sonst den AR-Parameter von enterVR verwenden.
-         */
-        if (typeof scene.enterAR === "function") {
-          await scene.enterAR();
-        } else {
-          await scene.enterVR(true);
-        }
-      } else {
-        await scene.enterVR();
-      }
+      await scene.enterVR();
     } catch (error) {
-      console.error(
-        useAR ? "AR-Start fehlgeschlagen:" : "VR-Start fehlgeschlagen:",
-        error
-      );
-
-      if (!scene.is("ar-mode")) AR.end();
+      console.error("VR-Start fehlgeschlagen:", error);
 
       const reason = error && error.message
         ? error.message
         : String(error);
 
       availabilityMessage(
-        (useAR ? "AR" : "VR") +
-        " konnte nicht gestartet werden: " + reason
+        "VR konnte nicht gestartet werden: " + reason
       );
 
       F.setStatus(
-        (useAR ? "AR" : "VR") +
-        "-Start fehlgeschlagen. Browser und Berechtigungen prüfen."
+        "VR-Start fehlgeschlagen. Browser und Berechtigungen prüfen."
       );
     } finally {
       support.starting = false;
@@ -910,8 +737,6 @@
         updateEntryHint(el.components["fkc-gallery-entry-hint"]);
       });
 
-    if (AR.active) AR.update();
-
     return result;
   };
 
@@ -927,18 +752,9 @@
     },
 
     tick: function (time) {
-      const arMode = scene.is("ar-mode");
-
-      if (arMode) {
-        AR.begin();
-        AR.update();
-      } else if (AR.active) {
-        AR.end();
-      }
-
       /*
-       * Die vorhandene fkc-session-Komponente blendet das Panel
-       * in VR aus. Diese Ergänzung deckt auch AR ausdrücklich ab.
+       * Browserpanel während einer VR-Sitzung ausblenden.
+       * Keine Änderung an Raumgeometrie oder Hintergrund.
        */
       const panel = document.getElementById("panel");
 
@@ -950,18 +766,13 @@
         refreshModelControls();
         refreshStartButtons();
       }
-    },
-
-    remove: function () {
-      AR.end();
     }
   });
 
   function initializeInterface() {
     bindDesktopControls();
 
-    bindButton("start-vr", () => startXR(false));
-    bindButton("start-ar", () => startXR(true));
+    bindButton("start-vr", startVR);
 
     checkSupport();
     syncDesktopMenu();
@@ -985,7 +796,6 @@
   });
 
   scene.addEventListener("exit-vr", () => {
-    AR.end();
     syncDesktopMenu();
     refreshStartButtons();
     refreshModelControls();
@@ -1000,4 +810,10 @@
   } else {
     initializeInterface();
   }
+
+  console.info(
+    "FKC-VR BROWSER-XR-2 geladen: " +
+    "Browserwerkzeuge und VR erhalten; " +
+    "AR-Steuerung und Theme-Abhängigkeit entfernt."
+  );
 })(window.FKCVR);
