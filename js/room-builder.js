@@ -1070,7 +1070,8 @@
         );
       });
 
-      visual.setAttribute("gltf-model", "url(" + s.model + ")");
+       F.loadModelVisual(visual, s.model);
+
     } else {
       create("a-sphere", {
         class: "model-visual",
