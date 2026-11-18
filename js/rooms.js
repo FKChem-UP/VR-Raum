@@ -307,11 +307,41 @@
     slide: ""
   });
   
-   Object.assign(v1.stations[2], {
+  Object.assign(v1.stations[2], {
     title: "C₆₀-Buckminsterfulleren",
     model: "assets/models/C60-Fulleren.glb",
     slide: "",
+
+    variantAlignment: "individual",
+
+    info:
+      "C₆₀-Buckminsterfulleren besteht aus 60 Kohlenstoffatomen.\n\n" +
+      "An dieser Station werden zwei Darstellungen verglichen:\n" +
+      "das bisherige GLB-Modell und ein begrenzter CIF-Import.\n\n" +
+      "Der CIF-Import erzeugt durch Anwendung der " +
+      "Symmetrieoperationen die Atompositionen der Elementarzelle " +
+      "und rekonstruiert daraus einen vollständigen C₆₀-Käfig.\n" +
+      "Bindungen werden anhand der C–C-Abstände ermittelt; " +
+      "sie sind nicht als Bindungsliste in dieser CIF hinterlegt.\n\n" +
+      "Die Original-CIF-Labels C0 bis C9 bleiben als Metadaten " +
+      "erhalten. Die Modellnummern 1 bis 60 sind eine neue, " +
+      "separate Nummerierung.\n\n" +
+      "Dies ist ein erster C₆₀-Test, kein allgemeiner CIF-Import.",
+
+    variants: [
+      {
+        id: "c60-glb",
+        title: "C₆₀ – bisheriges GLB-Modell",
+        model: "assets/models/C60-Fulleren.glb"
+      },
+      {
+        id: "c60-cif",
+        title: "C₆₀ – aus CIF rekonstruierter Käfig",
+        model: "assets/structures/C60_fullerene.cif"
+      }
+    ]
   });
+
   
   Object.assign(v1.stations[4], {
     title: "Eis",
