@@ -1070,7 +1070,7 @@
         );
       });
 
-       F.loadModelVisual(visual, s.model);
+       F.loadModelVisual(visual, s.model, s.cifMode);
 
     } else {
       create("a-sphere", {

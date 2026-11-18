@@ -316,15 +316,19 @@
 
     info:
       "C₆₀-Buckminsterfulleren besteht aus 60 Kohlenstoffatomen.\n\n" +
-      "An dieser Station werden zwei Darstellungen verglichen:\n" +
-      "das bisherige GLB-Modell und ein begrenzter CIF-Import.\n\n" +
+      "Darstellungen: bisheriges GLB, CIF-Einzelmolekül und " +
+      "CIF-Elementarzelle mit 240 Atompositionen.\n\n" +
+      "Der blaue Rahmen zeigt die Zelle. Bindungen werden an " +
+      "Zellflächen geteilt; Atomkugeln sind nicht beschnitten.\n" +
+      "Die Ansichten werden auf eine ähnliche Anzeigegröße " +
+      "normalisiert, nicht auf einen gemeinsamen Å-Maßstab.\n\n" +
       "Der CIF-Import erzeugt durch Anwendung der " +
       "Symmetrieoperationen die Atompositionen der Elementarzelle " +
       "und rekonstruiert daraus einen vollständigen C₆₀-Käfig.\n" +
       "Bindungen werden anhand der C–C-Abstände ermittelt; " +
       "sie sind nicht als Bindungsliste in dieser CIF hinterlegt.\n\n" +
       "Die Original-CIF-Labels C0 bis C9 bleiben als Metadaten " +
-      "erhalten. Die Modellnummern 1 bis 60 sind eine neue, " +
+      "erhalten. Die Modellnummern sind eine neue, " +
       "separate Nummerierung.\n\n" +
       "Dies ist ein erster C₆₀-Test, kein allgemeiner CIF-Import.",
 
@@ -336,8 +340,15 @@
       },
       {
         id: "c60-cif",
-        title: "C₆₀ – aus CIF rekonstruierter Käfig",
-        model: "assets/structures/C60_fullerene.cif"
+        title: "C₆₀ – Molekül aus CIF",
+        model: "assets/structures/C60_fullerene.cif",
+        cifMode: "molecule"
+      },
+      {
+        id: "c60-cif-cell",
+        title: "C₆₀ – Elementarzelle aus CIF",
+        model: "assets/structures/C60_fullerene.cif",
+        cifMode: "cell"
       }
     ]
   });

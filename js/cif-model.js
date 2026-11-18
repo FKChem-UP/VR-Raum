@@ -312,7 +312,14 @@
       );
     }
 
-    return {lengths, angles, atoms};
+    return {
+      lengths, angles, atoms,
+      spaceGroup: {
+        name: v["_space_group_name_h-m_alt"] ||
+          v["_symmetry_space_group_name_h-m"] || "Nicht angegeben",
+        number: v._space_group_it_number || v._symmetry_int_tables_number || ""
+      }
+    };
   }
 
   /*
@@ -492,6 +499,7 @@
       coordinateUnit: "angstrom",
       cellLengthsAngstrom: lengths.slice(),
       cellAnglesDegrees: structure.angles.slice(),
+      spaceGroup: structure.spaceGroup,
       cellAtomCount: atoms.length,
       moleculeCount: molecules.length,
       moleculeCentersFractional: molecules.map(item =>
@@ -500,13 +508,97 @@
       chosenCenterFractional: chosen.centerInCell.slice(),
       bondCutoffAngstrom: BOND_MAX,
       atoms: resultAtoms,
-      bonds
+      bonds,
+      cellAtoms: atoms.map((atom, index) => ({
+        ...atom,
+        id: "cell-atom-" + (index + 1),
+        modelNumber: index + 1,
+        fractional: atom.fractional.slice(),
+        positionAngstrom: atom.fractional.map(
+          (value, axis) => value * lengths[axis]
+        )
+      })),
+      cellBonds: neighbors.flatMap((entries, a) => entries
+        .filter(edge => a < edge.index)
+        .map(edge => ({
+          id: "cell-bond-" + (a + 1) + "-" + (edge.index + 1),
+          a,
+          b: edge.index,
+          deltaFractional: edge.delta.slice(),
+          distanceAngstrom: Math.hypot(...edge.delta.map(
+            (value, axis) => value * lengths[axis]
+          ))
+        })))
     };
   }
 
+  /*
+   * Eine kurze periodische Bindung an den Zellflächen teilen.
+   * Jedes Teilstück wird anhand seines Mittelpunkts in [0, 1]^3
+   * zurückverschoben. Dadurch entstehen keine langen Querstreben.
+   */
+  function cellBondSegments(structure) {
+    return structure.bonds.flatMap(bond => {
+      const start = structure.atoms[bond.a].fractional;
+      const delta = bond.deltaFractional;
+      const cuts = [0, 1];
+
+      delta.forEach((value, axis) => {
+        if (Math.abs(value) < EPS) return;
+        [0, 1].forEach(boundary => {
+          const t = (boundary - start[axis]) / value;
+          if (t > EPS && t < 1 - EPS) cuts.push(t);
+        });
+      });
+
+      const sorted = cuts.sort((a, b) => a - b)
+        .filter((value, index, values) =>
+          index === 0 || value - values[index - 1] > EPS
+        );
+
+      return sorted.slice(1).map((end, index) => {
+        const begin = sorted[index];
+        const shift = start.map((value, axis) =>
+          Math.floor(value + delta[axis] * (begin + end) / 2)
+        );
+        const point = t => start.map((value, axis) =>
+          (value + delta[axis] * t - shift[axis]) *
+          structure.cellLengthsAngstrom[axis]
+        );
+        return {
+          id: bond.id + "-segment-" + (index + 1),
+          bondId: bond.id,
+          startAngstrom: point(begin),
+          endAngstrom: point(end)
+        };
+      });
+    });
+  }
+
+  function createStructure(source, mode = "molecule") {
+    if (!["molecule", "cell"].includes(mode)) {
+      fail("Unbekannter Darstellungsmodus: " + mode);
+    }
+    // Auch die Zellansicht muss die Einzelkäfigprüfungen bestehen.
+    const molecule = extractMolecule(readStructure(source));
+    if (mode === "molecule") return {...molecule, mode};
+    const cell = {
+      ...molecule,
+      mode,
+      chosenCenterFractional: null,
+      atoms: molecule.cellAtoms,
+      bonds: molecule.cellBonds
+    };
+    cell.bondSegments = cellBondSegments(cell);
+    return cell;
+  }
+
+  // Numerisch prüfbarer Einstieg, unabhängig von sichtbarer VR-Skalierung.
+  F.CIF = {createStructure};
+
   function buildMesh(structure) {
     const group = new T.Group();
-    group.name = "C60-from-CIF";
+    group.name = "C60-from-CIF-" + structure.mode;
     group.userData.fkcStructure = structure;
 
     const sphere = new T.SphereGeometry(1, 24, 16);
@@ -526,6 +618,10 @@
       metalness: 0
     });
 
+    const frameMaterial = new T.MeshStandardMaterial({
+      name: "CIF-Cell-frame", color: "#2998c2", roughness: 0.6, metalness: 0
+    });
+
     const axis = new T.Vector3(0, 1, 0);
 
     structure.atoms.forEach(atom => {
@@ -541,28 +637,46 @@
       group.add(mesh);
     });
 
-    structure.bonds.forEach(bond => {
-      const start = new T.Vector3().fromArray(
-        structure.atoms[bond.a].positionAngstrom
-      );
-
-      const end = new T.Vector3().fromArray(
-        structure.atoms[bond.b].positionAngstrom
-      );
-
+    function rod(startArray, endArray, name, material, radius, metadata) {
+      const start = new T.Vector3().fromArray(startArray);
+      const end = new T.Vector3().fromArray(endArray);
       const direction = end.clone().sub(start);
       const length = direction.length();
-
-      const mesh = new T.Mesh(cylinder, bondMaterial);
-
-      mesh.name = bond.id;
+      if (length < EPS) return;
+      const mesh = new T.Mesh(cylinder, material);
+      mesh.name = name;
       mesh.position.copy(start).add(end).multiplyScalar(0.5);
       mesh.quaternion.setFromUnitVectors(axis, direction.normalize());
-      mesh.scale.set(0.10, length, 0.10);
-      mesh.userData.fkcBond = bond;
-
+      mesh.scale.set(radius, length, radius);
+      if (metadata) mesh.userData.fkcBond = metadata;
       group.add(mesh);
-    });
+    }
+
+    if (structure.mode === "cell") {
+      structure.bondSegments.forEach(segment => rod(
+        segment.startAngstrom, segment.endAngstrom,
+        segment.id, bondMaterial, 0.10, segment
+      ));
+      // Zwölf Kanten; Atommittelpunkte in [0, 1), Kugeln nicht beschnitten.
+      structure.cellLengthsAngstrom.forEach((length, axisIndex) => {
+        const other = [0, 1, 2].filter(index => index !== axisIndex);
+        [0, 1].forEach(u => [0, 1].forEach(v => {
+          const start = [0, 0, 0];
+          start[other[0]] = u * structure.cellLengthsAngstrom[other[0]];
+          start[other[1]] = v * structure.cellLengthsAngstrom[other[1]];
+          const end = start.slice();
+          end[axisIndex] = length;
+          rod(start, end, "cell-edge-" + axisIndex + u + v,
+            frameMaterial, 0.035);
+        }));
+      });
+    } else {
+      structure.bonds.forEach(bond => rod(
+        structure.atoms[bond.a].positionAngstrom,
+        structure.atoms[bond.b].positionAngstrom,
+        bond.id, bondMaterial, 0.10, bond
+      ));
+    }
 
     return {
       group,
@@ -571,6 +685,7 @@
         cylinder.dispose();
         atomMaterial.dispose();
         bondMaterial.dispose();
+        frameMaterial.dispose();
       }
     };
   }
@@ -578,9 +693,9 @@
   /*
    * Gemeinsamer Einstieg für bisherige GLBs und neue CIFs.
    */
-  F.loadModelVisual = function (visual, source) {
+  F.loadModelVisual = function (visual, source, mode = "molecule") {
     if (/\.cif(?:[?#].*)?$/i.test(source)) {
-      visual.setAttribute("fkc-cif-model", {src: source});
+      visual.setAttribute("fkc-cif-model", {src: source, mode});
     } else {
       visual.setAttribute("gltf-model", "url(" + source + ")");
     }
@@ -588,7 +703,8 @@
 
   AFRAME.registerComponent("fkc-cif-model", {
     schema: {
-      src: {type: "string", default: ""}
+      src: {type: "string", default: ""},
+      mode: {type: "string", default: "molecule"}
     },
 
     init: function () {
@@ -630,8 +746,7 @@
 
         if (requestId !== this.requestId || !this.el.isConnected) return;
 
-        const cell = readStructure(source);
-        const structure = extractMolecule(cell);
+        const structure = createStructure(source, this.data.mode);
         const built = buildMesh(structure);
 
         this.built = built;
@@ -652,6 +767,7 @@
           "CIF-C60-1: Strukturprüfung erfolgreich:",
           {
             atomsInCell: structure.cellAtomCount,
+            mode: structure.mode,
             moleculesInCell: structure.moleculeCount,
             atomsInModel: structure.atoms.length,
             bondsInModel: structure.bonds.length,
@@ -664,7 +780,8 @@
           }
         );
 
-        F.setStatus("CIF-C60 geprüft: 60 Atome und 90 Bindungen.");
+        F.setStatus("CIF-C60 geprüft: " + structure.atoms.length +
+          " Atome und " + structure.bonds.length + " Bindungen.");
       } catch (error) {
         if (
           requestId !== this.requestId ||

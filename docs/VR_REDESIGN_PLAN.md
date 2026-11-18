@@ -24,6 +24,7 @@ Das Projekt verwendet HTML, CSS, JavaScript und A-Frame/WebXR ohne Buildsystem. 
 
 ## Ergebnis der bisherigen lesenden Bestandsaufnahme
 Diese Befunde beziehen sich auf die vorangegangene Quellcodeprüfung und sind vor einem Patch erneut zu prüfen.
+Historischer Ausgangsstand: Der aktuelle Umsetzungsstand und neuere Entscheidungen stehen am Ende dieses Dokuments.
 
 - Vorlesung 1, Station 3 enthält GLB und CIF-Einzelkäfig; `variantAlignment: "individual"` ist gesetzt.
 - CIF-Pfad: `assets/structures/C60_fullerene.cif`. GLB, Eis-Modell und ältere CIF unter `assets/models` existieren weiterhin.
@@ -51,6 +52,7 @@ Diese Befunde beziehen sich auf die vorangegangene Quellcodeprüfung und sind vo
 
 ## Vereinbartes nächstes Arbeitspaket: CIF-Basis reproduzierbar absichern
 Ziel: belastbare Grundlage für die Elementarzelle schaffen, zunächst ohne Darstellungsumbau.
+Dies war die ursprüngliche Etappe. Der Nutzer hat anschließend die Zellumsetzung ausdrücklich freigegeben; offene manuelle Basisprüfungen bleiben Teil der folgenden Validierung.
 
 1. Aktuellen Git-Status aufnehmen und vorhandene Nutzeränderungen schützen.
 2. Relevante aktuelle Dateien lesen: `index.html`, `js/rooms.js`, `js/room-builder.js`, `js/vr-tools.js`, `js/cif-model.js`, `js/vr-controls.js`, `js/app.js`, `js/browser-xr.js` und `assets/structures/C60_fullerene.cif`.
@@ -85,3 +87,45 @@ Nicht enthalten: Elementarzellenumbau, Atomlabels, Messwerkzeuge, allgemeine Mod
 - Manipulation und Reset funktionieren; Zellparameter und Raumgruppe sind nachvollziehbar aus der CIF übernommen.
 - Labels stammen aus Metadaten, unterscheiden Label/Nummer/ID und blockieren weder Auswahl, Zeichnen noch Menü. Kein erfundenes CIF-Label beim GLB.
 - Eis, Begrüßungs-Fulleren, Raumwechsel und Zeichnen bleiben funktionsfähig. PC- und Pico-Tests getrennt dokumentieren; numerische Aussagen nur mit ausgeführtem Nachweis.
+
+## Neu bestätigte Entscheidungen und Zukunftsideen
+- Variante A: GLB bleibt aktuell als Vergleichsoption neben CIF-Molekül und CIF-Zelle erhalten. Erst wenn CIF die benötigten Darstellungen zuverlässig ersetzt, kann die GLB-Option entfallen. Asset-Löschungen sind nicht Bestandteil dieser Freigabe; insbesondere wird das C60-GLB auch im Begrüßungsraum verwendet. Vor späterem Aufräumen sämtliche Referenzen prüfen und konkrete Löschfreigabe einholen.
+- Beim Wechsel sollen Modelle ungefähr gleich groß erscheinen. Beide CIF-Ansichten verwenden dieselbe größte normalisierte Ausdehnung; bestehende manuelle Skalierung bleibt erhalten. Dies ist keine exakte Volumengleichheit. Die Zelle kann anschließend bewusst vergrößert werden.
+- Strukturansicht (Molekül, Zelle, später beispielsweise Koordinationsansicht) und Darstellungsstil sollen langfristig unabhängig wählbar sein. Stile: Ball-and-Stick, Space-filling und Wires; jeder Stil soll für alle geeigneten Strukturansichten nutzbar sein. Noch nicht umgesetzt.
+- Langfristig dieselbe Bedienung für weitere Verbindungen/CIFs. Der jetzige C60-Importer ist dafür nicht ausreichend; andere Bindungsregeln, Zellformen und Netzwerke benötigen eigene Erweiterungen.
+- Künftige Nutzerideen in diesem Dokument notieren und als Wunsch, bestätigte Entscheidung oder offene Frage kennzeichnen, statt sie stillschweigend vorwegzunehmen.
+- Den Nutzer nach abgeschlossenen überprüften Änderungen ausdrücklich auffordern, GitHub Desktop für den lokalen Commit zu öffnen. Push für externe Sicherung und veröffentlichte Pico-Tests; niemals ohne Zustimmung selbst committen/pushen.
+
+## Aktueller Umsetzungsstand: C60-Molekül und Elementarzelle
+- `cifMode` trennt Quelle und Strukturansicht: `molecule` (Standard) oder `cell`. Vorlesung 1 behält `c60-glb` und `c60-cif`; hinzu kommt `c60-cif-cell`.
+- Der Importer prüft weiterhin alle vier Einzelkäfige und erhält vollständige Zellatome, periodische Bindungen und Raumgruppe als Metadaten. Die Zellansicht baut 240 Atomkugeln, geteilte Bindungen und zwölf blaue Rahmenkanten.
+- Zellkonvention: Atommittelpunkte in [0, 1) je Achse; Atomkugeln nicht geometrisch beschnitten. Bindungen werden an Zellflächen geteilt und die Abschnitte periodisch zurückverschoben. Diese erste Ausführung folgt dem vorgeschlagenen einfachen Kugelansatz; visuelle Rückmeldung ist noch erforderlich.
+- Individuelle bestehende Normalisierung bleibt erhalten. Zellparameter/Raumgruppe im Modellinfomenü stammen aus geladenen Strukturmetadaten.
+- Geändert: `js/cif-model.js`, `js/rooms.js`, `js/vr-tools.js`, `js/room-builder.js`, Cache-Versionen in `index.html` und die beiden Kontext-/Planungsdokumente. Neu: `tests/cif-model.test.cjs`, ohne zusätzliche Abhängigkeiten und ohne Buildsystem.
+- Tatsächlich ausgeführt: Syntaxprüfung der vier geänderten JS-Dateien mit `node --check`; numerischer Test mit `node tests/cif-model.test.cjs` bestanden. Molekül: 60 Atome/90 Bindungen; Zelle: 240 Atome/360 Bindungen; 444 Bindungsabschnitte. Alle Abschnitte innerhalb der Zellgrenzen, maximal 1,85 Å und ihre summierte Länge je Bindung entspricht der ursprünglichen Bindungslänge. C–C-Abstände: ungefähr 1,400029 bis 1,455767 Å. ID-Eindeutigkeit, originale CIF-Labels, Grad 3 und Modusübergabe ebenfalls geprüft.
+- Molekülzentren modulo Zelle, bis auf numerische Rundung: (0, 0, 0), (0, 1/2, 1/2), (1/2, 0, 1/2), (1/2, 1/2, 0). Die Hypothese eines mittigen Moleküls wird für diesen Ursprung nicht bestätigt.
+- Nutzer bestätigt lokalen Serverstart und PC-Zugriff auf den bisherigen Raum. Keine vom Agenten ausgeführten Browser- oder Pico-Tests der neuen Darstellung; keine Aussagen über bestandene Geräte-Regression.
+
+## Nächstes Arbeitspaket: manuelle PC-/Pico-Validierung
+1. Lokal ohne Cache neu laden, Vorlesung 1 betreten und das C60-Modell auswählen.
+2. Im bestehenden Modellmenü mehrfach GLB → CIF-Molekül → CIF-Zelle → CIF-Molekül → GLB wechseln; nur eine Ansicht sichtbar, kein unerwarteter Größensprung.
+3. Beide CIF-Ansichten drehen, kippen, skalieren und zurücksetzen. Zelle vergrößern; Rahmen und Randbindungen kontrollieren; Modellinformation und Konsole prüfen.
+4. Eis, Begrüßungs-Fulleren, Raumwechsel und Zeichnen gegenprüfen. Nach erfolgreichem PC-Test lokal committen; für Pico-Test pushen und Pages-Deployment abwarten.
+5. Auf Pico Variantenwechsel, Greifen, Drehen, Zweihandskalierung, Reset und Raumwechsel prüfen. Ergebnisse getrennt dokumentieren; zunächst gezielte Fehler beheben, dann Atomlabels planen.
+
+## Neue Nutzerideen: Untersuchung und Bearbeitung von Strukturausschnitten
+- Wunsch: Atome und Bindungen per Laser farbig markieren, später dauerhaft auswählen. Dauerhafte Auswahl und Bindungsmarkierung sind noch nicht umgesetzt.
+- Wunsch: Bindungsdistanzen und Winkel aus echten Å-Koordinaten messen; zunächst zwei/ drei Atome am Einzelkäfig. Periodische Zellmessungen benötigen ausdrücklich definierte Atomabbilder. Noch nicht umgesetzt.
+- Wunsch: bestimmte Atome, Bindungen und Moleküle entfernen. Empfohlene, noch abzustimmende erste Lösung: reversibles Ausblenden mit Wiederherstellen, keine Änderung der CIF. Bei Zellansichten Molekülzugehörigkeit ergänzen; bei Netzwerken wie NaCl nicht von Molekülen sprechen.
+- Wunsch: NaCl-Zelle und Koordinationsumgebungen von Na+ beziehungsweise Cl- (je sechs Gegenionen), später Koordinationspolyeder. Dafür Importer erweitern, konkrete CIF prüfen und Nachbarschafts-/Ladungs-/Radiuskonventionen festlegen; der C60-Importer ist noch nicht allgemein.
+- Vorschläge des Agenten, noch nicht zur Umsetzung freigegeben: explizite Werkzeugmodi zur Vermeidung von Zeichen-/Auswahlkonflikten, Auswahl zurücknehmen, Zellrahmen umschalten, Nachbarn hervorheben, Legende und Schnittansicht.
+
+## Etappe: Atomlabels und vorübergehende Anvisierhervorhebung
+- Vom Nutzer zur Umsetzung freigegeben. Der vorherige C60-Umbau wurde als funktionierend zurückgemeldet; kein separat bestätigter Pico-/Regressionstest.
+- Neues kleines Modul `js/atom-labels.js`; Einbindung und Szenenkomponente in `index.html`; Menüanbindung in `js/vr-tools.js`. Keine allgemeine Modularisierung und keine Änderungen an Controllerfunktionen oder Zeichencode.
+- Menü: ausgewähltes Modell → Atomlabels → Aus / Beim Anvisieren. Standard Aus. Einstellung pro Modellroot, bei Variantenwechsel erhalten; nach Raumneuaufbau wieder Aus.
+- Bei Maus-/VR-Anvisieren maximal ein CIF-Atomlabel mit Original-CIF-Label und separater Modellnummer, beispielsweise „C0 · Atom 17“. Gelbe Hervorhebung über temporär geklontes Material, Rücksetzung bei Wegzeigen/Deaktivierung. Bei zwei VR-Lasern wird rechts bevorzugt, sofern rechts ein geeignetes Atom trifft.
+- Beschriftung als kamerazugewandtes Sprite außerhalb der Modellgeometrie, ohne Raycast. Kein Einfluss auf Modellnormalisierung. Menü, Bindungs-/GLB-Treffer, unsichtbare und veraltete Treffer zeigen keine Labels. Labels bewusst ohne Tiefentest für Lesbarkeit; Überlagerung der Szene am Gerät noch prüfen.
+- Keine dauerhafte Auswahl, keine Bindungshervorhebung, keine erfundenen GLB-Labels und kein Modus „Alle anzeigen“ in dieser Etappe.
+- Tatsächlich ausgeführt: `node tests/atom-labels.test.cjs` bestanden (vereinfachte Testobjekte: Metadaten/Format, Moduswechsel, GLB-Ausschluss, Sichtbarkeit, veraltete Treffer, Materialwechsel und Originalmaterial-Rücksetzung). `node tests/cif-model.test.cjs` weiterhin bestanden. Syntaxprüfung von `js/atom-labels.js` und `js/vr-tools.js`, Diff-Whitespaceprüfung bestanden. Keine Browser-/Pico-Tests des Agenten.
+- Nächste Validierung: am PC und Pico einschalten, Menü schließen, verschiedene Atome anvisieren; Label/Farbe wechseln und verschwinden beim Wegzeigen. Bindungen/GLB liefern keine Labels. Variantenwechsel, Vergrößern/Reset, Raumwechsel, Menü, Zeichnen und Modellwahl gegenprüfen; Konsole kontrollieren. Nach erfolgreichem PC-Test ausdrücklich GitHub Desktop für Commit öffnen, für Pico-Test pushen und Deployment abwarten.

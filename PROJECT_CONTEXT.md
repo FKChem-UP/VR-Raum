@@ -10,22 +10,28 @@ Der VR-Raum wurde speziell für die Veranstaltung zur Festkörperchemie (FKC) en
 - **`js/app.js`**: Enthält die Hauptlogik der Anwendung.
 - **`.nojekyll`**: Stellt sicher, dass GitHub Pages reine HTML- und JavaScript-Dateien ausliefert.
 
-## Nachgewiesene Start- und Testmöglichkeiten
-Um die Anwendung lokal zu starten und zu testen:
-1. Lokalen Entwicklungsserver einrichten (z. B. Python HTTP-Server oder Node.js http-server).
-2. Die Datei `index.html` im Browser öffnen, der WebXR-/WebVR unterstützt, z. B. Chrome.
-3. Aufrufen der Anwendung unter `http://localhost:<PORT>`.
+## Start- und Testmöglichkeiten
+- Python 3.9.10 und Node.js sind lokal verfügbar. Der Nutzer hat Serverstart und PC-Zugriff bestätigt; dies ist kein vom Agenten ausgeführter Browser-Funktionstest.
+- Lokaler PC-Start: `py -m http.server 8000 --bind 127.0.0.1 --directory 'c:\Users\Eric Sperlich\Documents\GitHub\VR-Raum'`, danach `http://localhost:8000/` öffnen.
+- Reproduzierbarer Strukturtest ohne zusätzliche Pakete: `node 'c:\Users\Eric Sperlich\Documents\GitHub\VR-Raum\tests\cif-model.test.cjs'`.
+- Atomlabel-Logiktest ohne zusätzliche Pakete: `node 'c:\Users\Eric Sperlich\Documents\GitHub\VR-Raum\tests\atom-labels.test.cjs'` (vereinfachte Testobjekte, kein Renderingtest).
+- Pico-Tests der veröffentlichten Version benötigen Push und erfolgreiches GitHub-Pages-Deployment. Lokales Headset-HTTPS ist noch nicht eingerichtet. A-Frame wird extern geladen.
 
 ## Bekannte Probleme und offene Fragen
-- **Fehlender Kontext:** Einige JavaScript-Dateien im `js`-Ordner (z. B. `vr-controls.js`) wurden noch nicht auf ihren spezifischen Inhalt untersucht.
-- **Mögliche Abhängigkeiten:** Nicht klar, ob alle eingebundenen Dateien und verlinkten Bibliotheken mit den aktuellen Anforderungen kompatibel sind.
+- CIF-Import ist C60-spezifisch; andere Elemente und Zellformen sind noch nicht unterstützt.
+- Neue Zellansicht, Variantenwechsel, Manipulation, Reset und Regression müssen am PC und Pico manuell getestet werden.
+- Ansichten werden auf dieselbe größte Ausdehnung normalisiert, nicht auf exakt gleiches geometrisches Volumen oder einen gemeinsamen Å-Maßstab.
 
 ## Aktueller Arbeitsstand
-Lesender Zugriff auf die wichtigsten Dateien wurde durchgeführt. Weiterführende Analysen könnten in den JavaScript-Dateien Vertiefung finden, um das VR-Raumerlebnis vollständig zu evaluieren.
+C60 in Vorlesung 1 bietet nun GLB, CIF-Einzelmolekül und CIF-Elementarzelle im bestehenden Variantenmenü. Zellrahmen und periodische Bindungsabschnitte sind implementiert; Originalkoordinaten bleiben als Metadaten erhalten. Anwendungscode für Begrüßungsraum, Steuerung und Zeichnen wurde nicht geändert.
+
+Agententests: JavaScript-Syntaxprüfung und numerischer CIF-Test bestanden: Molekül 60 Atome/90 Bindungen; Zelle 240 Atome/360 Bindungen, 444 sichtbare Bindungsabschnitte. Der Nutzer meldet den C60-Umbau als funktionierend; Umfang und Gerät dieser Prüfung wurden nicht separat angegeben.
+
+Neu: `js/atom-labels.js` ergänzt „Atomlabels: Aus / Beim Anvisieren“ pro Modell. CIF-Atome werden beim Anvisieren gelb hervorgehoben und mit Original-CIF-Label und separater Modellnummer beschriftet. Am PC Maus, in VR aktuelle Controller-Treffer; keine Triggeränderung, keine dauerhafte Auswahl, keine GLB-Labels. Einstellung bleibt beim Variantenwechsel, nicht bei neuem Raumaufbau erhalten. Atomlabel-Logiktest und Syntaxprüfung bestanden; PC-/Pico-Rendering und Bedienung noch ungeprüft.
 
 ## Umbauplanung und nächstes Arbeitspaket
 Die bestätigten Anforderungen, die lesende Bestandsaufnahme und offene Entscheidungen sind in [docs/VR_REDESIGN_PLAN.md](docs/VR_REDESIGN_PLAN.md) dokumentiert.
 
-Vereinbartes nächstes Arbeitspaket: **CIF-Basis reproduzierbar absichern** — aktuelle Dateien und Git-Status prüfen, vorhandene lokale Startumgebung feststellen, Variantenwechsel und CIF-Manipulation/Reset am PC sowie numerische Strukturprüfungen durchführen und Ergebnisse dokumentieren. Noch kein Elementarzellenumbau, keine Atomlabels und keine allgemeine Modularisierung.
+Nächstes Arbeitspaket: **Atomlabels und Anvisierhervorhebung am PC und Pico validieren** — Labels ein/aus, Atomwechsel, Wegzeigen, Varianten-/Raumwechsel, Skalierung/Reset und Zeichnen testen. Danach dauerhafte Auswahl und Distanzmessung planen; zunächst eventuelle Regressionen beheben.
 
-Bisher wurden keine Browser-, Pico- oder numerischen Strukturtests durch den Agenten ausgeführt. Die oben genannten Serveroptionen sind Vorschläge, keine nachgewiesenen lokalen Startmöglichkeiten. Mit der Speicherung der Planung wurde kein Anwendungscode geändert und das nächste Arbeitspaket noch nicht ausgeführt.
+Zukunftsideen werden in der Umbauplanung gesammelt: unabhängige Darstellungsstile (Ball-and-Stick, Space-filling, Wires), weitere Strukturansichten und Verbindungen sowie mögliche spätere GLB-Ablösung. Aktuell keine Asset-Löschung. Nach überprüften Etappen den Nutzer ausdrücklich auf den nötigen GitHub-Desktop-Commit hinweisen; Commit/Push nur mit ausdrücklicher Zustimmung ausführen.

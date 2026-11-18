@@ -875,7 +875,7 @@
       });
     }, {once: true});
 
-    F.loadModelVisual(pending, variant.model);
+    F.loadModelVisual(pending, variant.model, variant.cifMode);
   };
 
 
@@ -1197,6 +1197,7 @@
         help: "Allgemeine Bedienhilfe",
         info: "Informationen zum Modell",
         variants: "Modelldarstellung",
+        "atom-labels": "Atomlabels",
         confirm: "Raum zurücksetzen"
       };
 
@@ -1210,7 +1211,7 @@
         55, 75, 914
       );
 
-      const modelPages = ["model", "info", "variants"];
+      const modelPages = ["model", "info", "variants", "atom-labels"];
       const isModelPage = modelPages.includes(this.page);
 
       ctx.font = "27px Arial";
@@ -1408,6 +1409,12 @@
             "Modelldarstellung wechseln",
             () => this.navigate("variants"),
             "#efe0b8"
+          );
+
+          button(
+            "Atomlabels: " + (model.fkcAtomLabels === "hover" ? "Beim Anvisieren" : "Aus"),
+            () => this.navigate("atom-labels"),
+            "#d2e9ec"
           );
 
           button(
@@ -1792,12 +1799,25 @@
        * Browserwerkzeuge weiterhin direkt hierhin navigieren.
        */
       if (this.page === "info") {
-        const value = model
+        let value = model
           ? model.fkcInfo ||
             "Für dieses Modell sind noch keine " +
             "Zusatzinformationen hinterlegt."
           : "Vor dem Öffnen des Menüs ein geladenes Modell " +
             "greifen oder auswählen.";
+
+        const visual = model && model.querySelector(".model-visual");
+        const structure = visual && visual.fkcStructure;
+        if (structure) {
+          value = "Aktuelle CIF-Ansicht: " +
+            (structure.mode === "cell" ? "Elementarzelle" : "Einzelmolekül") +
+            "\nZellparameter aus CIF (Å): " +
+            structure.cellLengthsAngstrom.join(" / ") +
+            "\nZellwinkel (°): " + structure.cellAnglesDegrees.join(" / ") +
+            "\nRaumgruppe: " + structure.spaceGroup.name +
+            (structure.spaceGroup.number ? " (" + structure.spaceGroup.number + ")" : "") +
+            "\n\n" + value;
+        }
 
         const lines = text(value, 13);
 
@@ -1815,6 +1835,26 @@
           );
         }
 
+        back("model");
+      }
+
+      if (this.page === "atom-labels") {
+        if (!model) {
+          text("Zunächst ein geladenes 3D-Modell auswählen.");
+        } else {
+          text("Original-CIF-Label und separate Modellnummer.\n" +
+            "GLB-Modelle besitzen keine CIF-Atomlabels.");
+          [["off", "Aus"], ["hover", "Beim Anvisieren"]].forEach(([mode, title]) => {
+            button(title, () => {
+              const selected = this.getSelectedModel();
+              if (selected !== model) return;
+              F.AtomLabels.setMode(selected, mode);
+              feedback("Atomlabels: " + title);
+            }, null, (model.fkcAtomLabels || "off") === mode);
+          });
+          text("Menü schließen und Maus oder Laser auf ein CIF-Atom richten.\n" +
+            "Gelbe Hervorhebung ist vorübergehend; kein Klick nötig.");
+        }
         back("model");
       }
 
@@ -2007,7 +2047,8 @@
           root.fkcVariants = variants.map((variant, number) => ({
             id: variant.id || "variant-" + (number + 1),
             title: variant.title || "Darstellung " + (number + 1),
-            model: variant.model
+            model: variant.model,
+            cifMode: variant.cifMode || "molecule"
           }));
 
           root.fkcVariantId = root.fkcVariants[0].id;
