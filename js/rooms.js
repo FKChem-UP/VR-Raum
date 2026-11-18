@@ -306,7 +306,13 @@
     model: "assets/models/Graphit.glb",
     slide: ""
   });
-
+  
+   Object.assign(v1.stations[2], {
+    title: "C₆₀-Buckminsterfulleren",
+    model: "assets/models/C60-Fulleren.glb",
+    slide: "",
+  });
+  
   Object.assign(v1.stations[4], {
     title: "Eis",
     model: "assets/models/Eis2.glb",
