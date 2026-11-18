@@ -21,6 +21,8 @@ Der VR-Raum wurde speziell für die Veranstaltung zur Festkörperchemie (FKC) en
 - CIF-Import ist C60-spezifisch; andere Elemente und Zellformen sind noch nicht unterstützt.
 - Neue Zellansicht, Variantenwechsel, Manipulation, Reset und Regression müssen am PC und Pico manuell getestet werden.
 - Ansichten werden auf dieselbe größte Ausdehnung normalisiert, nicht auf exakt gleiches geometrisches Volumen oder einen gemeinsamen Å-Maßstab.
+- Nutzer bestätigt VR-Labels und Variantenwechsel; PC-Labels funktionieren laut Rückmeldung nicht. PC-Fehlerbehebung nachrangig.
+- Handmenü-Prototyp: Controller-Grip-Achse als Handflächen-Näherung; Ausrichtung, Größe und Bedienung auf Pico noch ungeprüft.
 
 ## Aktueller Arbeitsstand
 C60 in Vorlesung 1 bietet nun GLB, CIF-Einzelmolekül und CIF-Elementarzelle im bestehenden Variantenmenü. Zellrahmen und periodische Bindungsabschnitte sind implementiert; Originalkoordinaten bleiben als Metadaten erhalten. Anwendungscode für Begrüßungsraum, Steuerung und Zeichnen wurde nicht geändert.
@@ -32,6 +34,8 @@ Neu: `js/atom-labels.js` ergänzt „Atomlabels: Aus / Beim Anvisieren“ pro Mo
 ## Umbauplanung und nächstes Arbeitspaket
 Die bestätigten Anforderungen, die lesende Bestandsaufnahme und offene Entscheidungen sind in [docs/VR_REDESIGN_PLAN.md](docs/VR_REDESIGN_PLAN.md) dokumentiert.
 
-Nächstes Arbeitspaket: **Atomlabels und Anvisierhervorhebung am PC und Pico validieren** — Labels ein/aus, Atomwechsel, Wegzeigen, Varianten-/Raumwechsel, Skalierung/Reset und Zeichnen testen. Danach dauerhafte Auswahl und Distanzmessung planen; zunächst eventuelle Regressionen beheben.
+Neu: `js/hand-menu.js` bietet modellbezogene Aktionen an der gegenüberliegenden Hand zur gewählten Laserhand. Öffnen durch zum Kopf gedrehte Handinnenseite (Grip-Orientierungsnäherung, 300 ms Verzögerung), Ausblenden beim Wegdrehen/Greifen. Hauptmenü behält allgemeine Einstellungen und Laserhandwahl; PC-Modellmenü bleibt als bisheriger Zugang. Nur gewählte Laserhand zeichnet, beide Hände greifen/skalierten weiterhin. Handmenü enthält Varianten, Labelumschaltung, Reset, Modellinformationen und CIF-Legende. Handmenü-, Label- und CIF-Logiktests sowie Syntaxprüfungen bestanden; keine Agenten-Gerätetests.
+
+Nächstes Arbeitspaket: **Handmenü auf Pico validieren** — Einblendbewegung, Handwahl, Variantenwechsel, Labels, Reset, Informationsseiten, Greifen/Skalieren, Hauptmenü, Zeichnen und Raumwechsel prüfen. Zunächst Ergonomie/Regressionen korrigieren, danach Auswahl/Messwerkzeuge.
 
 Zukunftsideen werden in der Umbauplanung gesammelt: unabhängige Darstellungsstile (Ball-and-Stick, Space-filling, Wires), weitere Strukturansichten und Verbindungen sowie mögliche spätere GLB-Ablösung. Aktuell keine Asset-Löschung. Nach überprüften Etappen den Nutzer ausdrücklich auf den nötigen GitHub-Desktop-Commit hinweisen; Commit/Push nur mit ausdrücklicher Zustimmung ausführen.

@@ -19,6 +19,7 @@
    */
 
   F.Settings = {
+    laserHand: "right",
     lasers: {
       left: "#32d8df",
       right: "#ff9d38"
@@ -158,6 +159,7 @@
     if (hitDirty) rebuildHits();
 
     const menuOpen = F.Menu && F.Menu.opened;
+    const handMenuOpen = F.HandMenu && F.HandMenu.opened;
 
     const targets = hitTargets.filter(target => {
       if (
@@ -170,6 +172,10 @@
           target.type === "action" &&
           target.el.dataset.fkcMenu === "true"
         );
+      }
+
+      if (handMenuOpen) {
+        return target.type === "action" && target.el.dataset.fkcHandMenu === "true";
       }
 
       if (
@@ -1022,6 +1028,8 @@
     },
 
     open: function (hand) {
+      const handMenu = F.getScene().components["fkc-hand-menu"];
+      if (handMenu) handMenu.hide();
       this.init();
       this.cancelClick();
       connectNavigation();
@@ -1317,7 +1325,11 @@
 
         button(
           "Ausgewähltes 3D-Modell",
-          () => this.navigate("model"),
+          () => {
+            if (F.getScene().is("vr-mode") && F.HandMenu) {
+              this.notify("Hauptmenü schließen; die andere Handfläche zum Kopf drehen.");
+            } else this.navigate("model");
+          },
           "#efe0b8",
           false,
           "selected-model"
@@ -1452,6 +1464,15 @@
         text(
           "Eine gemeinsame Laser- und Malfarbe pro Hand.\n" +
           "Laserbreite und Malstrichstärke sind unabhängig."
+        );
+
+        button(
+          "Laserhand: " + (F.Settings.laserHand === "left" ? "Links" : "Rechts") + " – wechseln",
+          () => {
+            F.HandMenu.setLaserHand(F.Settings.laserHand === "left" ? "right" : "left");
+            feedback("Laserhand gewechselt. Modellmenü liegt an der anderen Hand.");
+          },
+          "#efe0b8"
         );
 
         button(

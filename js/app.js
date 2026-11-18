@@ -261,6 +261,7 @@
     };
 
     navigation.tick = function (time, delta) {
+      if (F.HandMenu && F.HandMenu.opened) return;
       /*
        * PC- und bisheriger VR-Ablauf bleiben erhalten.
        * Für AR ohne vr-mode ergänzen wir denselben Joystickablauf.
@@ -447,11 +448,10 @@
 
       if (mesh) {
         const menuHit = !!(
-          F.Menu &&
-          F.Menu.opened &&
           hit.type === "action" &&
           hit.el &&
-          hit.el.dataset.fkcMenu === "true"
+          ((F.Menu && F.Menu.opened && hit.el.dataset.fkcMenu === "true") ||
+            (F.HandMenu && F.HandMenu.opened && hit.el.dataset.fkcHandMenu === "true"))
         );
 
         mesh.frustumCulled = false;
@@ -492,6 +492,7 @@
 
       tools.activate = function () {
         if (!immersive(this.el.sceneEl)) return;
+        if (F.HandMenu && this.data.hand !== F.HandMenu.laserHand()) return;
 
         this.drawingAllowed = false;
         this.stroke = null;
@@ -502,7 +503,9 @@
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
-          if (this.hit.el.dataset.fkcMenu === "true") {
+          if (this.hit.el.dataset.fkcHandMenu === "true") {
+            if (F.HandMenu) F.HandMenu.click(this.hit);
+          } else if (this.hit.el.dataset.fkcMenu === "true") {
             if (F.Menu) F.Menu.click(this.hit);
           } else if (!(F.Menu && F.Menu.opened)) {
             const roomId = this.hit.el.dataset.roomId;
@@ -515,7 +518,7 @@
           return;
         }
 
-        if (F.Menu && F.Menu.opened) return;
+        if ((F.Menu && F.Menu.opened) || (F.HandMenu && F.HandMenu.opened)) return;
 
         const grabber = this.el.components["fkc-grabber"];
 
@@ -548,6 +551,16 @@
 
         this.pollButtons();
 
+        // Beide Hände bleiben zum Greifen/Reset und für B/Y aktiv.
+        // Nur die gewählte Hand zeigt einen Laser und zeichnet per Trigger.
+        if (F.HandMenu && this.data.hand !== F.HandMenu.laserHand()) {
+          this.stroke = null;
+          this.drawingAllowed = false;
+          this.hit = null;
+          this.hide();
+          return;
+        }
+
         /*
          * Eine Tastenaktion kann den Raum oder das Menü
          * verändert haben. Treffer deshalb neu bestimmen.
@@ -564,7 +577,8 @@
           return;
         }
 
-        if (this.states.trigger && !(F.Menu && F.Menu.opened)) {
+        if (this.states.trigger && !(F.Menu && F.Menu.opened) &&
+            !(F.HandMenu && F.HandMenu.opened)) {
           this.sampleDrawing();
         }
 

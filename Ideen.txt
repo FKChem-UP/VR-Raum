@@ -77,9 +77,10 @@ IDE-09: Atomlabels einblenden, zunächst am C60 testen.
   Übergebene Anforderungen: Original-CIF-Label, Modellnummer und eindeutige ID
   getrennt halten; Labels dürfen Maus/Laser nicht blockieren; keine erfundenen
   CIF-Labels für GLB. Später Atome anhand ihrer Original-CIF-Labels identifizieren.
-  Status: "Aus / Beim Anvisieren" lokal implementiert und zur Umsetzung
-  freigegeben. Logiktests bestanden; sichtbare PC-/Pico-Funktion noch nicht
-  vom Nutzer bestätigt. "Alle anzeigen" war in der Übergabe nur optional/offen.
+  Status: "Aus / Beim Anvisieren" lokal implementiert. Nutzer bestätigt Labels
+  und Variantenwechsel mit VR-Brille. PC-Labels funktionieren laut Nutzer nicht;
+  deren Fehlerbehebung ist ausdrücklich nachrangig und für später vorgesehen.
+  "Alle anzeigen" bleibt Zukunftswunsch, noch nicht umgesetzt.
 
 IDE-10: Atome und Bindungen durch den Laserpointer in anderer Farbe markieren.
   Status: Vorübergehende gelbe Atomhervorhebung beim Anvisieren lokal umgesetzt.
@@ -116,6 +117,33 @@ IDE-15: Später Atome auf gemeinsamer Atomdatenstruktur einfärben.
   Quelle: eingebrachte Planungsübergabe, dort als Vorschlag beschrieben.
   Status: Noch nicht verbindlich zur Umsetzung freigegeben; nicht mit der
   bereits freigegebenen vorübergehenden Anvisierhervorhebung verwechseln.
+
+IDE-16: Kompaktes Menü an der Controller-/Handinnenseite statt vieler Klicks
+  im großen Menü vor dem Gesicht. Erst bei aktiver Drehung der Handfläche zum
+  Kopf einblenden, beim Wegdrehen ausblenden; nicht dauerhaft sichtbar.
+  Nur Optionen zum ausgewählten 3D-Modell dort anbieten. Allgemeine Einstellungen
+  (Komfort, Laserfarbe/-dicke usw.) bleiben im Hauptmenü.
+  Status: Zur Umsetzung freigegeben, erster Prototyp lokal implementiert;
+  Ergonomie und Einblendrichtung auf Pico noch ungeprüft.
+
+IDE-17: Laserhand im Hauptmenü wählbar; Modellmenü an der gegenüberliegenden Hand.
+  Status: Rechts als Standard, Links/Rechts umschaltbar. Nur gewählte Hand zeigt
+  Laser/zeichnet; beide Hände bleiben zum Greifen und Skalieren verfügbar.
+  Geräteprüfung noch offen.
+
+IDE-18: Modellmenü langfristig mit Ansicht, Sichtbarkeit (alle/ohne H), Labels
+  (an/beim Anvisieren/aus), Darstellung (Kugel-Stab/raumfüllend/Linien, eventuell
+  Symbole), Messen (Distanz/Winkel/Torsion), Elementfarbenlegende und weiteren Buttons.
+  Status: Varianten, Labels Aus/Beim Anvisieren, Reset, Modellinformation und
+  CIF-Elementlegende im Prototyp. Weitere Funktionen noch nicht umgesetzt.
+  Einheitliche Oberbegriffe, modellabhängige verfügbare Ausschnitte gewünscht.
+
+IDE-19: Auch Abstände zwischen nicht direkt gebundenen Atomen messen.
+  Status: Machbar, noch nicht umgesetzt; periodische Atomabbilder müssen eindeutig sein.
+
+IDE-20: CIF-Dateien aller Strukturen im Begrüßungsraum sammeln, um später deren
+  GLBs durch CIF-generierte Darstellungen zu ersetzen.
+  Status: Nutzer bereitet Dateien vor; kein aktueller Austausch oder Löschauftrag.
 
 6. WEITERE PUNKTE AUS DER EINGEBRACHTEN ÜBERGABE
 --------------------------------------------
@@ -154,6 +182,6 @@ IDE-15: Später Atome auf gemeinsamer Atomdatenstruktur einfärben.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
-Werkzeugmodi, Undo, zusätzliche Legende, Zellrahmen-Umschalter, Nachbarhervorhebung,
+Werkzeugmodi, Undo, Zellrahmen-Umschalter, Nachbarhervorhebung,
 Koordinationspolyeder und Schnittansichten wurden vom Agenten als sinnvolle
 Erweiterungen vorgeschlagen. Sie sind keine separat bestätigten Nutzeraufträge.

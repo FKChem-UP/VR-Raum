@@ -111,12 +111,14 @@
     tick: function () {
       const scene = this.el;
       const camera = scene.camera;
-      if (!camera || (F.Menu && F.Menu.opened)) { this.clear(); return; }
+      if (!camera || (F.Menu && F.Menu.opened) ||
+          (F.HandMenu && F.HandMenu.opened)) { this.clear(); return; }
       let target = null;
       const xr = scene.renderer && scene.renderer.xr;
       if (scene.is("vr-mode") || (xr && xr.getSession())) {
         // Bevorzugt rechts, maximal ein Label; keine Controllerüberschreibung.
-        for (const id of ["rightHand", "leftHand"]) {
+        const hands = F.HandMenu ? [F.HandMenu.laserHand() + "Hand"] : ["rightHand", "leftHand"];
+        for (const id of hands) {
           const hand = document.getElementById(id);
           const tools = hand && hand.components["fkc-controller"];
           if (tools && tools.source && tools.line && tools.line.visible) {
