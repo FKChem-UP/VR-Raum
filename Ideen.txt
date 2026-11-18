@@ -1,0 +1,159 @@
+IDEEN UND UMSETZUNGSWÜNSCHE FÜR DEN VR-RAUM
+=========================================
+
+Zweck dieser Datei
+-----------------
+Zentrale Sammlung der vom Nutzer in diesem Chat geäußerten Ideen und Wünsche,
+einschließlich der hier eingebrachten Planungsübergabe. Neue Ideen künftig
+ergänzen; erledigte Ideen nicht löschen, sondern ihren Status aktualisieren.
+Eine Idee ist keine automatische Umsetzungs- oder Löschfreigabe.
+
+Der lokale Quellcode belegt den Implementierungsstand. Technische Details,
+Prüfkriterien und Etappenberichte stehen in docs/VR_REDESIGN_PLAN.md.
+Statusangaben unten beruhen auf dem bisherigen Gespräch und dessen dokumentierten
+Etappen; sie ersetzen keine erneute Quellcode- oder Geräteprüfung.
+
+1. DIDAKTISCHER ZWECK
+--------------------
+- VR-Lehrraum für die Festkörperchemie-Veranstaltung: Strukturen räumlich
+  untersuchen und verschiedene Darstellungen derselben Verbindung vergleichen.
+- Einzelmolekül und kristallographische Elementarzelle klar unterscheiden.
+- Modelle auswählen, drehen, kippen, skalieren und zurücksetzen können.
+- PC und Pico 4/Pico 4 Ultra mit Pico Browser berücksichtigen; häufige
+  Headset-Tests sind ausdrücklich gewünscht.
+
+2. CIF ALS GEMEINSAME STRUKTURQUELLE
+----------------------------------
+IDE-01: C60-Molekül und vollständige Elementarzelle aus derselben CIF erzeugen.
+  Ort: C60-Station in Vorlesung 1, ausdrücklich nicht das Begrüßungsmodell.
+  Status: Lokal implementiert; Nutzer meldete Erfolg. Welche Geräte und
+  Einzelprüfungen dabei getestet wurden, wurde nicht separat bestätigt.
+
+IDE-02: Ansichten über das vorhandene Menü "Modelldarstellung wechseln" wählen.
+  Immer nur eine Variante sichtbar; keine parallele Überlagerung der Ansichten.
+  Status: Lokal implementiert, zusammen mit IDE-01 als funktionierend gemeldet.
+
+IDE-03: Vollständigen Zellinhalt statt nur eines Käfigs mit Rahmen darstellen.
+  Übergebene Anforderung: 240 Atompositionen, Zellrahmen und passende periodische
+  Bindungsabschnitte; Moleküle dürfen an Zellgrenzen angeschnitten sein.
+  Keine langen Bindungsstäbe quer durch die Zelle. Zellparameter und Raumgruppe
+  nachvollziehbar aus der CIF im Infotext anzeigen.
+  Status: Lokal implementiert; numerische Prüfungen bestanden. Geräte-Regression
+  nicht vollständig bestätigt.
+
+IDE-04: Beim Variantenwechsel ungefähr vergleichbare Modellgröße beibehalten.
+  Der C60-Ball und die Zellansicht sollen ähnlich groß wirken; die Zelle soll
+  anschließend bewusst vom Nutzer vergrößert werden können, statt beim Wechsel
+  plötzlich als riesiges Objekt zu erscheinen.
+  Status: Gleiche größte normalisierte Ausdehnung implementiert. Das ist keine
+  exakte Volumengleichheit; optische Vergleichbarkeit weiter prüfen.
+
+IDE-05: Langfristig deutlich mehr Strukturausschnitte/Varianten aus CIF erzeugen.
+  Beispiele: Molekül, Elementarzelle, Koordinationsansicht und weitere anhand
+  einer fachlichen Beschreibung definierte Ausschnitte.
+  Status: Zukunftswunsch; bisher nur C60-Molekül und C60-Zelle umgesetzt.
+
+IDE-06: Dasselbe Prinzip auf andere Verbindungen und CIF-Dateien übertragen.
+  Konkret genannt: NaCl-Elementarzelle, koordiniertes Na+ und koordiniertes Cl-.
+  Fachliche Einordnung: Koordinationsumgebungen, keine einzelnen NaCl-Moleküle.
+  Status: Zukunftswunsch. Aktueller Importer ist C60-spezifisch; allgemeiner
+  Import, Elemente, Nachbarschaftsregeln und periodische Ausschnitte fehlen.
+
+3. GLB-ABLÖSUNG UND AUFRÄUMEN
+---------------------------
+IDE-07: Aktuell GLB als zusätzliche Vergleichsvariante behalten (Variante A).
+  Status: Bestätigte Entscheidung, umgesetzt.
+
+IDE-08: GLB-Varianten später abschaffen, sobald CIF alle benötigten Darstellungen
+  zuverlässig erzeugt. Dann bewusst auch entbehrliche GLB-Dateien entfernen,
+  damit das Projekt aufgeräumter ist.
+  Status: Bedingter Zukunftswunsch, keine aktuelle Löschfreigabe. Vorher alle
+  Referenzen prüfen; insbesondere nutzt das Begrüßungs-Fulleren weiterhin GLB.
+  Eis und Begrüßungsmodell sollen beim aktuellen C60-Umbau unverändert bleiben.
+
+4. ATOME UND BINDUNGEN UNTERSUCHEN
+-------------------------------
+IDE-09: Atomlabels einblenden, zunächst am C60 testen.
+  Übergebene Anforderungen: Original-CIF-Label, Modellnummer und eindeutige ID
+  getrennt halten; Labels dürfen Maus/Laser nicht blockieren; keine erfundenen
+  CIF-Labels für GLB. Später Atome anhand ihrer Original-CIF-Labels identifizieren.
+  Status: "Aus / Beim Anvisieren" lokal implementiert und zur Umsetzung
+  freigegeben. Logiktests bestanden; sichtbare PC-/Pico-Funktion noch nicht
+  vom Nutzer bestätigt. "Alle anzeigen" war in der Übergabe nur optional/offen.
+
+IDE-10: Atome und Bindungen durch den Laserpointer in anderer Farbe markieren.
+  Status: Vorübergehende gelbe Atomhervorhebung beim Anvisieren lokal umgesetzt.
+  Bindungshervorhebung noch offen. Dauerhafte Auswahl ist eine mögliche nächste
+  Etappe; genaue Bedienung noch abzustimmen, nicht bereits separat freigegeben.
+
+IDE-11: Bindungsdistanzen messen, zunächst am C60.
+  Echte Strukturkoordinaten in Å unabhängig von der VR-Anzeigegröße erhalten;
+  Vergrößern oder Drehen darf die Messwerte nicht verändern.
+  Status: Koordinatengrundlage vorhanden; Messwerkzeug noch nicht umgesetzt.
+  Periodische Messungen benötigen eine eindeutige Auswahl der Atomabbilder.
+
+IDE-12: Winkel messen, zunächst am C60.
+  In der Übergabe genannt: drei Atome, zweites Atom als Scheitel.
+  Status: Wunsch, noch nicht umgesetzt. Torsionswinkel mit vier Atomen wurden
+  lediglich als spätere optionale Erweiterung übergeben, nicht bestätigt.
+
+IDE-13: Bestimmte Atome, Bindungen oder Moleküle löschen/entfernen können.
+  Status: Wunsch, noch nicht umgesetzt. Offen: nur aus der Ansicht entfernen
+  oder tatsächliche Strukturdaten ändern? Reversibles Ausblenden mit
+  Wiederherstellen wurde vom Agenten vorgeschlagen, noch nicht beschlossen.
+  Kein Auftrag, CIF-Dateien oder Assets jetzt zu verändern/löschen.
+
+5. DARSTELLUNGSSTILE
+-------------------
+IDE-14: Darstellungsmethode umstellen: Ball-and-Stick, Space-filling, Wires.
+  Zunächst am C60 ausprobieren. Langfristig für jede geeignete Strukturansicht
+  unabhängig wählbar, also sowohl Molekül als auch Zelle, Koordinationsansicht
+  und weitere künftige Ausschnitte.
+  Status: Zukunftswunsch; aktuell nur die bestehende Kugel-Stab-Darstellung.
+  Radiuskonventionen für Space-filling und andere Verbindungen noch klären.
+
+IDE-15: Später Atome auf gemeinsamer Atomdatenstruktur einfärben.
+  Quelle: eingebrachte Planungsübergabe, dort als Vorschlag beschrieben.
+  Status: Noch nicht verbindlich zur Umsetzung freigegeben; nicht mit der
+  bereits freigegebenen vorübergehenden Anvisierhervorhebung verwechseln.
+
+6. WEITERE PUNKTE AUS DER EINGEBRACHTEN ÜBERGABE
+--------------------------------------------
+- Allgemeinere Strukturunterstützung: weitere Elemente, nichtkubische Zellen,
+  Netzwerke, Besetzung, Fehlordnung und geeignete Bindungsregeln.
+  Status: Übergebene Zukunftsvorschläge, noch keine Umsetzungsfreigabe.
+- Multiplayer: laut Übergabe Rückmeldung der Uni-IT abwarten.
+  Status: Offen; in diesem Chat nicht technisch geprüft oder implementiert.
+- Fachliche Grenzen wahren: CsCl statt CsF für den besprochenen Strukturtyp;
+  S8/P4 keine Wasserstoffbrücken zuschreiben; Röntgendemo als illustrativ
+  behandeln, keine realistischen Intensitäts-/Strukturfaktorberechnungen
+  behaupten. C60-Prüfwerte nicht auf andere Strukturen übertragen.
+- Bestehende Bedienung, Zeichnen, Raumwechsel, Eis und Begrüßungs-Fulleren
+  erhalten; keine allgemeine Modularisierung oder Einführung eines Buildsystems.
+
+7. GEWÜNSCHTE ZUSAMMENARBEIT UND DOKUMENTATION
+-------------------------------------------
+- Alle künftig im Chat geäußerten Ideen/Umsetzungswünsche in dieser Datei sammeln.
+- Planung zuerst besprechen; danach kleine lokale Änderungen, Tests und
+  Rückmeldung. Nicht jede Idee sofort umsetzen.
+- Auf main im bestehenden Projektordner arbeiten; ki-test war nur ein Testbranch.
+- Verständliche Schritt-für-Schritt-Anleitungen geben, bis der Nutzer ausdrücklich
+  mitteilt, dass sie nicht mehr nötig sind.
+- Immer ausdrücklich Bescheid sagen, wenn der Nutzer GitHub Desktop öffnen und
+  "Commit" drücken soll, weil das Fenster während der Vollbildarbeit nicht sichtbar ist.
+- Lokal am PC testen können, ohne jedes Mal zu veröffentlichen. Push auch zur
+  externen Sicherung nutzen und für Tests der neuen GitHub-Pages-Version auf dem
+  Headset bzw. zum Zeigen von Fortschritten gegenüber Kollegen.
+- Commits und Pushes nicht ohne ausdrückliche Zustimmung durch den Agenten
+  ausführen; ebenso keine Pakete installieren oder Dateien löschen ohne Freigabe.
+- Kurze Projektübersicht, Projektregeln und gespeicherte Umbauplanung erhalten.
+  PROJECT_CONTEXT.md und docs/VR_REDESIGN_PLAN.md sind vorhanden; diese Datei
+  sammelt Ideen, ersetzt aber nicht die technische Planung oder Testprotokolle.
+- Unbekannte Punkte markieren. Nutzerberichte und tatsächlich ausgeführte
+  Agententests klar trennen; niemals ungeprüfte Funktion als getestet ausgeben.
+
+NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
+---------------------------------
+Werkzeugmodi, Undo, zusätzliche Legende, Zellrahmen-Umschalter, Nachbarhervorhebung,
+Koordinationspolyeder und Schnittansichten wurden vom Agenten als sinnvolle
+Erweiterungen vorgeschlagen. Sie sind keine separat bestätigten Nutzeraufträge.
