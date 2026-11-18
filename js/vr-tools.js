@@ -875,9 +875,9 @@
       });
     }, {once: true});
 
-  pending.setAttribute(
-      "gltf-model",
+    F.loadModelVisual(pending, variant.model);
   };
+
 
   /*
    * MODELLAUSWAHL FÜR DAS MENÜ
