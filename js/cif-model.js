@@ -594,7 +594,47 @@
   }
 
   // Numerisch prüfbarer Einstieg, unabhängig von sichtbarer VR-Skalierung.
-  F.CIF = {createStructure};
+  const styles = [
+    {id: "ball-stick", title: "Ball-and-Stick", atomRadius: 0.32, bondRadius: 0.10},
+    {id: "space-filling", title: "Space-Filling", atomRadius: 1.70, bondRadius: 0},
+    {id: "wires", title: "Wires", atomRadius: 0.025, bondRadius: 0.025},
+    {id: "capped-sticks", title: "Capped Sticks", atomRadius: 0.14, bondRadius: 0.14}
+  ];
+
+  function applyStyle(group, styleId) {
+    const style = styles.find(entry => entry.id === styleId);
+    if (!style) throw new Error("Nicht unterstützter CIF-Style: " + styleId);
+    group.traverse(mesh => {
+      if (mesh.userData.fkcAtom) {
+        // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
+        // Die übrigen Radien sind rein visuelle Darstellungsradien.
+        mesh.scale.setScalar(style.atomRadius);
+      } else if (mesh.userData.fkcBond) {
+        mesh.visible = style.bondRadius > 0;
+        mesh.scale.x = mesh.scale.z = style.bondRadius;
+      }
+    });
+    group.userData.fkcStyle = styleId;
+  }
+
+  F.CIF = {
+    createStructure, styles, applyStyle,
+    setStyle(root, styleId) {
+      const visual = root && root.querySelector(".model-visual");
+      const mesh = visual && visual.getObject3D("mesh");
+      if (!mesh || !visual.fkcStructure || root.fkcPendingVisual) return false;
+      const scene = F.getScene();
+      const labels = scene && scene.components["fkc-atom-labels"];
+      if (labels) labels.clear();
+      applyStyle(mesh, styleId);
+      root.fkcStyle = styleId;
+      // Anzeigegröße/Griffbereich an geänderte Atomradien anpassen.
+      const normalize = visual.components["fkc-normalize"];
+      if (normalize) normalize.normalize();
+      F.invalidateHits();
+      return true;
+    }
+  };
 
   function buildMesh(structure) {
     const group = new T.Group();
@@ -748,6 +788,8 @@
 
         const structure = createStructure(source, this.data.mode);
         const built = buildMesh(structure);
+        const root = this.el.closest(".interactable");
+        applyStyle(built.group, (root && root.fkcStyle) || "ball-stick");
 
         this.built = built;
         this.el.fkcStructure = structure;

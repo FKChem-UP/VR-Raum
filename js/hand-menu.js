@@ -64,6 +64,8 @@
       this.toHead = new T.Vector3();
       this.quaternion = new T.Quaternion();
       this.rigQuaternion = new T.Quaternion();
+      this.headQuaternion = new T.Quaternion();
+      this.sceneQuaternion = new T.Quaternion();
       this.canvas = document.createElement("canvas");
       this.canvas.width = WIDTH;
       this.canvas.height = HEIGHT;
@@ -175,14 +177,19 @@
       const object = this.root.object3D;
       object.position.copy(this.position);
       scene.object3D.worldToLocal(object.position);
-      object.lookAt(this.head);
+      // Parallel zur Augen-/Kameraebene statt schräg zur seitlichen Handposition.
+      // Kopfrollwinkel wird übernommen, keine zusätzliche Links-/Aufwärtsneigung.
+      scene.camera.getWorldQuaternion(this.headQuaternion);
+      scene.object3D.getWorldQuaternion(this.sceneQuaternion);
+      object.quaternion.copy(this.sceneQuaternion.invert())
+        .multiply(this.headQuaternion);
       object.visible = true;
       object.updateWorldMatrix(true, true);
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
-        structure && structure.mode].join("|");
+        structure && structure.mode, model.fkcStyle].join("|");
       if (signature !== this.signature) {
         this.signature = signature;
         this.render(structure);
@@ -232,7 +239,16 @@
         this.buttons.push(b);
         y += 72;
       };
-      if (this.page === "info") {
+      if (this.page === "styles") {
+        text("Styles – unabhängig von der Ansicht");
+        F.CIF.styles.forEach(style => button(style.title, () => {
+          F.CIF.setStyle(model, style.id);
+        }, (model.fkcStyle || "ball-stick") === style.id));
+        text("Space-Filling: C-Radius 1,70 Å.");
+        text("Ellipsoid: keine ADPs in C60-CIF.");
+        text("Polyhedral: kein Metallzentrum in C60.");
+        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
+      } else if (this.page === "info") {
         const info = (structure ?
           "Zelle (Å): " + structure.cellLengthsAngstrom.join(" / ") +
           "\nWinkel (°): " + structure.cellAnglesDegrees.join(" / ") +
@@ -256,6 +272,9 @@
         if (variants.length > 3) button("Weitere Ansichten", () => {
           this.offset = this.offset + 3 < variants.length ? this.offset + 3 : 0;
         });
+        if (structure) button("Styles: " +
+          (F.CIF.styles.find(style => style.id === (model.fkcStyle || "ball-stick"))).title,
+          () => { this.page = "styles"; });
         button("Labels: " + (model.fkcAtomLabels === "hover" ? "Beim Anvisieren" : "Aus"), () => {
           F.AtomLabels.setMode(model, model.fkcAtomLabels === "hover" ? "off" : "hover");
         });

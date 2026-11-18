@@ -111,8 +111,7 @@
     tick: function () {
       const scene = this.el;
       const camera = scene.camera;
-      if (!camera || (F.Menu && F.Menu.opened) ||
-          (F.HandMenu && F.HandMenu.opened)) { this.clear(); return; }
+      if (!camera || (F.Menu && F.Menu.opened)) { this.clear(); return; }
       let target = null;
       const xr = scene.renderer && scene.renderer.xr;
       if (scene.is("vr-mode") || (xr && xr.getSession())) {

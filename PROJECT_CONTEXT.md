@@ -36,6 +36,10 @@ Die bestätigten Anforderungen, die lesende Bestandsaufnahme und offene Entschei
 
 Neu: `js/hand-menu.js` bietet modellbezogene Aktionen an der gegenüberliegenden Hand zur gewählten Laserhand. Öffnen durch zum Kopf gedrehte Handinnenseite (Grip-Orientierungsnäherung, 300 ms Verzögerung), Ausblenden beim Wegdrehen/Greifen. Hauptmenü behält allgemeine Einstellungen und Laserhandwahl; PC-Modellmenü bleibt als bisheriger Zugang. Nur gewählte Laserhand zeichnet, beide Hände greifen/skalierten weiterhin. Handmenü enthält Varianten, Labelumschaltung, Reset, Modellinformationen und CIF-Legende. Handmenü-, Label- und CIF-Logiktests sowie Syntaxprüfungen bestanden; keine Agenten-Gerätetests.
 
-Nächstes Arbeitspaket: **Handmenü auf Pico validieren** — Einblendbewegung, Handwahl, Variantenwechsel, Labels, Reset, Informationsseiten, Greifen/Skalieren, Hauptmenü, Zeichnen und Raumwechsel prüfen. Zunächst Ergonomie/Regressionen korrigieren, danach Auswahl/Messwerkzeuge.
+Nutzer bestätigt Handmenü mit beiden Händen. Neu: Handmenü parallel zur Kamera-/Augenebene ausgerichtet; Atomlabels auch bei geöffnetem Handmenü erlaubt. Vier CIF-Styles am C60: Ball-and-Stick, Space-Filling (C-VdW-Radius 1,70 Å), Wires (dünne Stäbe) und Capped Sticks (runde Atomkappen). Style bleibt beim Variantenwechsel erhalten; Auswahl im Handmenü unter Styles. Syntax-/Logik-/Struktur-/Styletests bestanden; sichtbarer Pico-Nachtest offen.
+
+Neue CIFs im Strukturordner bleiben unverändert und noch nicht angebunden. Co-Produkt1 enthält trikline Zelle und anisotrope ADPs; bisheriger Importer unterstützt beides noch nicht. Ellipsoid und Polyhedral nicht implementiert. YBa-CIF benötigt wegen Teilbesetzungen und Bezug auf dotierte Studie fachliche Prüfung.
+
+Nächstes Arbeitspaket: **Menüausrichtung, Labels bei offenem Menü und Styles validieren**, danach begrenzten Co-Produkt1-Import planen. Vorlesungszuordnung der neuen Modelle anhand aktueller Raumdaten klären.
 
 Zukunftsideen werden in der Umbauplanung gesammelt: unabhängige Darstellungsstile (Ball-and-Stick, Space-filling, Wires), weitere Strukturansichten und Verbindungen sowie mögliche spätere GLB-Ablösung. Aktuell keine Asset-Löschung. Nach überprüften Etappen den Nutzer ausdrücklich auf den nötigen GitHub-Desktop-Commit hinweisen; Commit/Push nur mit ausdrücklicher Zustimmung ausführen.

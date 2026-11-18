@@ -175,7 +175,9 @@
       }
 
       if (handMenuOpen) {
-        return target.type === "action" && target.el.dataset.fkcHandMenu === "true";
+        // Menüoberfläche und ausgewähltes Modell zulassen, keine Raumaktionen.
+        return (target.type === "action" && target.el.dataset.fkcHandMenu === "true") ||
+          (target.type === "model" && target.el === scene.lastSelectedModel);
       }
 
       if (

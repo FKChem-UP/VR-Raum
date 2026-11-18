@@ -71,6 +71,33 @@ assert.equal(calls[1][1].mode, "molecule");
 F.loadModelVisual(visual, "model.glb");
 assert.equal(calls[2][0], "gltf-model");
 assert.equal(components["fkc-cif-model"].schema.mode.default, "molecule");
+const atomMesh = {
+  userData: {fkcAtom: molecule.atoms[0]},
+  scale: {setScalar(value) { this.x = this.y = this.z = value; }}
+};
+const bondMesh = {userData: {fkcBond: molecule.bonds[0]}, scale: {y: 1.4}, visible: true};
+const frameMesh = {userData: {}, scale: {x: 0.035}, visible: true};
+const group = {
+  userData: {},
+  traverse(callback) { [atomMesh, bondMesh, frameMesh].forEach(callback); }
+};
+const coordinatesBefore = JSON.stringify(molecule.atoms);
+for (const style of F.CIF.styles) {
+  F.CIF.applyStyle(group, style.id);
+  assert.equal(atomMesh.scale.x, style.atomRadius);
+  assert.equal(bondMesh.scale.x, style.bondRadius);
+  assert.equal(bondMesh.visible, style.bondRadius > 0);
+  assert.equal(bondMesh.scale.y, 1.4, "Bindungslänge bleibt erhalten");
+  assert.equal(frameMesh.scale.x, 0.035, "Zellrahmen bleibt unverändert");
+  assert.equal(group.userData.fkcStyle, style.id);
+}
+assert.equal(JSON.stringify(molecule.atoms), coordinatesBefore);
+assert.throws(() => F.CIF.applyStyle(group, "ellipsoid"), /Nicht unterstützter/);
+F.CIF.applyStyle(group, "space-filling");
+assert.equal(atomMesh.scale.x, 1.70);
+F.CIF.applyStyle(group, "ball-stick");
+assert.equal(bondMesh.visible, true, "Bindungen erscheinen nach Style-Rückwechsel");
+console.log("CIF-Styletests bestanden: vier Styles, Radiuskonvention, Rückwechsel und unveränderte Strukturkoordinaten.");
 console.log("CIF-Strukturtest bestanden:", {
   molecule: [molecule.atoms.length, molecule.bonds.length],
   cell: [cell.atoms.length, cell.bonds.length],
