@@ -875,10 +875,8 @@
       });
     }, {once: true});
 
-    pending.setAttribute(
+  pending.setAttribute(
       "gltf-model",
-      "url(" + variant.model + ")"
-    );
   };
 
   /*
