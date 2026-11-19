@@ -77,6 +77,10 @@ const atomMesh = {
   scale: {setScalar(value) { this.x = this.y = this.z = value; }}
 };
 const bondMesh = {userData: {fkcBond: molecule.bonds[0]}, scale: {y: 1.4}, visible: true};
+const coloredMaterial = {};
+const neutralMaterial = {};
+bondMesh.userData.fkcElementMaterial = coloredMaterial;
+bondMesh.userData.fkcNeutralMaterial = neutralMaterial;
 const frameMesh = {userData: {}, scale: {x: 0.035}, visible: true};
 const group = {
   userData: {},
@@ -89,6 +93,7 @@ for (const style of F.CIF.styles) {
   assert.equal(bondMesh.scale.x, style.bondRadius);
   assert.equal(bondMesh.visible, style.bondRadius > 0);
   assert.equal(bondMesh.scale.y, 1.4, "Bindungslänge bleibt erhalten");
+  assert.equal(bondMesh.material, ["wires", "capped-sticks"].includes(style.id) ? coloredMaterial : neutralMaterial);
   assert.equal(frameMesh.scale.x, 0.035, "Zellrahmen bleibt unverändert");
   assert.equal(group.userData.fkcStyle, style.id);
 }
@@ -102,6 +107,11 @@ const coSource = fs.readFileSync(path.join(root, "assets/structures/Co-Produkt1.
 const coCell = F.CIF.createStructure(coSource, "cell");
 for (const bond of coCell.bonds) {
   const segments = coCell.bondSegments.filter(segment => segment.bondId === bond.id);
+  for (const half of [0, 1]) {
+    assert.ok(Math.abs(segments.filter(segment => segment.half === half)
+      .reduce((sum, segment) => sum + length(segment), 0) - bond.distanceAngstrom / 2) < 1e-8,
+      "Elementfarbgrenze liegt am echten Bindungsmittelpunkt, auch über Zellgrenzen");
+  }
   assert.ok(Math.abs(segments.reduce((sum, segment) => sum + length(segment), 0) - bond.distanceAngstrom) < 1e-8);
   for (const segment of segments) {
     for (const position of [segment.startAngstrom, segment.endAngstrom]) {

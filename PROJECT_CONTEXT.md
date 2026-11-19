@@ -1,5 +1,16 @@
 # PROJECT_CONTEXT.md
 
+## Aktueller Fortsetzungsstand (vor historischen Nachträgen lesen)
+- Arbeitskopie: `c:\Users\Eric Sperlich\Documents\GitHub\VR-Raum`, Branch main. Kein Buildsystem, A-Frame 1.4.2, keine neuen Pakete ohne Zustimmung. Commit/Push/Löschen nur ausdrücklich erlaubt; Nutzer auf GitHub-Desktop-Commit hinweisen.
+- Pico hat Priorität, PC-Featureparität später. Co-Testmodell wurde vom Nutzer als gut dargestellt bestätigt; kein pauschaler Nachweis aller Funktionen.
+- C60 Vorlesung 1: GLB/Molekül/Zelle. Co-Produkt1 Team B Station 1 linke Wand: Komplex 64 Atome/72 Bindungen, Zelle 72 Atome/76 Bindungen; freies Chlorid/Kristallwasser nur in Zelle. Begrüßungs-GLBs unverändert.
+- Aktuelles Handmenü: Gegenhand zur wählbaren Laserhand, Einblenden per Grip-Drehung, zum Viewerzentrum, 10 cm vor Hand vom Kopf weg, 0,245×0,288 m. Direkte Style-/Messbuttons, Hover/Druckfeedback und kleiner Laserpunkt. Bewegung mit offenem Handmenü erlaubt.
+- Labels standardmäßig Hover, Alle/Aus, Trigger-Pins. Konturierte Schrift ohne Rechtecke. Mehrere Distanz-/Winkel-/Torsionsmessungen erhalten; gelb/rot/blau, Winkelbogen/Torsionsebenen. Nur Einzelmolekül, Zellmessung offen. Reset löscht Messungen; Varianten-/Raumwechsel räumt auf.
+- Neueste Änderung: Wires/Capped Sticks mit elementfarbigen Bindungshälften, echtes Bindungsmittelpunkt-Splitting auch in Zelle. Analytische Atom-Trefferkugeln Radius 0,22 Å in diesen Styles; keine neue sichtbare Geometrie. C60 nun 804 Renderabschnitte statt 444, weiterhin 360 Zellbindungen. Sechs Node-Tests und Syntax-/Diffprüfung bestanden; neue Trefferfunktion nicht im echten Renderer getestet. Pico-Nachtest offen.
+- Import weiterhin begrenzt auf C60 und konkrete Co-Datei/P-1. Keine universelle CIF-Unterstützung. Nächste Co-Pakete planen: Koordinationsansicht/Polyeder, ADP-Tensoren/Ellipsoide, Umgebungswahl und Ausblenden; anschließend Salz wie NaCl und weitere Strukturklassen mit numerischen Prüfungen. 3–10 erfolgreiche Beispiele garantieren nicht beliebige CIF-Sonderfälle.
+- Vor Fortsetzung: `.clinerules/01-project.md`, diese Übersicht, `Ideen.txt`, Ende von `docs/VR_REDESIGN_PLAN.md` lesen, Git-Status prüfen, betroffene aktuelle Quelldateien vollständig lesen. Nicht auf vollständige Chat-Erinnerung vertrauen.
+- Testbefehle: `node tests/cif-model.test.cjs`, `node tests/co-structure.test.cjs`, `node tests/hand-menu.test.cjs`, `node tests/measurements.test.cjs`, `node tests/atom-labels.test.cjs`, `node tests/room-entry.test.cjs` aus Projektordner. Keine Agenten-Pico-Tests; Nutzer meldet nach tatsächlichen Tests nur Probleme, Schweigen ohne belegten Test nicht als Testausführung protokollieren.
+
 ## Zweck des VR-Raums
 Der VR-Raum wurde speziell für die Veranstaltung zur Festkörperchemie (FKC) entwickelt. Ziel ist es, interaktive und immersive Erfahrungen zu schaffen, durch die Studierende Modelle von Festkörperstrukturen und chemischen Prozessen räumlich erkunden können.
 

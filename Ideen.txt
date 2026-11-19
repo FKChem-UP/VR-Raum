@@ -256,6 +256,18 @@ IDE-42: Kleinen transparenten Laserzielpunkt auf dem Handmenü in Laserfarbe zei
   Umgesetzt: Durchmesser 3,6 mm, Opacity 0,55; nicht treffbar, Schrift möglichst
   wenig überdeckt. Pico-Nachtest offen.
 
+IDE-43: Wires/Capped-Sticks-Bindungen halb in Farbe jedes Endatoms darstellen,
+  z.B. N–C halb blau/halb grau. Umgesetzt, Farbgrenze am Bindungsmittelpunkt,
+  auch für periodische Zellabschnitte. Numerische Tests bestanden; Pico-Nachtest offen.
+IDE-44: Kleine Atome in Wires/Capped Sticks leichter treffen. Unsichtbarer
+  analytischer Trefferradius 0,22 Å statt sichtbare Kugeln vergrößern; keine
+  Bounds-/Koordinatenänderung. Auswahl eng benachbarter Atome auf Pico nachtesten.
+IDE-45: Co möglichst vollständig als Testfall ausbauen, dann Salz (z.B. NaCl),
+  dann 3–10 weitere Verbindungen, um Import zunehmend zu verallgemeinern.
+  Ziel bestätigt; Anzahl Beispiele garantiert keine universelle CIF-Unterstützung.
+Kontextpflege: Nach abgeschlossenen Paketen Compact sinnvoll; Übersicht/Ideen/Plan
+  vorher sichern, anschließend aktuellen Code erneut lesen. Erinnerung nicht garantiert.
+
 Co-Teststation jetzt sichtbar in Team B, Station 1 (linke Wand): Verbindung als
   zusammenhängende zweikernige Koordinationseinheit, 64 Atome/72 Bindungen,
   ohne freies Chlorid Cl03 und Kristallwasser O1/H2/H3; Zelle 72 Atome/76 Bindungen,

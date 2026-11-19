@@ -541,7 +541,7 @@
     return structure.bonds.flatMap(bond => {
       const start = structure.atoms[bond.a].fractional;
       const delta = bond.deltaFractional;
-      const cuts = [0, 1];
+      const cuts = [0, 0.5, 1];
 
       delta.forEach((value, axis) => {
         if (Math.abs(value) < EPS) return;
@@ -569,6 +569,9 @@
         return {
           id: bond.id + "-segment-" + (index + 1),
           bondId: bond.id,
+          a: bond.a,
+          b: bond.b,
+          half: (begin + end) / 2 < 0.5 ? 0 : 1,
           startAngstrom: point(begin),
           endAngstrom: point(end)
         };
@@ -628,6 +631,10 @@
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
         mesh.scale.x = mesh.scale.z = style.bondRadius;
+        if (mesh.userData.fkcElementMaterial) {
+          mesh.material = ["wires", "capped-sticks"].includes(styleId)
+            ? mesh.userData.fkcElementMaterial : mesh.userData.fkcNeutralMaterial;
+        }
       }
     });
     group.userData.fkcStyle = styleId;
@@ -690,11 +697,32 @@
       // Darstellungsradius, kein physikalischer Atomradius.
       mesh.scale.setScalar(0.32);
       mesh.userData.fkcAtom = atom;
+      const originalRaycast = mesh.raycast;
+      const center = new T.Vector3();
+      const worldScale = new T.Vector3();
+      const hitPoint = new T.Vector3();
+      const hitSphere = new T.Sphere();
+      // Analytische Trefferfläche, keine zusätzliche sichtbare Geometrie/Bounds.
+      mesh.raycast = function (raycaster, intersections) {
+        if (!["wires", "capped-sticks"].includes(group.userData.fkcStyle)) {
+          originalRaycast.call(this, raycaster, intersections);
+          return;
+        }
+        this.getWorldPosition(center);
+        this.getWorldScale(worldScale);
+        const localRadius = this.scale.x;
+        hitSphere.center.copy(center);
+        hitSphere.radius = Math.max(worldScale.x, worldScale.y, worldScale.z) * 0.22 / localRadius;
+        if (!raycaster.ray.intersectSphere(hitSphere, hitPoint)) return;
+        const distance = raycaster.ray.origin.distanceTo(hitPoint);
+        if (distance < raycaster.near || distance > raycaster.far) return;
+        intersections.push({distance, point: hitPoint.clone(), object: this});
+      };
 
       group.add(mesh);
     });
 
-    function rod(startArray, endArray, name, material, radius, metadata) {
+    function rod(startArray, endArray, name, material, radius, metadata, elementMaterial) {
       const start = new T.Vector3().fromArray(startArray);
       const end = new T.Vector3().fromArray(endArray);
       const direction = end.clone().sub(start);
@@ -706,13 +734,18 @@
       mesh.quaternion.setFromUnitVectors(axis, direction.normalize());
       mesh.scale.set(radius, length, radius);
       if (metadata) mesh.userData.fkcBond = metadata;
+      if (elementMaterial) {
+        mesh.userData.fkcElementMaterial = elementMaterial;
+        mesh.userData.fkcNeutralMaterial = material;
+      }
       group.add(mesh);
     }
 
     if (structure.mode === "cell") {
       structure.bondSegments.forEach(segment => rod(
         segment.startAngstrom, segment.endAngstrom,
-        segment.id, bondMaterial, 0.10, segment
+        segment.id, bondMaterial, 0.10, segment,
+        atomMaterials.get(structure.atoms[segment.half === 0 ? segment.a : segment.b].element)
       ));
       // Zwölf Kanten; Atommittelpunkte in [0, 1), Kugeln nicht beschnitten.
       structure.cellLengthsAngstrom.forEach((length, axisIndex) => {
@@ -730,11 +763,15 @@
         }));
       });
     } else {
-      structure.bonds.forEach(bond => rod(
-        structure.atoms[bond.a].positionAngstrom,
-        structure.atoms[bond.b].positionAngstrom,
-        bond.id, bondMaterial, 0.10, bond
-      ));
+      structure.bonds.forEach(bond => {
+        const start = structure.atoms[bond.a].positionAngstrom;
+        const end = structure.atoms[bond.b].positionAngstrom;
+        const midpoint = start.map((value, axis) => (value + end[axis]) / 2);
+        rod(start, midpoint, bond.id + "-a", bondMaterial, 0.10, bond,
+          atomMaterials.get(structure.atoms[bond.a].element));
+        rod(midpoint, end, bond.id + "-b", bondMaterial, 0.10, bond,
+          atomMaterials.get(structure.atoms[bond.b].element));
+      });
     }
 
     return {
