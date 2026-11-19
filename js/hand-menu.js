@@ -191,7 +191,8 @@
       }
       // An der Hand verankert, zum Kopf ausgerichtet für lesbare Beschriftung.
       // Abstand von der Hand zum Betrachter statt mitrotierender Handflächenachse.
-      this.position.addScaledVector(this.toHead, 0.07);
+      // 10 cm vom Kopf weg vor der Hand, statt zwischen Hand und Gesicht.
+      this.position.addScaledVector(this.toHead, -0.10);
       const object = this.root.object3D;
       object.position.copy(this.position);
       scene.object3D.worldToLocal(object.position);
@@ -370,7 +371,7 @@
             selected: F.Measure.enabled && F.Measure.mode === mode,
             action: () => F.Measure.toggleMode(mode)
           })));
-          button("Messung zurücksetzen", () => this.el.components["fkc-measurements"].reset());
+          button("Alle Messungen zurücksetzen", () => this.el.components["fkc-measurements"].reset());
         }
         button("Modell zurücksetzen", () => F.resetTarget(model));
         text("Legende: Atomsorten");

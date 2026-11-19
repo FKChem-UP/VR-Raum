@@ -27,7 +27,7 @@ const transform = point => [-point[1] * 4 + 3, point[0] * 4 - 7, point[2] * 4 + 
 near(F.Measure.torsion(...[[1, 0, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1]].map(transform)), 90);
 let calls = 0;
 F.getScene = () => ({components: {"fkc-measurements": {
-  reset() { calls++; }, select() { calls++; }
+  clearSelection() { calls++; }, select() { calls++; }
 }}});
 F.Menu = {blockDrawing() {}};
 assert.equal(F.Measure.click({type: "model"}), false);
@@ -62,6 +62,14 @@ const component = Object.assign({
     clearRect() {}, fillRect() {}, strokeText() {}, fillText(text) { labelText = text; }})},
   texture: {repeat: {set() {}}}
 }, components["fkc-measurements"]);
+// Geometrie-Erzeugung im Auswahltest stubben; Archivlogik separat unten prüfen.
+component.saved = [];
+component.createDisplay = function () {
+  this.points = [];
+  this.meshes = [];
+  this.root = null;
+  this.measurementMode = F.Measure.mode;
+};
 F.setStatus = () => {};
 component.reset();
 const selectAtom = index => component.select({el: root, mesh: meshes[index]});
@@ -77,12 +85,13 @@ selectAtom(3);
 assert.equal(component.points.length, 1, "Nach Ergebnis neue Auswahl");
 selectAtom(3);
 assert.equal(component.points.length, 0, "Erneuter Atomklick nimmt Auswahl zurück");
-assert.equal(labels.measureLabels.size, 0);
+assert.equal(labels.measureLabels.size, 3, "Vorige Winkelmessung behält Atomlabels");
 F.Measure.mode = "distance";
 component.select({el: root, mesh: {userData: {fkcBond: {a: 0, b: 1}}}});
 assert.equal(component.points.length, 2);
 assert.equal(labelText, "1.000 Å");
-assert.equal(labels.measureLabels.size, 2);
+assert.equal(labels.measureLabels.size, 3, "Union der Labels aus gespeicherter und aktueller Messung");
+component.disposeDisplay = function () {};
 component.reset();
 assert.equal(labels.measureLabels.size, 0, "Messreset entfernt nur Messlabels");
 F.Measure.mode = "torsion";
@@ -102,6 +111,29 @@ assert.equal(F.Measure.enabled, true);
 assert.equal(F.Measure.mode, "angle");
 F.Measure.toggleMode("angle");
 assert.equal(F.Measure.enabled, false, "Aktiver Button beendet Messmodus");
+component.saved = [];
+component.points = atoms.slice(0, 2);
+component.meshes = meshes.slice(0, 2);
+component.root = root;
+component.visual = visual;
+component.measurementMode = "distance";
+component.archive();
+assert.equal(component.saved.length, 1);
+component.points = atoms.slice(0, 3);
+component.meshes = meshes.slice(0, 3);
+component.root = root;
+component.visual = visual;
+component.measurementMode = "angle";
+component.archive();
+assert.equal(component.saved.length, 2);
+assert.equal(component.saved[0].measurementMode, "distance");
+assert.equal(component.saved[1].measurementMode, "angle");
+component.clearSelection();
+assert.equal(component.saved.length, 2, "Modusende leert nur Auswahl");
+assert.equal(labels.measureLabels.size, 3);
+component.reset();
+assert.equal(component.saved.length, 0);
+assert.equal(labels.measureLabels.size, 0);
 console.log("Distanztest bestanden: Å-Geometrie, Symmetrie und exklusive Messmodus-Weiterleitung.");
 console.log("Winkel-/Torsionstests bestanden: 0/45/90/180°, ±90°, entartete Geometrie und Transformationsinvarianz.");
 console.log("Messauswahltests bestanden: Atom-/Bindungsklicks, Messlabels, Rücknahme, kompakte Ergebnisbreite und Zell-Ausschluss.");

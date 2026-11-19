@@ -242,6 +242,24 @@ IDE-39: Bewegen und Drehen bei geöffnetem Handmenü erlauben, um Styles aus
   verschiedenen Richtungen zu betrachten. Handmenü-Navigationssperre entfernt;
   Hauptmenüsperre und Zeichensperre während Handmenü bleiben bestehen.
 
+IDE-40: Mehrere abgeschlossene Messungen gleichzeitig behalten, auch Kombination
+  Distanz/Winkel/Torsion. Umgesetzt: Ergebnisse und beteiligte Atomlabels erhalten
+  bei neuer Messung, Moduswechsel und Modusende. Alle Messungen zurücksetzen
+  entfernt Anzeigen; Geometrie-/Raumwechsel entfernt betroffene Ergebnisse.
+  Distanz gelb, Winkel rot mit Bogen, Torsion blau mit zwei transparenten
+  Dreiecken in den Ebenen A-B-C und B-C-D. Nachtest offen, Überlagerung möglich.
+
+IDE-41: Handmenü etwas weiter vom Körper, vor der Hand. Versatz jetzt 10 cm
+  von der Hand weg vom Augenmittelpunkt statt 7 cm zum Kopf hin. Nachtest offen.
+
+Rückmelderegel: Nutzer möchte nach tatsächlich erfolgtem Headset-Test nur Probleme
+  melden; keine Problemmeldung wird als Zufriedenheit behandelt. Ohne Kenntnis,
+  dass getestet wurde, keinen durchgeführten Test behaupten oder protokollieren.
+
+Co-Fortschritt: zusammenhängende Nicht-H-Einheit numerisch rekonstruiert:
+  36 Nicht-H-Atome, 44 Bindungen, zwei Co-Zentren mit je sechs Nachbarn.
+  Keine H-Zuordnung/VR-Anbindung; cif-structure.js weiterhin nicht eingebunden.
+
 Umgebungsideen aus der vorherigen Planung, noch nicht umgesetzt:
 - Ansichten Komplex/Komplexkation, lokales Ensemble mit Gegenionen/LM,
   fachlich festgelegte Formeleinheit und Koordinationsumgebung.

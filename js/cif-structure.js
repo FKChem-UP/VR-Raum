@@ -132,5 +132,63 @@
     return {atoms, bonds, operations, lengths, angles, matrix, volume,
       spaceGroup: parsed.values["_space_group_name_h-m_alt"], parsed};
   }
-  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read};
+  function reconstructCoHeavy(structure) {
+    if (structure.operations.length !== 2 ||
+        structure.operations[0].replace(/\s/g, "") !== "x,y,z" ||
+        structure.operations[1].replace(/\s/g, "") !== "-x,-y,-z") {
+      throw new Error("Co-Rekonstruktion derzeit nur für vorliegende P-1-Operationen.");
+    }
+    const sites = new Map(structure.atoms.map(atom => [atom.cifLabel, atom]));
+    const edges = new Map();
+    const add = (a, edge) => {
+      if (!edges.has(a)) edges.set(a, []);
+      edges.get(a).push(edge);
+    };
+    for (const bond of structure.bonds) {
+      let sign = 1;
+      let shift = [0, 0, 0];
+      if (bond.symmetry2 && bond.symmetry2 !== ".") {
+        const match = /^(1|2)_([0-9]{3})$/.exec(bond.symmetry2);
+        if (!match) throw new Error("Nicht unterstützter Co-Bindungscode.");
+        sign = match[1] === "2" ? -1 : 1;
+        shift = match[2].split("").map(value => Number(value) - 5);
+      }
+      add(bond.a, {label: bond.b, sign, shift, distance: bond.reportedDistanceAngstrom});
+      add(bond.b, {label: bond.a, sign, shift: shift.map(value => -sign * value), distance: bond.reportedDistanceAngstrom});
+    }
+    const start = structure.atoms.find(atom => atom.element === "Co");
+    if (!start) throw new Error("Kein Co-Zentrum gefunden.");
+    const states = [{label: start.cifLabel, sign: 1, shift: [0, 0, 0]}];
+    const key = state => state.label + ":" + state.sign + ":" + state.shift.join(",");
+    const indexes = new Map([[key(states[0]), 0]]);
+    const bonds = [];
+    const bondKeys = new Set();
+    for (let a = 0; a < states.length; a++) {
+      if (states.length > 500) throw new Error("Periodisches Netzwerk statt begrenzter Co-Einheit.");
+      const state = states[a];
+      for (const edge of edges.get(state.label) || []) {
+        const next = {label: edge.label, sign: state.sign * edge.sign,
+          shift: edge.shift.map((value, axis) => state.shift[axis] + state.sign * value)};
+        if (sites.get(next.label).element === "H") continue;
+        const id = key(next);
+        if (!indexes.has(id)) { indexes.set(id, states.length); states.push(next); }
+        const b = indexes.get(id);
+        const bondKey = [Math.min(a, b), Math.max(a, b)].join(":");
+        if (!bondKeys.has(bondKey)) {
+          bondKeys.add(bondKey);
+          bonds.push({a, b, reportedDistanceAngstrom: edge.distance});
+        }
+      }
+    }
+    const atoms = states.map((state, index) => {
+      const site = sites.get(state.label);
+      const fractional = site.fractional.map((value, axis) => state.sign * value + state.shift[axis]);
+      return {...site, id: "co-heavy-" + (index + 1), modelNumber: index + 1,
+        fractional, positionAngstrom: cartesian(fractional, structure.matrix),
+        symmetrySign: state.sign, cellShift: state.shift.slice()};
+    });
+    return {atoms, bonds, omittedHydrogen: true,
+      description: "Zusammenhängende Nicht-H-Einheit aus expliziten CIF-Bindungen; keine H-Zuordnung."};
+  }
+  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy};
 })(window.FKCVR = window.FKCVR || {});

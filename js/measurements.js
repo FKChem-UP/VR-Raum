@@ -25,8 +25,13 @@
   }
   const counts = {distance: 2, angle: 3, torsion: 4};
   const titles = {distance: "Distanz", angle: "Winkel", torsion: "Torsion"};
+  const colors = {distance: "#ffcc33", angle: "#ff5555", torsion: "#5599ff"};
+  const displayFields = ["geometry", "material", "line", "canvas", "texture", "labelMaterial",
+    "label", "haloGeometry", "haloMaterial", "halos", "rodGeometry", "rodMaterial", "rods",
+    "guideGeometry", "guideMaterial", "guide", "planeGeometry", "planeMaterial", "planes",
+    "points", "meshes", "root", "visual", "labelWidth", "measurementMode"];
   F.Measure = {
-    distance, angle, torsion, counts, titles,
+    distance, angle, torsion, counts, titles, colors,
     enabled: false,
     mode: "distance",
     toggleMode(mode) {
@@ -42,7 +47,7 @@
     setEnabled(value) {
       this.enabled = value;
       const component = F.getScene().components["fkc-measurements"];
-      if (component) component.reset();
+      if (component) component.clearSelection();
       F.Menu.blockDrawing();
     },
     click(hit) {
@@ -54,10 +59,18 @@
   };
   AFRAME.registerComponent("fkc-measurements", {
     init: function () {
+      this.saved = [];
+      this.createDisplay();
+    },
+    createDisplay: function () {
       this.points = [];
+      this.meshes = [];
+      this.root = null;
+      this.measurementMode = F.Measure.mode;
+      const color = colors[this.measurementMode];
       this.geometry = new T.BufferGeometry();
       this.geometry.setAttribute("position", new T.Float32BufferAttribute(new Array(12).fill(0), 3));
-      this.material = new T.LineBasicMaterial({color: "#ffcc33", depthTest: false});
+      this.material = new T.LineBasicMaterial({color, depthTest: false});
       this.line = new T.Line(this.geometry, this.material);
       this.line.raycast = function () {};
       this.canvas = document.createElement("canvas");
@@ -71,7 +84,7 @@
       this.label.renderOrder = 1101;
       this.el.object3D.add(this.line, this.label);
       this.haloGeometry = new T.SphereGeometry(1, 16, 12);
-      this.haloMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
+      this.haloMaterial = new T.MeshBasicMaterial({color, transparent: true,
         opacity: 0.16, depthWrite: false});
       this.halos = [];
       for (let i = 0; i < 4; i++) {
@@ -81,7 +94,7 @@
         this.halos.push(halo);
       }
       this.rodGeometry = new T.CylinderGeometry(1, 1, 1, 12);
-      this.rodMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
+      this.rodMaterial = new T.MeshBasicMaterial({color, transparent: true,
         opacity: 0.35, depthTest: false, depthWrite: false});
       this.rods = [];
       for (let i = 0; i < 3; i++) {
@@ -91,17 +104,60 @@
         this.el.object3D.add(rod);
         this.rods.push(rod);
       }
-      this.reset();
+      this.guideGeometry = new T.BufferGeometry();
+      this.guideGeometry.setAttribute("position", new T.Float32BufferAttribute(new Array(99).fill(0), 3));
+      this.guideMaterial = new T.LineBasicMaterial({color, depthTest: false});
+      this.guide = new T.Line(this.guideGeometry, this.guideMaterial);
+      this.guide.raycast = function () {};
+      this.guide.renderOrder = 1003;
+      this.el.object3D.add(this.guide);
+      this.planeGeometry = new T.BufferGeometry();
+      this.planeGeometry.setAttribute("position", new T.Float32BufferAttribute(new Array(18).fill(0), 3));
+      this.planeMaterial = new T.MeshBasicMaterial({color, transparent: true, opacity: 0.12,
+        side: T.DoubleSide, depthTest: false, depthWrite: false});
+      this.planes = new T.Mesh(this.planeGeometry, this.planeMaterial);
+      this.planes.raycast = function () {};
+      this.planes.renderOrder = 1000;
+      this.el.object3D.add(this.planes);
+      this.hideDisplay();
     },
-    reset: function () {
+    hideDisplay: function () {
+      this.line.visible = this.label.visible = this.guide.visible = this.planes.visible = false;
+      this.halos.concat(this.rods).forEach(object => { object.visible = false; });
+    },
+    clearSelection: function () {
       this.points = [];
       this.root = null;
       this.meshes = [];
-      this.line.visible = this.label.visible = false;
-      if (this.halos) this.halos.forEach(halo => { halo.visible = false; });
-      if (this.rods) this.rods.forEach(rod => { rod.visible = false; });
+      if (this.guide) this.hideDisplay();
+      else this.line.visible = this.label.visible = false;
+      this.syncLabels();
+    },
+    syncLabels: function () {
       const labels = this.el.components["fkc-atom-labels"];
-      if (labels && labels.measureLabels) labels.measureLabels.clear();
+      if (!labels) return;
+      if (!labels.measureLabels) labels.measureLabels = new Map();
+      labels.measureLabels.clear();
+      [...(this.saved || []), this].forEach(record => {
+        (record.meshes || []).forEach((mesh, i) => labels.measureLabels.set(mesh,
+          {root: record.root, atom: record.points[i]}));
+      });
+    },
+    reset: function () {
+      const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
+      for (const record of this.saved || []) {
+        Object.assign(this, record);
+        this.disposeDisplay();
+      }
+      Object.assign(this, active);
+      this.saved = [];
+      this.clearSelection();
+    },
+    archive: function () {
+      if (this.points.length !== counts[this.measurementMode]) return;
+      this.saved.push(Object.fromEntries(displayFields.map(key => [key, this[key]])));
+      this.createDisplay();
+      this.syncLabels();
     },
     select: function (hit) {
       const visual = hit.el.querySelector(".model-visual");
@@ -115,8 +171,15 @@
       const atom = hit.mesh.userData.fkcAtom;
       if (!atom && !(F.Measure.mode === "distance" && bond &&
           Number.isInteger(bond.a) && Number.isInteger(bond.b))) return;
-      if (this.root !== hit.el || this.points.length === required ||
-          (F.Measure.mode === "distance" && bond)) this.reset();
+      // Abgeschlossene Anzeigen erhalten; nur Auswahl für neue Messung leeren.
+      if (this.root && this.root !== hit.el) this.clearSelection();
+      if (this.points.length === counts[this.measurementMode]) this.archive();
+      if (F.Measure.mode === "distance" && bond) this.clearSelection();
+      this.measurementMode = F.Measure.mode;
+      if (this.material) {
+        [this.material, this.haloMaterial, this.rodMaterial, this.guideMaterial, this.planeMaterial]
+          .forEach(material => material.color.set(colors[this.measurementMode]));
+      }
       this.root = hit.el;
       this.visual = visual;
       const meshes = new Map();
@@ -133,13 +196,7 @@
         } else this.points.push(atom);
       } else return;
       this.meshes = this.points.map(atom => meshes.get(atom.id));
-      const labels = this.el.components["fkc-atom-labels"];
-      if (labels) {
-        if (!labels.measureLabels) labels.measureLabels = new Map();
-        labels.measureLabels.clear();
-        this.meshes.forEach((mesh, i) => labels.measureLabels.set(mesh,
-          {root: this.root, atom: this.points[i]}));
-      }
+      this.syncLabels();
       this.line.visible = this.label.visible = false;
       if (this.points.length !== required) {
         F.setStatus(titles[F.Measure.mode] + ": " + this.points.length + "/" + required + " Atome gewählt.");
@@ -160,18 +217,35 @@
       ctx.strokeStyle = "#173527";
       ctx.lineWidth = 7;
       ctx.lineJoin = "round";
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = colors[this.measurementMode];
       ctx.font = "bold 52px Arial";
       ctx.textAlign = "center";
       ctx.strokeText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       ctx.fillText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       this.texture.needsUpdate = true;
       F.setStatus(titles[F.Measure.mode] + ": " + text);
+      // Sofort archivieren: Modus-Aus und nächste Messung erhalten dieses Ergebnis.
+      if (this.saved && this.geometry) this.archive();
     },
     tick: function () {
+      const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
+      const valid = [];
+      for (const record of this.saved) {
+        Object.assign(this, record);
+        if (this.validDisplay()) { this.updateDisplay(); valid.push(record); }
+        else this.disposeDisplay();
+      }
+      Object.assign(this, active);
+      this.saved = valid;
+      if (this.root && !this.validDisplay()) this.clearSelection();
+      this.updateDisplay();
+      this.syncLabels();
+    },
+    validDisplay: function () {
+      return this.root && this.root.isConnected && this.root.querySelector(".model-visual") === this.visual;
+    },
+    updateDisplay: function () {
       if (!this.root) return;
-      if (!this.root.isConnected || this.root.querySelector(".model-visual") !== this.visual ||
-          this.el.lastSelectedModel !== this.root) { this.reset(); return; }
       if (!this.el.camera || !this.meshes) return;
       const visible = !(F.Menu && F.Menu.opened);
       const positions = this.meshes.map(mesh => {
@@ -199,7 +273,7 @@
         const radius = Math.max(scale.x, scale.y, scale.z) * 0.4;
         rod.scale.set(radius, length, radius);
       });
-      if (this.points.length !== counts[F.Measure.mode]) {
+      if (this.points.length !== counts[this.measurementMode]) {
         this.line.visible = this.label.visible = false;
         return;
       }
@@ -222,9 +296,35 @@
       this.label.position.copy(this.el.object3D.worldToLocal(centerWorld));
       this.label.scale.set(height * this.labelWidth / 128, height, 1);
       this.line.visible = this.label.visible = visible;
+      this.guide.visible = this.planes.visible = false;
+      if (this.measurementMode === "angle") {
+        const [a, b, c] = positions;
+        const u = a.clone().sub(b);
+        const v = c.clone().sub(b);
+        const normal = u.clone().cross(v);
+        if (normal.lengthSq() > 1e-16) {
+          const radius = Math.min(u.length(), v.length()) * 0.3;
+          const sweep = u.angleTo(v);
+          u.normalize(); normal.normalize();
+          const attr = this.guideGeometry.attributes.position;
+          for (let i = 0; i <= 32; i++) {
+            const p = u.clone().applyAxisAngle(normal, sweep * i / 32).multiplyScalar(radius).add(b);
+            attr.setXYZ(i, p.x, p.y, p.z);
+          }
+          attr.needsUpdate = true;
+          this.guideGeometry.computeBoundingSphere();
+          this.guide.visible = visible;
+        }
+      } else if (this.measurementMode === "torsion") {
+        const attr = this.planeGeometry.attributes.position;
+        [positions[0], positions[1], positions[2], positions[1], positions[2], positions[3]]
+          .forEach((p, i) => attr.setXYZ(i, p.x, p.y, p.z));
+        attr.needsUpdate = true;
+        this.planeGeometry.computeBoundingSphere();
+        this.planes.visible = visible;
+      }
     },
-    remove: function () {
-      this.reset();
+    disposeDisplay: function () {
       this.halos.concat(this.rods).forEach(object => this.el.object3D.remove(object));
       this.haloGeometry.dispose();
       this.haloMaterial.dispose();
@@ -235,6 +335,15 @@
       this.material.dispose();
       this.texture.dispose();
       this.labelMaterial.dispose();
+      this.el.object3D.remove(this.guide, this.planes);
+      this.guideGeometry.dispose();
+      this.guideMaterial.dispose();
+      this.planeGeometry.dispose();
+      this.planeMaterial.dispose();
+    },
+    remove: function () {
+      this.reset();
+      this.disposeDisplay();
     }
   });
 })(window.FKCVR);

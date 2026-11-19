@@ -29,6 +29,22 @@ assert.throws(() => api.symmetryPoint([0, 0, 0], "alert(x),y,z"), /Symmetrieterm
 const cubic = api.cellMatrix([2, 2, 2], [90, 90, 90]);
 const point = api.cartesian([0.5, 0.5, 0.5], cubic);
 assert.ok(point.every(value => Math.abs(value - 1) < 1e-10));
+const complex = api.reconstructCoHeavy(structure);
+assert.equal(complex.atoms.filter(atom => atom.element === "Co").length, 2);
+assert.ok(complex.atoms.every(atom => atom.element !== "H"));
+assert.equal(new Set(complex.atoms.map(atom => atom.id)).size, complex.atoms.length);
+for (const bond of complex.bonds) {
+  const a = complex.atoms[bond.a].positionAngstrom;
+  const b = complex.atoms[bond.b].positionAngstrom;
+  assert.ok(Math.abs(Math.hypot(...b.map((value, i) => value - a[i])) -
+    bond.reportedDistanceAngstrom) < 0.005);
+}
+for (let i = 0; i < complex.atoms.length; i++) {
+  if (complex.atoms[i].element !== "Co") continue;
+  assert.equal(complex.bonds.filter(bond => bond.a === i || bond.b === i).length, 6);
+}
+console.log("Co-Nicht-H-Rekonstruktion bestanden:", complex.atoms.length, "Atome,", complex.bonds.length,
+  "Bindungen, zwei Co-Zentren mit je sechs Nachbarn. Noch keine H-Rekonstruktion oder VR-Anbindung.");
 console.log("Co-Strukturgrundlage bestanden:", {
   asymmetricSites: structure.atoms.length,
   nonHydrogenSites: structure.atoms.filter(atom => atom.element !== "H").length,
