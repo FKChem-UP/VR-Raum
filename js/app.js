@@ -261,7 +261,6 @@
     };
 
     navigation.tick = function (time, delta) {
-      if (F.HandMenu && F.HandMenu.opened) return;
       /*
        * PC- und bisheriger VR-Ablauf bleiben erhalten.
        * Für AR ohne vr-mode ergänzen wir denselben Joystickablauf.

@@ -104,6 +104,14 @@ assert.equal(mode, "angle");
 assert.equal(enabled, true);
 angleButton.action();
 assert.equal(enabled, false);
+const uv = {x: (distanceButton.x + distanceButton.w / 2) / 768,
+  y: 1 - (distanceButton.y + distanceButton.h / 2) / 900};
+assert.equal(menu.buttonIndex(uv), 8);
+assert.equal(menu.buttonIndex({x: 0, y: 0}), -1);
+menu.hoverIndex = 8;
+menu.pressedIndex = 8;
+menu.render(structure);
+assert.equal(menu.buttons.length, 13, "Hover/Druck verändert Trefferbereiche nicht");
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

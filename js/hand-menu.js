@@ -76,6 +76,9 @@
       this.offset = 0;
       this.infoOffset = 0;
       this.lastClick = -Infinity;
+      this.hoverIndex = -1;
+      this.pressedIndex = -1;
+      this.pressUntil = -Infinity;
       this.buttons = [];
       this.position = new T.Vector3();
       this.head = new T.Vector3();
@@ -116,9 +119,6 @@
       this.root.object3D.visible = false;
       if (wasOpen) {
         F.Menu.blockDrawing();
-        const navigation = F.getNavigation();
-        if (navigation) navigation.cancel();
-        if (F.Comfort) F.Comfort.reset();
         F.invalidateHits();
       }
     },
@@ -201,12 +201,25 @@
       object.lookAt(this.head);
       object.visible = true;
       object.updateWorldMatrix(true, true);
+      const laser = document.getElementById(laserHand() + "Hand");
+      const tools = laser && laser.components["fkc-controller"];
+      let hoverIndex = -1;
+      if (tools && tools.source) {
+        // Aktuelle Pose verwenden, nicht den Treffer des vorigen Frames.
+        tools.updateRay();
+        const hit = F.findHit(tools.raycaster, true);
+        if (hit && hit.el === this.root && hit.uv) {
+          hoverIndex = this.buttonIndex(hit.uv);
+        }
+      }
+      this.hoverIndex = hoverIndex;
+      if (performance.now() >= this.pressUntil) this.pressedIndex = -1;
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
-        F.Measure && F.Measure.mode].join("|");
+        F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex].join("|");
       if (signature !== this.signature) {
         this.signature = signature;
         this.render(structure);
@@ -217,15 +230,22 @@
       if (!F.HandMenu.opened || !hit.uv || selectedModel(this.el) !== this.model) return;
       const time = performance.now();
       if (time - this.lastClick < 250) return;
-      const x = hit.uv.x * WIDTH;
-      const y = (1 - hit.uv.y) * HEIGHT;
-      const button = this.buttons.find(b => x >= b.x && x <= b.x + b.w &&
-        y >= b.y && y <= b.y + b.h);
+      const index = this.buttonIndex(hit.uv);
+      const button = this.buttons[index];
       if (!button) return;
       this.lastClick = time;
+      this.pressedIndex = index;
+      this.pressUntil = time + 180;
       F.Menu.blockDrawing();
       button.action();
       this.signature = "";
+    },
+
+    buttonIndex: function (uv) {
+      const x = uv.x * WIDTH;
+      const y = (1 - uv.y) * HEIGHT;
+      return this.buttons.findIndex(b => x >= b.x && x <= b.x + b.w &&
+        y >= b.y && y <= b.y + b.h);
     },
 
     render: function (structure) {
@@ -248,11 +268,20 @@
       };
       const button = (label, action, selected = false) => {
         const b = {x: 28, y, w: 712, h: 40, action};
-        ctx.fillStyle = selected ? "#b9dcc4" : "#d5e2d9";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
+        const index = this.buttons.length;
+        const pressed = this.pressedIndex === index;
+        const hovered = this.hoverIndex === index;
+        const shift = pressed ? 4 : 0;
+        ctx.fillStyle = "#8c9b92";
+        ctx.fillRect(b.x, b.y + 4, b.w, b.h);
+        ctx.fillStyle = pressed ? "#f3bcbc" : hovered ? "#fff0b8" : selected ? "#b9dcc4" : "#d5e2d9";
+        ctx.fillRect(b.x, b.y + shift, b.w, b.h);
+        ctx.strokeStyle = hovered ? "#b57c00" : "#82988a";
+        ctx.lineWidth = hovered ? 4 : 2;
+        ctx.strokeRect(b.x, b.y + shift, b.w, b.h);
         ctx.fillStyle = "#173527";
         ctx.font = "29px Arial";
-        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 29, 677);
+        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 29 + shift, 677);
         this.buttons.push(b);
         y += 46;
       };
@@ -262,18 +291,22 @@
         entries.forEach((entry, index) => {
           const x = 28 + index * (w + 12);
           const selected = !!entry.selected;
-          const shift = selected ? 5 : 0;
+          const buttonIndex = this.buttons.length;
+          const pressed = this.pressedIndex === buttonIndex;
+          const hovered = this.hoverIndex === buttonIndex;
+          const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
           ctx.fillRect(x, y + 5, w, 92);
-          ctx.fillStyle = selected ? "#f3bcbc" : "#d5e2d9";
+          ctx.fillStyle = pressed ? "#e99d9d" : selected ? "#f3bcbc" : hovered ? "#fff0b8" : "#d5e2d9";
           ctx.fillRect(x, y + shift, w, 87);
-          ctx.strokeStyle = selected ? "#a34444" : "#82988a";
-          ctx.lineWidth = selected ? 3 : 2;
+          ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
+          ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
           ctx.strokeRect(x, y + shift, w, 87);
           const atomCount = entry.count || 2;
           const points = [];
           for (let i = 0; i < atomCount; i++) {
-            points.push([x + w * (0.22 + i * 0.56 / (atomCount - 1)),
+            points.push([entry.kind === "space-filling" ? x + w / 2 + (i === 0 ? -10 : 10) :
+              x + w * (0.22 + i * 0.56 / (atomCount - 1)),
               y + shift + 27 + (atomCount > 2 && i % 2 ? 12 : 0)]);
           }
           if (entry.kind !== "space-filling") {
@@ -283,8 +316,8 @@
             points.forEach(([px, py], i) => { if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
             ctx.stroke();
           }
-          points.forEach(([px, py]) => {
-            ctx.fillStyle = "#486e56";
+          points.forEach(([px, py], i) => {
+            ctx.fillStyle = entry.kind === "space-filling" && i === 1 ? "#78a486" : "#486e56";
             ctx.beginPath();
             ctx.arc(px, py, entry.kind === "space-filling" ? 17 : entry.kind === "wires" ? 3 : 8, 0, Math.PI * 2);
             ctx.fill();

@@ -233,6 +233,31 @@ IDE-36: Keine Handmenü-Untermenüs; direkte Symbolbuttons für Messung und Styl
   lange Modelltexte nicht mehr als Hand-Unterseite, weiterhin im bisherigen Menü.
   Gelbe Aura blasser (0,16), Messstäbe 0,35. Umsetzung lokal, Pico-Nachtest offen.
 
+IDE-37: Space-Filling-Symbol mit eindeutig überlappenden Kugeln. Umgesetzt mit
+  überlappenden, verschieden getönten Kreisen; Pico-Nachtest offen.
+IDE-38: Alle Handmenübuttons beim Anvisieren highlighten und beim Drücken kurz
+  animieren, auch Reset. Umgesetzt: goldener Hoverrahmen/helle Fläche, circa
+  180 ms Druckzustand; aktive Mess-/Styleauswahl weiterhin hellrot.
+IDE-39: Bewegen und Drehen bei geöffnetem Handmenü erlauben, um Styles aus
+  verschiedenen Richtungen zu betrachten. Handmenü-Navigationssperre entfernt;
+  Hauptmenüsperre und Zeichensperre während Handmenü bleiben bestehen.
+
+Umgebungsideen aus der vorherigen Planung, noch nicht umgesetzt:
+- Ansichten Komplex/Komplexkation, lokales Ensemble mit Gegenionen/LM,
+  fachlich festgelegte Formeleinheit und Koordinationsumgebung.
+- Umgebungsvorschau transparent anzeigen, Reichweite wählbar (z.B. 1/1,5/2 Å,
+  weitere sinnvolle Kontaktreichweiten prüfen), Kandidaten anklicken/übernehmen;
+  beim Ausschalten verschwinden nicht übernommene Kandidaten.
+- Einzelatome oder ganze Moleküle/Ionen reversibel hinzufügen/ausblenden;
+  Radius als Kontaktfilter, nicht als universelle Bindungsregel.
+- Zuordnung und Ladungen sowie Wahl der Gegenionen/LM fachlich abstimmen.
+
+Co-Umsetzung begonnen: separates, noch nicht in VR eingebundenes Modul
+js/cif-structure.js liest mehrzeilige Felder, Atom-/ADP-/Bindungstabellen,
+trikline Zellmatrix und P-1-Symmetriecodes. Numerische Tests bestanden.
+Nächste Etappe: vollständige Komplexrekonstruktion und CIF-Teststation in Team B,
+GLBs erhalten; H-Bindungen/Bestandteile noch absichern.
+
 Neueste Rückmeldung: Nutzer meldet vorherigen Distanz-/Labelprototyp als funktionierend.
 Handmenü nochmals um etwa 10 % auf 0,245×0,288 m verkleinert; Nachtest offen.
 
