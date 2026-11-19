@@ -70,9 +70,13 @@ assert.equal(F.HandMenu.readViewerHead(fallback, null, position), true);
 assert.equal(cameraUpdated, true);
 assert.equal(F.HandMenu.readViewerHead({}, null, position), false);
 const ctx = {};
+const drawnTexts = [];
+const drawnRectangles = [];
 for (const method of ["fillRect", "fillText", "strokeRect", "beginPath", "moveTo", "lineTo", "stroke", "arc", "fill"]) {
   ctx[method] = function () {};
 }
+ctx.fillText = function (text, x, y) { drawnTexts.push({text, x, y}); };
+ctx.fillRect = function (x, y, w, h) { drawnRectangles.push({x, y, w, h}); };
 let mode = "distance";
 let enabled = false;
 F.Measure = {
@@ -117,6 +121,12 @@ menu.render({mode: "coordination", atoms: new Array(7), polyhedra: [{}], spaceGr
 assert.equal(menu.buttons.length, 14, "Koordinationsansicht bietet fünf Styles und Messungen");
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
 menu.buttons[7].action(); // Polyhedral-Style direkt erreichbar.
+for (const entry of drawnTexts.filter(entry => /^(Styles|Messen|Legende)/.test(entry.text))) {
+  assert.ok(drawnRectangles.filter(rectangle => rectangle.y >= entry.y)
+    .every(rectangle => rectangle.y >= entry.y + 10),
+    "Überschrift inklusive Unterlängen mit Abstand zur nächsten Fläche: " + entry.text);
+}
+assert.ok(drawnTexts.every(entry => entry.y <= 890), "Auch Legende und Kurzinfo passen auf die Menüfläche");
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

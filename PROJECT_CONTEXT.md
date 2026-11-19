@@ -1,6 +1,7 @@
 # PROJECT_CONTEXT.md
 
 ## Aktueller Fortsetzungsstand (vor historischen Nachträgen lesen)
+- Neueste Rückmeldung: Nutzer bestätigt gute Co-Koordinations-/Polyederdarstellung auf Pico. Überschriften im Handmenü teilweise übermalt; Zeilenabstand von 30 auf 44 Canvaspixel korrigiert, physische Menügröße gleich. Layouttests und Pico-Nachtest unterscheiden. Neue Wünsche: Zahnrad-Einstellungsseite (Menügröße, Bindungsfarben, später Kontakt-/H-Brückenparameter), Umgebungsauswahl und H-Brücken. Noch nicht implementiert; nächstes Paket gemeinsam festlegen, Empfehlung Umgebung vor H-Brücken.
 - Arbeitskopie: `c:\Users\Eric Sperlich\Documents\GitHub\VR-Raum`, Branch main. Kein Buildsystem, A-Frame 1.4.2, keine neuen Pakete ohne Zustimmung. Commit/Push/Löschen nur ausdrücklich erlaubt; Nutzer auf GitHub-Desktop-Commit hinweisen.
 - Pico hat Priorität, PC-Featureparität später. Co-Testmodell wurde vom Nutzer als gut dargestellt bestätigt; kein pauschaler Nachweis aller Funktionen.
 - C60 Vorlesung 1: GLB/Molekül/Zelle. Co-Produkt1 Team B Station 1 linke Wand: Komplex 64 Atome/72 Bindungen, Zelle 72 Atome/76 Bindungen; freies Chlorid/Kristallwasser nur in Zelle. Neu: Koordinationsumgebung eines Co, 7 Atome/6 Bindungen (Co, 2 N, 2 O, 2 Cl). Original-IDs/Labels/Modellnummern und Symmetrieabbilder erhalten; nur Positionen zum Co-Zentrum verschoben. Begrüßungs-GLBs unverändert.

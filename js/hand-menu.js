@@ -278,7 +278,9 @@
         ctx.fillStyle = "#203f30";
         ctx.font = "28px Arial";
         ctx.fillText(value, 28, y + 30, 710);
-        y += 30;
+        // Platz unter der Schriftgrundlinie für Unterlängen und Abstand zur
+        // nächsten Button-/Legendenfläche, damit diese den Text nicht übermalt.
+        y += 44;
       };
       const button = (label, action, selected = false) => {
         const b = {x: 28, y, w: 712, h: 40, action};

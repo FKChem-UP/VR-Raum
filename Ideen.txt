@@ -352,7 +352,23 @@ IDE-46: Co-Koordinationsumgebung und danach Polyhedral-Style umsetzen.
   7 Atome/6 Bindungen. Polyhedral in Komplex und Koordinationsansicht,
   transparente konvexe Hüllen aus echten Nachbarpositionen, kein Idealoktaeder.
   Labels und Messungen im Ausschnitt erhalten. Zellpolyeder noch nicht umgesetzt.
-  Numerische und Logiktests bestanden; Pico-Nachtest der neuen Ansichten offen.
+  Numerische und Logiktests bestanden; Nutzer bestätigt gute Darstellung/Gefallen
+  der Koordinationsansicht und Polyeder nach Pico-Test. Kein pauschaler Regressionstest.
+
+IDE-47: Handmenüüberschriften Styles/Messen/Legende nicht von nachfolgenden
+  Buttons oder Legende übermalen lassen. Textzeilenabstand lokal vergrößert,
+  physische Menügröße unverändert. Layouttest; neuer Pico-Nachtest offen.
+IDE-48: Zahnrad am Handmenü mit separater Einstellungsseite erwünscht:
+  Menügröße größer/kleiner, Bindungsfarbe; eventuell Umgebungsradius und
+  H-Brücken-Grenzwerte. Noch nicht umgesetzt. Ausnahme vom früheren Wunsch
+  nach keinerlei Unterseiten: Arbeitswerkzeuge bleiben direkt, Einstellungen
+  könnten getrennt sein. Globale Komfort-/Lasereinstellungen bleiben Hauptmenü.
+  Bindungsfarbe: einheitlicher Farbwert vs. Endatomfarben als Modus klären.
+IDE-49: Umgebung einblenden, Kandidaten auswählen und beim Ausschalten nur
+  übernommene Ergänzungen behalten; H-Brücken anzeigen ebenfalls ausdrücklich
+  gewünscht. Umgebungsidee schon früher beschrieben, weiter offen. Empfehlung:
+  zunächst periodische Umgebungskandidaten/Radius/Übernahme, danach fachliche
+  Donor-Akzeptor- und Winkelregeln für H-Brücken, nicht nur ein Distanzlimit.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
