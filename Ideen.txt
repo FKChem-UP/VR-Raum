@@ -182,6 +182,16 @@ IDE-26: Raum über Poster erst nach 1 Sekunde ununterbrochenem Drücken betreten
   bricht ab. Status: PC-/VR-Haltebestätigung lokal implementiert, Gerätetest offen.
   Hauptmenü-Raumwahl und Browser-Raumauswahl bleiben unverändert.
 
+IDE-27: Pico-Priorität: zunächst Pico-Ansicht und Bedienung fertigstellen;
+  PC-/weitere Browser-/Headset-Parität danach, vorhandene PC-Funktionen erhalten.
+  Separater Betreten-Ladebalken war auf Pico nicht sichtbar. Fortschritt jetzt
+  direkt im weißen Türsymbol und Schriftzug: schwarze Füllung von unten nach
+  oben während 1 Sekunde, bei Abbruch wieder weiß. Pico-Nachtest offen.
+
+IDE-28: Atomlabel-Rechteck passend zur Textmenge, z.B. C1 schmaler als Cl12.
+  Status: Canvas-Textbreite gemessen, seitliche Polsterung und passende
+  Sprite-Breite; gleiche Texthöhe unabhängig von Label-Länge. Pico-Nachtest offen.
+
 Aktuelle Rückmeldung: Handmenüausrichtung vom Nutzer als gut bestätigt.
 Co-Produkt1.cif wurde vom Nutzer um HKL-Reflexzeilen gekürzt; jetzt 19304 Bytes
 und 476 Zeilen. Koordinaten, Bindungstabelle und anisotrope ADPs vorhanden;

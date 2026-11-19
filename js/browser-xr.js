@@ -337,6 +337,32 @@
 
     const texture = new T.CanvasTexture(canvas);
 
+    // Dieselbe Schrift-/Symbolgeometrie in Schwarz erneut zeichnen, aber
+    // nur unterhalb der steigenden Füllgrenze. Hintergrund bleibt transparent.
+    const whiteImage = document.createElement("canvas");
+    whiteImage.width = canvas.width;
+    whiteImage.height = canvas.height;
+    whiteImage.getContext("2d").drawImage(canvas, 0, 0);
+    component.setEntryProgress = progress => {
+      const fill = Math.max(0, Math.min(1, progress));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(whiteImage, 0, 0);
+      ctx.save();
+      ctx.beginPath();
+      // Symbol inklusive Konturen: y=44 bis 230.
+      const top = 230 - 186 * fill;
+      ctx.rect(0, top, canvas.width, canvas.height - top);
+      ctx.clip();
+      drawSymbol("#000000", 10);
+      ctx.font = "bold 104px Arial, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#000000";
+      ctx.fillText("Betreten", 268, 138);
+      ctx.restore();
+      texture.needsUpdate = true;
+    };
+
     if ("colorSpace" in texture && T.SRGBColorSpace) {
       texture.colorSpace = T.SRGBColorSpace;
     } else if (T.sRGBEncoding) {

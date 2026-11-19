@@ -40,13 +40,17 @@ const originalMaterial = {
 };
 mesh.material = originalMaterial;
 const component = Object.assign({
-  active: null, label: {visible: false}, texture: {},
-  labelCanvas: {getContext: () => ({clearRect() {}, fillRect() {}, strokeRect() {}, fillText() {}})}
+  active: null, label: {visible: false}, texture: {repeat: {set() {}}},
+  labelCanvas: {getContext: () => ({measureText: text => ({width: text.length * 32}),
+    clearRect() {}, fillRect() {}, strokeRect() {}, fillText() {}})}
 }, components["fkc-atom-labels"]);
 const target = F.AtomLabels.atomFromHit(hit);
 component.show(target);
 assert.notEqual(mesh.material, originalMaterial);
 assert.equal(component.label.visible, true);
+assert.equal(component.labelWidth, 112);
+assert.ok(F.AtomLabels.labelWidth(4 * 32) > F.AtomLabels.labelWidth(2 * 32));
+assert.equal(F.AtomLabels.labelWidth(9999), 768);
 component.show(target);
 assert.equal(clones, 1, "Kein neues Material pro Frame");
 const second = {...mesh, material: originalMaterial};

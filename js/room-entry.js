@@ -106,6 +106,7 @@
     },
 
     cancel: function () {
+      this.updateHints(0);
       this.state.target = null;
       this.mousePressed = false;
       this.pointerId = null;
@@ -114,6 +115,11 @@
     },
 
     draw: function (progress) {
+      this.updateHints(progress);
+      if (this.inVR()) {
+        this.label.visible = false;
+        return;
+      }
       const ctx = this.canvas.getContext("2d");
       ctx.clearRect(0, 0, 512, 160);
       ctx.fillStyle = "#173527";
@@ -130,6 +136,13 @@
       ctx.fillRect(20, 108, 472 * progress, 30);
       this.texture.needsUpdate = true;
       this.label.visible = true;
+    },
+
+    updateHints: function (progress) {
+      this.el.querySelectorAll("[fkc-gallery-entry-hint]").forEach(el => {
+        const hint = el.components["fkc-gallery-entry-hint"];
+        if (hint && hint.setEntryProgress) hint.setEntryProgress(progress);
+      });
     },
 
     tick: function () {
@@ -156,6 +169,7 @@
       if ((F.Menu && F.Menu.opened) || (F.HandMenu && F.HandMenu.opened)) pressed = false;
       const result = advance(this.state, poster(hit), pressed, performance.now());
       if (result.complete) {
+        this.draw(1);
         const roomId = this.roomId;
         this.cancel();
         if (F.Menu) F.Menu.blockDrawing();

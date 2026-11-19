@@ -46,6 +46,8 @@ Nutzer bestätigt gute Handmenüausrichtung. Neu: Labels zeigen nur Original-CIF
 
 Nächstes Arbeitspaket: **Poster-Haltebestätigung nachtesten**, anschließend **Distanzmessung am CIF-C60-Einzelkäfig** planen/umsetzen: zwei Atome per Trigger wählen, Distanz in Å, auch nicht gebundene Atome, Rücknahme/Neustart/Beenden, keine gleichzeitige Zeichenaktion. Noch kein Messcode umgesetzt. Winkel und periodische Zellmessungen danach; Co-Produkt1-Import als separate spätere Etappe. Vorlesungszuordnung neuer Modelle vor Anbindung klären.
 
+Aktuelle Priorität: zunächst Pico fertigstellen, PC-/weitere Geräteparität später; bestehende PC-Funktionen erhalten. Nutzer meldet separaten Posterfortschrittsbalken auf Pico unsichtbar. Neue Anzeige integriert in bestehenden Tür-/Betreten-Hinweis: Weiß wird beim Halten von unten nach oben schwarz, Abbruch setzt zurück. Atomlabel-Hintergrund jetzt an gemessene Textbreite angepasst, statt breitem Festformat. Nachtest auf Pico offen; Logiktests ersetzen kein Rendering.
+
 Fortsetzung nach Kontextkomprimierung oder neuem Chat: zuerst diese Übersicht, `.clinerules/01-project.md`, `Ideen.txt` und `docs/VR_REDESIGN_PLAN.md` lesen, Git-Status prüfen und betroffene aktuelle Quelldateien vollständig lesen. Frühere Chat-/Dateiinhalte nicht als vollständig verfügbar voraussetzen. Keine Commits/Pushes oder Asset-Löschungen ohne Zustimmung.
 
 Zukunftsideen werden in der Umbauplanung gesammelt: unabhängige Darstellungsstile (Ball-and-Stick, Space-filling, Wires), weitere Strukturansichten und Verbindungen sowie mögliche spätere GLB-Ablösung. Aktuell keine Asset-Löschung. Nach überprüften Etappen den Nutzer ausdrücklich auf den nötigen GitHub-Desktop-Commit hinweisen; Commit/Push nur mit ausdrücklicher Zustimmung ausführen.

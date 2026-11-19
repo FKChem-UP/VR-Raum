@@ -20,6 +20,7 @@
   F.AtomLabels = {
     atomFromHit,
     text: atom => atom.cifLabel,
+    labelWidth: measuredWidth => Math.min(768, Math.max(72, Math.ceil(measuredWidth) + 48)),
     setMode(root, mode) {
       if (!root || !["off", "hover"].includes(mode)) return;
       root.fkcAtomLabels = mode;
@@ -92,17 +93,23 @@
         this.highlightMaterial.emissive.set("#624000");
         target.mesh.material = this.highlightMaterial;
         const ctx = this.labelCanvas.getContext("2d");
+        ctx.font = "bold 56px Arial";
+        const text = F.AtomLabels.text(target.atom);
+        this.labelWidth = F.AtomLabels.labelWidth(ctx.measureText(text).width);
+        // Feste Texturgröße, nur den belegten Bereich abbilden: keine
+        // Textur-Neuanlage bei jedem Atomwechsel, konstante Schriftgröße.
+        this.texture.repeat.set(this.labelWidth / 768, 1);
         ctx.clearRect(0, 0, 768, 128);
         ctx.fillStyle = "#172a22";
-        ctx.fillRect(0, 0, 768, 128);
+        ctx.fillRect(0, 0, this.labelWidth, 128);
         ctx.strokeStyle = "#ffcc33";
         ctx.lineWidth = 5;
-        ctx.strokeRect(3, 3, 762, 122);
+        ctx.strokeRect(3, 3, this.labelWidth - 6, 122);
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 56px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(F.AtomLabels.text(target.atom), 384, 64, 730);
+        ctx.fillText(text, this.labelWidth / 2, 64, this.labelWidth - 32);
         this.texture.needsUpdate = true;
       }
       this.label.visible = true;
@@ -139,13 +146,14 @@
       camera.getWorldPosition(this.cameraPosition);
       camera.getWorldQuaternion(this.quaternion);
       const distance = this.position.distanceTo(this.cameraPosition);
-      const width = T.MathUtils.clamp(distance * 0.25, 0.12, 0.65);
+      const height = T.MathUtils.clamp(distance * 0.25, 0.12, 0.65) / 6;
+      const width = height * this.labelWidth / 128;
       const radius = Math.max(this.scale.x, this.scale.y, this.scale.z);
-      this.position.add(new T.Vector3(0, radius + width / 6, 0)
+      this.position.add(new T.Vector3(0, radius + height, 0)
         .applyQuaternion(this.quaternion));
       scene.object3D.worldToLocal(this.position);
       this.label.position.copy(this.position);
-      this.label.scale.set(width, width / 6, 1);
+      this.label.scale.set(width, height, 1);
     },
 
     remove: function () {
