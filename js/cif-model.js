@@ -561,10 +561,11 @@
         const shift = start.map((value, axis) =>
           Math.floor(value + delta[axis] * (begin + end) / 2)
         );
-        const point = t => start.map((value, axis) =>
-          (value + delta[axis] * t - shift[axis]) *
-          structure.cellLengthsAngstrom[axis]
-        );
+        const point = t => {
+          const fractional = start.map((value, axis) => value + delta[axis] * t - shift[axis]);
+          return structure.cellMatrix ? F.CIFStructure.cartesian(fractional, structure.cellMatrix) :
+            fractional.map((value, axis) => value * structure.cellLengthsAngstrom[axis]);
+        };
         return {
           id: bond.id + "-segment-" + (index + 1),
           bondId: bond.id,
@@ -578,6 +579,12 @@
   function createStructure(source, mode = "molecule") {
     if (!["molecule", "cell"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
+    }
+    if (/_atom_site_aniso_label/i.test(source) && /\bCo01\s+Co\s/.test(source)) {
+      if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
+      const structure = F.CIFStructure.createCoStructure(source, mode);
+      if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
+      return structure;
     }
     // Auch die Zellansicht muss die Einzelkäfigprüfungen bestehen.
     const molecule = extractMolecule(readStructure(source));
@@ -600,6 +607,12 @@
     {id: "wires", title: "Wires", atomRadius: 0.025, bondRadius: 0.025},
     {id: "capped-sticks", title: "Capped Sticks", atomRadius: 0.14, bondRadius: 0.14}
   ];
+  const elements = {
+    H: {color: "#eeeeee", vdw: 1.20}, C: {color: "#515151", vdw: 1.70},
+    N: {color: "#3055ee", vdw: 1.55}, O: {color: "#ee3333", vdw: 1.52},
+    Cl: {color: "#35c935", vdw: 1.75},
+    Co: {color: "#ed709b", vdw: 2.00}
+  };
 
   function applyStyle(group, styleId) {
     const style = styles.find(entry => entry.id === styleId);
@@ -608,7 +621,10 @@
       if (mesh.userData.fkcAtom) {
         // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
         // Die übrigen Radien sind rein visuelle Darstellungsradien.
-        mesh.scale.setScalar(style.atomRadius);
+        const element = elements[mesh.userData.fkcAtom.element];
+        if (!element) throw new Error("Unbekanntes Darstellungselement.");
+        mesh.scale.setScalar(styleId === "space-filling" ? element.vdw :
+          styleId === "ball-stick" && mesh.userData.fkcAtom.element === "H" ? 0.20 : style.atomRadius);
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
         mesh.scale.x = mesh.scale.z = style.bondRadius;
@@ -618,7 +634,7 @@
   }
 
   F.CIF = {
-    createStructure, styles, applyStyle,
+    createStructure, styles, applyStyle, elements,
     setStyle(root, styleId) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
@@ -638,18 +654,13 @@
 
   function buildMesh(structure) {
     const group = new T.Group();
-    group.name = "C60-from-CIF-" + structure.mode;
+    group.name = (structure.name || "C60") + "-from-CIF-" + structure.mode;
     group.userData.fkcStructure = structure;
 
     const sphere = new T.SphereGeometry(1, 24, 16);
     const cylinder = new T.CylinderGeometry(1, 1, 1, 12);
 
-    const atomMaterial = new T.MeshStandardMaterial({
-      name: "CIF-Carbon",
-      color: "#515151",
-      roughness: 0.45,
-      metalness: 0
-    });
+    const atomMaterials = new Map();
 
     const bondMaterial = new T.MeshStandardMaterial({
       name: "CIF-Bond",
@@ -665,6 +676,12 @@
     const axis = new T.Vector3(0, 1, 0);
 
     structure.atoms.forEach(atom => {
+      if (!atomMaterials.has(atom.element)) {
+        if (!elements[atom.element]) throw new Error("Unbekanntes Darstellungselement: " + atom.element);
+        atomMaterials.set(atom.element, new T.MeshStandardMaterial({name: "CIF-" + atom.element,
+          color: elements[atom.element].color, roughness: 0.45, metalness: 0}));
+      }
+      const atomMaterial = atomMaterials.get(atom.element);
       const mesh = new T.Mesh(sphere, atomMaterial);
 
       mesh.name = atom.id;
@@ -706,7 +723,9 @@
           start[other[1]] = v * structure.cellLengthsAngstrom[other[1]];
           const end = start.slice();
           end[axisIndex] = length;
-          rod(start, end, "cell-edge-" + axisIndex + u + v,
+          const convert = point => structure.cellMatrix ? F.CIFStructure.cartesian(
+            point.map((value, axis) => value / structure.cellLengthsAngstrom[axis]), structure.cellMatrix) : point;
+          rod(convert(start), convert(end), "cell-edge-" + axisIndex + u + v,
             frameMaterial, 0.035);
         }));
       });
@@ -723,7 +742,7 @@
       dispose: function () {
         sphere.dispose();
         cylinder.dispose();
-        atomMaterial.dispose();
+        atomMaterials.forEach(material => material.dispose());
         bondMaterial.dispose();
         frameMaterial.dispose();
       }
@@ -806,7 +825,7 @@
         if (F.invalidateHits) F.invalidateHits();
 
         console.info(
-          "CIF-C60-1: Strukturprüfung erfolgreich:",
+          "CIF: Struktur aufgebaut:",
           {
             atomsInCell: structure.cellAtomCount,
             mode: structure.mode,
@@ -822,7 +841,7 @@
           }
         );
 
-        F.setStatus("CIF-C60 geprüft: " + structure.atoms.length +
+        F.setStatus("CIF-Modell aufgebaut: " + structure.atoms.length +
           " Atome und " + structure.bonds.length + " Bindungen.");
       } catch (error) {
         if (

@@ -7,6 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const F = {};
+vm.runInNewContext(fs.readFileSync(path.join(root, "js/cif-structure.js"), "utf8"), {window: {FKCVR: F}});
 const components = {};
 vm.runInNewContext(fs.readFileSync(path.join(root, "js/cif-model.js"), "utf8"), {
   window: {FKCVR: F},
@@ -97,6 +98,24 @@ F.CIF.applyStyle(group, "space-filling");
 assert.equal(atomMesh.scale.x, 1.70);
 F.CIF.applyStyle(group, "ball-stick");
 assert.equal(bondMesh.visible, true, "Bindungen erscheinen nach Style-Rückwechsel");
+const coSource = fs.readFileSync(path.join(root, "assets/structures/Co-Produkt1.cif"), "utf8");
+const coCell = F.CIF.createStructure(coSource, "cell");
+for (const bond of coCell.bonds) {
+  const segments = coCell.bondSegments.filter(segment => segment.bondId === bond.id);
+  assert.ok(Math.abs(segments.reduce((sum, segment) => sum + length(segment), 0) - bond.distanceAngstrom) < 1e-8);
+  for (const segment of segments) {
+    for (const position of [segment.startAngstrom, segment.endAngstrom]) {
+      const matrix = coCell.cellMatrix;
+      const z = position[2] / matrix[2][2];
+      const y = (position[1] - z * matrix[2][1]) / matrix[1][1];
+      const x = (position[0] - y * matrix[1][0] - z * matrix[2][0]) / matrix[0][0];
+      assert.ok([x, y, z].every(value => value >= -1e-7 && value <= 1 + 1e-7));
+    }
+  }
+}
+atomMesh.userData.fkcAtom = {element: "O"};
+F.CIF.applyStyle(group, "space-filling");
+assert.equal(atomMesh.scale.x, 1.52);
 console.log("CIF-Styletests bestanden: vier Styles, Radiuskonvention, Rückwechsel und unveränderte Strukturkoordinaten.");
 console.log("CIF-Strukturtest bestanden:", {
   molecule: [molecule.atoms.length, molecule.bonds.length],

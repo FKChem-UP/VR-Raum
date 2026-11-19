@@ -30,6 +30,27 @@ const cubic = api.cellMatrix([2, 2, 2], [90, 90, 90]);
 const point = api.cartesian([0.5, 0.5, 0.5], cubic);
 assert.ok(point.every(value => Math.abs(value - 1) < 1e-10));
 const complex = api.reconstructCoHeavy(structure);
+for (const mode of ["molecule", "cell"]) {
+  const model = api.createCoStructure(source, mode);
+  console.log("Co-Modell", mode, model.atoms.length, "Atome", model.bonds.length, "Bindungen", model.excludedSites || "");
+  assert.equal(new Set(model.atoms.map(atom => atom.id)).size, model.atoms.length);
+  if (mode === "cell") {
+    assert.equal(model.atoms.length, 72);
+    assert.equal(model.bonds.length, 76);
+    model.atoms.forEach(atom => assert.ok(atom.fractional.every(value => value >= 0 && value < 1)));
+  } else {
+    assert.equal(model.atoms.length, 64);
+    assert.equal(model.bonds.length, 72);
+    assert.equal(model.excludedSites.join(","), "O1,H3,H2,Cl03");
+    assert.equal(model.atoms.filter(atom => atom.element === "Co").length, 2);
+    assert.ok(model.atoms.some(atom => atom.element === "H"));
+    for (const bond of model.bonds) {
+      const a = model.atoms[bond.a].positionAngstrom;
+      const b = model.atoms[bond.b].positionAngstrom;
+      assert.ok(Math.abs(Math.hypot(...b.map((value, axis) => value - a[axis])) - bond.distanceAngstrom) < 0.005);
+    }
+  }
+}
 assert.equal(complex.atoms.filter(atom => atom.element === "Co").length, 2);
 assert.ok(complex.atoms.every(atom => atom.element !== "H"));
 assert.equal(new Set(complex.atoms.map(atom => atom.id)).size, complex.atoms.length);
@@ -44,7 +65,7 @@ for (let i = 0; i < complex.atoms.length; i++) {
   assert.equal(complex.bonds.filter(bond => bond.a === i || bond.b === i).length, 6);
 }
 console.log("Co-Nicht-H-Rekonstruktion bestanden:", complex.atoms.length, "Atome,", complex.bonds.length,
-  "Bindungen, zwei Co-Zentren mit je sechs Nachbarn. Noch keine H-Rekonstruktion oder VR-Anbindung.");
+  "Bindungen, zwei Co-Zentren mit je sechs Nachbarn.");
 console.log("Co-Strukturgrundlage bestanden:", {
   asymmetricSites: structure.atoms.length,
   nonHydrogenSites: structure.atoms.filter(atom => atom.element !== "H").length,

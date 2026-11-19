@@ -252,6 +252,17 @@ IDE-40: Mehrere abgeschlossene Messungen gleichzeitig behalten, auch Kombination
 IDE-41: Handmenü etwas weiter vom Körper, vor der Hand. Versatz jetzt 10 cm
   von der Hand weg vom Augenmittelpunkt statt 7 cm zum Kopf hin. Nachtest offen.
 
+IDE-42: Kleinen transparenten Laserzielpunkt auf dem Handmenü in Laserfarbe zeigen.
+  Umgesetzt: Durchmesser 3,6 mm, Opacity 0,55; nicht treffbar, Schrift möglichst
+  wenig überdeckt. Pico-Nachtest offen.
+
+Co-Teststation jetzt sichtbar in Team B, Station 1 (linke Wand): Verbindung als
+  zusammenhängende zweikernige Koordinationseinheit, 64 Atome/72 Bindungen,
+  ohne freies Chlorid Cl03 und Kristallwasser O1/H2/H3; Zelle 72 Atome/76 Bindungen,
+  einschließlich dieser Bestandteile. Vier Styles mit Elementfarben und
+  dokumentierter Radiuskonvention; H geometrisch eindeutig zugeordnet.
+  Numerisch geprüft, Pico-Rendering noch offen; Begrüßungs-GLBs unverändert.
+
 Rückmelderegel: Nutzer möchte nach tatsächlich erfolgtem Headset-Test nur Probleme
   melden; keine Problemmeldung wird als Zufriedenheit behandelt. Ohne Kenntnis,
   dass getestet wurde, keinen durchgeführten Test behaupten oder protokollieren.

@@ -288,6 +288,25 @@
 
   const room = id => F.rooms.find(item => item.id === id);
   const v1 = room("vorlesung-1");
+  Object.assign(room("team-b").stations[0], {
+    title: "Co-Produkt1 – CIF-Testmodell",
+    model: "assets/structures/Co-Produkt1.cif",
+    cifMode: "molecule",
+    variantAlignment: "individual",
+    info: "CIF-Test: zusammenhängende zweikernige Co-Einheit und vollständige trikline Zelle.\n" +
+      "Verbindungsansicht: koordinierte Einheit ohne freies Chlorid und Kristallwasser.\n" +
+      "Zellansicht enthält alle CIF-Positionen einschließlich dieser Bestandteile.\n" +
+      "Nicht-H-Bindungen aus CIF; H-Bindungen geometrisch über eindeutigen C/N/O-Nachbarn " +
+      "zwischen 0,6 und 1,25 Å ergänzt, keine Wasserstoffbrücken dargestellt.\n" +
+      "Space-Filling-Radien (Å): H 1,20; C 1,70; N 1,55; O 1,52; Cl 1,75; Co 2,00 " +
+      "(gewählte Radiuskonvention, für Co keine Ableitung aus der CIF).\n" +
+      "ADPs gespeichert; Ellipsoid und Polyhedral noch nicht umgesetzt.",
+    variants: [
+      {id: "co-complex", title: "Co – Verbindung (Komplex)",
+        model: "assets/structures/Co-Produkt1.cif", cifMode: "molecule"},
+      {id: "co-cell", title: "Co – Elementarzelle", model: "assets/structures/Co-Produkt1.cif", cifMode: "cell"}
+    ]
+  });
 
   /*
    * ============================================================

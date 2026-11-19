@@ -105,6 +105,14 @@
       }, this.el);
       this.root.dataset.fkcHandMenu = "true";
       this.root.setObject3D("mesh", this.mesh);
+      this.cursorGeometry = new T.CircleGeometry(0.0018, 20);
+      this.cursorMaterial = new T.MeshBasicMaterial({color: "#ff9d38", transparent: true,
+        opacity: 0.55, depthTest: false, depthWrite: false, side: T.DoubleSide});
+      this.cursor = new T.Mesh(this.cursorGeometry, this.cursorMaterial);
+      this.cursor.renderOrder = 120;
+      this.cursor.raycast = function () {};
+      this.cursor.visible = false;
+      this.root.object3D.add(this.cursor);
       this.root.object3D.visible = false;
       this.exit = () => this.hide();
       this.el.addEventListener("exit-vr", this.exit);
@@ -205,12 +213,17 @@
       const laser = document.getElementById(laserHand() + "Hand");
       const tools = laser && laser.components["fkc-controller"];
       let hoverIndex = -1;
+      this.cursor.visible = false;
       if (tools && tools.source) {
         // Aktuelle Pose verwenden, nicht den Treffer des vorigen Frames.
         tools.updateRay();
         const hit = F.findHit(tools.raycaster, true);
         if (hit && hit.el === this.root && hit.uv) {
           hoverIndex = this.buttonIndex(hit.uv);
+          this.cursor.position.set((hit.uv.x - 0.5) * 0.245,
+            (hit.uv.y - 0.5) * 0.288, 0.001);
+          this.cursorMaterial.color.set(F.Settings.lasers[laserHand()]);
+          this.cursor.visible = true;
         }
       }
       this.hoverIndex = hoverIndex;
@@ -390,6 +403,7 @@
           // Kompakte Legende; für viele Elemente wird eine eigene Seite nötig.
           let x = 28;
           for (const [element, color] of colors) {
+            if (x > 650) { x = 28; y += 30; }
             ctx.fillStyle = color;
             ctx.fillRect(x, y, 25, 25);
             ctx.fillStyle = "#203f30";
@@ -413,6 +427,8 @@
       this.geometry.dispose();
       this.material.dispose();
       this.texture.dispose();
+      this.cursorGeometry.dispose();
+      this.cursorMaterial.dispose();
       F.invalidateHits();
     }
   });
