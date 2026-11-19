@@ -208,6 +208,22 @@ IDE-30: Distanz über zwei Atomklicks oder einen Bindungsklick anzeigen.
 IDE-31: Handmenü weiter verkleinern, gesamter Inhalt bequem erfassbar.
   Fläche jetzt 0,272×0,32 m statt 0,34×0,40 m; Zeilen kompakter. Pico-Nachtest offen.
 
+IDE-32: Ausgewählte Messatome dauerhaft beschriften und hervorheben; Messverbindungen
+  ebenfalls hervorheben. Atom-Auren gelb/transparent, Messverbindungen gelb/transparent
+  umgesetzt; Messlabels unabhängig von normalen Pins, bis Reset/Beenden/Geometriewechsel.
+  Original-Elementfarben bleiben unverändert. Noch kein Pico-Test dieser Erweiterung.
+
+IDE-33: Atom-/Messlabel-Hintergründe transparenter, Schrift deckend; Ergebnisrechteck
+  an Textbreite anpassen. Umgesetzt mit Hintergrundalpha 0,65, Textalpha 1.
+
+IDE-34: Winkel aus drei Atomen, Torsion aus vier Atomen messen. Umgesetzt für
+  CIF-Einzelmolekül: zweites Atom Winkelscheitel, Torsion vorzeichenbehaftet
+  -180 bis +180 Grad in Klickreihenfolge 1–2–3–4; entartete Geometrie nicht definiert.
+  Handmenü mit eigener Messseite und Reset/Beenden. Zellmessungen weiterhin offen.
+
+Neueste Rückmeldung: Nutzer meldet vorherigen Distanz-/Labelprototyp als funktionierend.
+Handmenü nochmals um etwa 10 % auf 0,245×0,288 m verkleinert; Nachtest offen.
+
 Nutzer bestätigt zuletzt Betreten-Füllanzeige und kompakte Atomlabels als funktionierend.
 Vorbereitung ohne Headset: CIFs/Originalquellen sammeln, Team-A/B-Lernziele,
 Stationstexte, gewünschte Strukturausschnitte und fachliche Prüfwerte planen.

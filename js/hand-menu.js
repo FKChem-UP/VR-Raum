@@ -90,7 +90,7 @@
       this.texture = new T.CanvasTexture(this.canvas);
       this.texture.minFilter = T.LinearFilter;
       this.texture.generateMipmaps = false;
-      this.geometry = new T.PlaneGeometry(0.272, 0.32);
+      this.geometry = new T.PlaneGeometry(0.245, 0.288);
       this.material = new T.MeshBasicMaterial({
         map: this.texture, side: T.DoubleSide, depthTest: false, depthWrite: false
       });
@@ -205,7 +205,8 @@
       const structure = visual && visual.fkcStructure;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
-        structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled].join("|");
+        structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
+        F.Measure && F.Measure.mode].join("|");
       if (signature !== this.signature) {
         this.signature = signature;
         this.render(structure);
@@ -255,7 +256,20 @@
         this.buttons.push(b);
         y += 60;
       };
-      if (this.page === "styles") {
+      if (this.page === "measure") {
+        text("Messen am CIF-Einzelmolekül");
+        ["distance", "angle", "torsion"].forEach(mode => {
+          button(F.Measure.titles[mode] + " · " + F.Measure.counts[mode] + " Atome", () => {
+            F.Measure.setMode(mode);
+          }, F.Measure.enabled && F.Measure.mode === mode);
+        });
+        text("Winkel: zweites Atom ist der Scheitel.");
+        text("Torsion: Reihenfolge 1–2–3–4, ±180°.");
+        text("Distanz: auch eine Bindung anklicken.");
+        button("Messung zurücksetzen", () => this.el.components["fkc-measurements"].reset());
+        button("Messen beenden", () => F.Measure.setEnabled(false));
+        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
+      } else if (this.page === "styles") {
         text("Styles – unabhängig von der Ansicht");
         F.CIF.styles.forEach(style => button(style.title, () => {
           F.CIF.setStyle(model, style.id);
@@ -296,11 +310,8 @@
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
         if (structure && structure.mode === "molecule") {
-          button("Distanz messen: " + (F.Measure.enabled ? "An" : "Aus"), () => {
-            F.Measure.setEnabled(!F.Measure.enabled);
-          });
-          if (F.Measure.enabled) button("Messung zurücksetzen", () => {
-            this.el.components["fkc-measurements"].reset();
+          button("Messen: " + (F.Measure.enabled ? F.Measure.titles[F.Measure.mode] : "Aus"), () => {
+            this.page = "measure";
           });
         }
         button("Modell zurücksetzen", () => F.resetTarget(model));

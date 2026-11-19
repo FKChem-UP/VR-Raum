@@ -42,6 +42,7 @@
     init: function () {
       this.active = null;
       this.pins = new Map();
+      this.measureLabels = new Map();
       this.extraLabels = new Map();
       this.mouse = new T.Vector2();
       this.mouseActive = false;
@@ -110,7 +111,7 @@
         // Textur-Neuanlage bei jedem Atomwechsel, konstante Schriftgröße.
         this.texture.repeat.set(this.labelWidth / 768, 1);
         ctx.clearRect(0, 0, 768, 128);
-        ctx.fillStyle = "#172a22";
+        ctx.fillStyle = "rgba(23, 42, 34, 0.65)";
         ctx.fillRect(0, 0, this.labelWidth, 128);
         ctx.strokeStyle = "#ffcc33";
         ctx.lineWidth = 5;
@@ -132,6 +133,12 @@
 
     updateExtraLabels: function (camera) {
       const wanted = new Map();
+      // Messlabels sind eigene temporäre Auswahl, unabhängig von normalen Pins
+      // und dem Labelmodus; keine Originalmaterialien verändern.
+      for (const [mesh, entry] of this.measureLabels) {
+        if (entry.root.isConnected && mesh.parent &&
+            entry.root.object3D.getObjectById(mesh.id)) wanted.set(mesh, entry.atom);
+      }
       for (const [mesh, entry] of this.pins) {
         const hit = {type: "model", el: entry.root, mesh};
         if (!entry.root.isConnected || !mesh.parent ||
@@ -164,7 +171,8 @@
           canvas.width = F.AtomLabels.labelWidth(ctx.measureText(atom.cifLabel).width);
           canvas.height = 128;
           ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#172a22";
+          ctx.clearRect(0, 0, canvas.width, 128);
+          ctx.fillStyle = "rgba(23, 42, 34, 0.65)";
           ctx.fillRect(0, 0, canvas.width, 128);
           ctx.strokeStyle = "#ffcc33";
           ctx.lineWidth = 5;
@@ -242,6 +250,7 @@
       }
       this.extraLabels.clear();
       this.pins.clear();
+      this.measureLabels.clear();
       document.removeEventListener("pointermove", this.move);
       document.removeEventListener("pointerleave", this.leave);
       window.removeEventListener("blur", this.leave);

@@ -3,9 +3,37 @@
 (function (F) {
   const T = AFRAME.THREE;
   const distance = (a, b) => Math.hypot(...a.map((value, axis) => value - b[axis]));
+  const sub = (a, b) => a.map((value, axis) => value - b[axis]);
+  const dot = (a, b) => a.reduce((sum, value, axis) => sum + value * b[axis], 0);
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const unit = a => {
+    const length = Math.hypot(...a);
+    if (length < 1e-10) throw new Error("Geometrie nicht definiert (gleiche/kollineare Punkte).");
+    return a.map(value => value / length);
+  };
+  function angle(a, b, c) {
+    return Math.acos(Math.max(-1, Math.min(1, dot(unit(sub(a, b)), unit(sub(c, b)))))) * 180 / Math.PI;
+  }
+  function torsion(a, b, c, d) {
+    const axis = unit(sub(c, b));
+    const first = sub(a, b);
+    const last = sub(d, c);
+    const v = unit(first.map((value, i) => value - dot(first, axis) * axis[i]));
+    const w = unit(last.map((value, i) => value - dot(last, axis) * axis[i]));
+    return Math.atan2(dot(cross(axis, v), w), dot(v, w)) * 180 / Math.PI;
+  }
+  const counts = {distance: 2, angle: 3, torsion: 4};
+  const titles = {distance: "Distanz", angle: "Winkel", torsion: "Torsion"};
   F.Measure = {
-    distance,
+    distance, angle, torsion, counts, titles,
     enabled: false,
+    mode: "distance",
+    setMode(mode) {
+      if (!counts[mode]) return;
+      this.mode = mode;
+      this.setEnabled(true);
+    },
     setEnabled(value) {
       this.enabled = value;
       const component = F.getScene().components["fkc-measurements"];
@@ -23,7 +51,7 @@
     init: function () {
       this.points = [];
       this.geometry = new T.BufferGeometry();
-      this.geometry.setAttribute("position", new T.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+      this.geometry.setAttribute("position", new T.Float32BufferAttribute(new Array(12).fill(0), 3));
       this.material = new T.LineBasicMaterial({color: "#ffcc33", depthTest: false});
       this.line = new T.Line(this.geometry, this.material);
       this.line.raycast = function () {};
@@ -36,79 +64,159 @@
       this.label.raycast = function () {};
       this.line.renderOrder = this.label.renderOrder = 1002;
       this.el.object3D.add(this.line, this.label);
+      this.haloGeometry = new T.SphereGeometry(1, 16, 12);
+      this.haloMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
+        opacity: 0.32, depthWrite: false});
+      this.halos = [];
+      for (let i = 0; i < 4; i++) {
+        const halo = new T.Mesh(this.haloGeometry, this.haloMaterial);
+        halo.raycast = function () {};
+        this.el.object3D.add(halo);
+        this.halos.push(halo);
+      }
+      this.rodGeometry = new T.CylinderGeometry(1, 1, 1, 12);
+      this.rodMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
+        opacity: 0.65, depthTest: false, depthWrite: false});
+      this.rods = [];
+      for (let i = 0; i < 3; i++) {
+        const rod = new T.Mesh(this.rodGeometry, this.rodMaterial);
+        rod.raycast = function () {};
+        rod.renderOrder = 1001;
+        this.el.object3D.add(rod);
+        this.rods.push(rod);
+      }
       this.reset();
     },
     reset: function () {
       this.points = [];
       this.root = null;
+      this.meshes = [];
       this.line.visible = this.label.visible = false;
+      if (this.halos) this.halos.forEach(halo => { halo.visible = false; });
+      if (this.rods) this.rods.forEach(rod => { rod.visible = false; });
+      const labels = this.el.components["fkc-atom-labels"];
+      if (labels && labels.measureLabels) labels.measureLabels.clear();
     },
     select: function (hit) {
       const visual = hit.el.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       if (!structure || structure.mode !== "molecule") {
-        F.setStatus("Distanzmessung zunächst nur am CIF-Einzelmolekül verfügbar.");
+        F.setStatus("Messungen zunächst nur am CIF-Einzelmolekül verfügbar.");
         return;
       }
-      if (this.root !== hit.el || this.points.length === 2) this.reset();
+      const required = counts[F.Measure.mode];
+      const bond = hit.mesh.userData.fkcBond;
+      const atom = hit.mesh.userData.fkcAtom;
+      if (!atom && !(F.Measure.mode === "distance" && bond &&
+          Number.isInteger(bond.a) && Number.isInteger(bond.b))) return;
+      if (this.root !== hit.el || this.points.length === required ||
+          (F.Measure.mode === "distance" && bond)) this.reset();
       this.root = hit.el;
       this.visual = visual;
       const meshes = new Map();
       visual.object3D.traverse(mesh => {
         if (mesh.userData.fkcAtom) meshes.set(mesh.userData.fkcAtom.id, mesh);
       });
-      const bond = hit.mesh.userData.fkcBond;
-      if (bond && Number.isInteger(bond.a) && Number.isInteger(bond.b)) {
+      if (F.Measure.mode === "distance" && bond && Number.isInteger(bond.a) && Number.isInteger(bond.b)) {
         this.points = [structure.atoms[bond.a], structure.atoms[bond.b]];
       } else if (hit.mesh.userData.fkcAtom) {
-        const atom = hit.mesh.userData.fkcAtom;
-        if (this.points[0] && this.points[0].id === atom.id) {
-          this.points = [];
+        const index = this.points.findIndex(point => point.id === atom.id);
+        if (index !== -1) {
+          this.points.splice(index, 1);
           F.setStatus("Atomauswahl zurückgenommen.");
-          return;
-        }
-        this.points.push(atom);
+        } else this.points.push(atom);
       } else return;
       this.meshes = this.points.map(atom => meshes.get(atom.id));
-      if (this.points.length !== 2) {
-        F.setStatus("Erstes Atom: " + this.points[0].cifLabel + ". Zweites Atom wählen.");
+      const labels = this.el.components["fkc-atom-labels"];
+      if (labels) {
+        if (!labels.measureLabels) labels.measureLabels = new Map();
+        labels.measureLabels.clear();
+        this.meshes.forEach((mesh, i) => labels.measureLabels.set(mesh,
+          {root: this.root, atom: this.points[i]}));
+      }
+      this.line.visible = this.label.visible = false;
+      if (this.points.length !== required) {
+        F.setStatus(titles[F.Measure.mode] + ": " + this.points.length + "/" + required + " Atome gewählt.");
         return;
       }
-      const result = distance(this.points[0].positionAngstrom, this.points[1].positionAngstrom);
+      let text;
+      try {
+        const coordinates = this.points.map(point => point.positionAngstrom);
+        const result = F.Measure[F.Measure.mode](...coordinates);
+        text = result.toFixed(F.Measure.mode === "distance" ? 3 : 1) +
+          (F.Measure.mode === "distance" ? " Å" : "°");
+      } catch (error) { text = "Nicht definiert"; }
       const ctx = this.canvas.getContext("2d");
-      ctx.fillStyle = "#173527";
-      ctx.fillRect(0, 0, 512, 128);
+      ctx.font = "bold 52px Arial";
+      this.labelWidth = Math.min(512, Math.max(96, Math.ceil(ctx.measureText(text).width) + 40));
+      this.texture.repeat.set(this.labelWidth / 512, 1);
+      ctx.clearRect(0, 0, 512, 128);
+      ctx.fillStyle = "rgba(23, 53, 39, 0.65)";
+      ctx.fillRect(0, 0, this.labelWidth, 128);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 52px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(result.toFixed(3) + " Å", 256, 82);
+      ctx.fillText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       this.texture.needsUpdate = true;
-      F.setStatus("Distanz: " + result.toFixed(3) + " Å");
+      F.setStatus(titles[F.Measure.mode] + ": " + text);
     },
     tick: function () {
       if (!this.root) return;
       if (!this.root.isConnected || this.root.querySelector(".model-visual") !== this.visual ||
           this.el.lastSelectedModel !== this.root) { this.reset(); return; }
-      if (this.points.length !== 2 || !this.el.camera) return;
-      const a = new T.Vector3();
-      const b = new T.Vector3();
-      this.meshes[0].getWorldPosition(a);
-      this.meshes[1].getWorldPosition(b);
-      this.el.object3D.worldToLocal(a);
-      this.el.object3D.worldToLocal(b);
+      if (!this.el.camera || !this.meshes) return;
+      const visible = !(F.Menu && F.Menu.opened);
+      const positions = this.meshes.map(mesh => {
+        mesh.updateWorldMatrix(true, false);
+        const position = mesh.getWorldPosition(new T.Vector3());
+        return this.el.object3D.worldToLocal(position);
+      });
+      this.halos.forEach((halo, i) => {
+        halo.visible = visible && i < positions.length;
+        if (i >= positions.length) return;
+        halo.position.copy(positions[i]);
+        const scale = this.meshes[i].getWorldScale(new T.Vector3());
+        halo.scale.setScalar(Math.max(scale.x, scale.y, scale.z) * 1.2);
+      });
+      this.rods.forEach((rod, i) => {
+        rod.visible = visible && i + 1 < positions.length;
+        if (i + 1 >= positions.length) return;
+        const a = positions[i];
+        const b = positions[i + 1];
+        const direction = b.clone().sub(a);
+        const length = direction.length();
+        rod.position.copy(a).add(b).multiplyScalar(0.5);
+        if (length > 1e-10) rod.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), direction.normalize());
+        const scale = this.meshes[i].getWorldScale(new T.Vector3());
+        const radius = Math.max(scale.x, scale.y, scale.z) * 0.4;
+        rod.scale.set(radius, length, radius);
+      });
+      if (this.points.length !== counts[F.Measure.mode]) {
+        this.line.visible = this.label.visible = false;
+        return;
+      }
       const attribute = this.geometry.attributes.position;
-      attribute.setXYZ(0, a.x, a.y, a.z);
-      attribute.setXYZ(1, b.x, b.y, b.z);
+      positions.forEach((position, i) => attribute.setXYZ(i, position.x, position.y, position.z));
+      this.geometry.setDrawRange(0, positions.length);
       attribute.needsUpdate = true;
       this.geometry.computeBoundingSphere();
-      this.label.position.copy(a).add(b).multiplyScalar(0.5);
+      this.label.position.set(0, 0, 0);
+      positions.forEach(position => this.label.position.add(position));
+      this.label.position.multiplyScalar(1 / positions.length);
       const head = new T.Vector3();
       this.el.camera.getWorldPosition(head);
       const width = T.MathUtils.clamp(this.meshes[0].getWorldPosition(new T.Vector3()).distanceTo(head) * 0.18, 0.10, 0.5);
-      this.label.scale.set(width, width / 4, 1);
-      this.line.visible = this.label.visible = !(F.Menu && F.Menu.opened);
+      const height = width / 4;
+      this.label.scale.set(height * this.labelWidth / 128, height, 1);
+      this.line.visible = this.label.visible = visible;
     },
     remove: function () {
+      this.reset();
+      this.halos.concat(this.rods).forEach(object => this.el.object3D.remove(object));
+      this.haloGeometry.dispose();
+      this.haloMaterial.dispose();
+      this.rodGeometry.dispose();
+      this.rodMaterial.dispose();
       this.el.object3D.remove(this.line, this.label);
       this.geometry.dispose();
       this.material.dispose();
