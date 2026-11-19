@@ -192,6 +192,26 @@ IDE-28: Atomlabel-Rechteck passend zur Textmenge, z.B. C1 schmaler als Cl12.
   Status: Canvas-Textbreite gemessen, seitliche Polsterung und passende
   Sprite-Breite; gleiche Texthöhe unabhängig von Label-Länge. Pico-Nachtest offen.
 
+IDE-29: Anvisierlabels standardmäßig aktiv; Menüoptionen Anvisieren/Alle/Aus.
+  Trigger heftet Atomlabel dauerhaft an, erneuter Klick entfernt es. Implementiert
+  für Pico-Trigger; angeheftete Labels gehören zur aktuellen Modellgeometrie und
+  werden beim Varianten-/Raumwechsel verworfen. Aus blendet auch Pins aus,
+  ihre Auswahl bleibt bis Geometriewechsel erhalten. Alle Labels kann überladen wirken.
+
+IDE-30: Distanz über zwei Atomklicks oder einen Bindungsklick anzeigen.
+  Erster Prototyp: eigener Distanzmodus im Handmenü, zunächst CIF-Einzelmolekül.
+  Linie und Wert in Å, auch ungebundene Atome. Nächster Klick nach abgeschlossener
+  Messung startet neue Messung; erneuter Klick auf erstes Atom nimmt Auswahl zurück.
+  Zurücksetzen/Beenden im Menü. Im Messmodus kein Label-Anheften/Zeichnen.
+  Zell-/periodische Messungen und Winkel später. Noch kein Pico-Test.
+
+IDE-31: Handmenü weiter verkleinern, gesamter Inhalt bequem erfassbar.
+  Fläche jetzt 0,272×0,32 m statt 0,34×0,40 m; Zeilen kompakter. Pico-Nachtest offen.
+
+Nutzer bestätigt zuletzt Betreten-Füllanzeige und kompakte Atomlabels als funktionierend.
+Vorbereitung ohne Headset: CIFs/Originalquellen sammeln, Team-A/B-Lernziele,
+Stationstexte, gewünschte Strukturausschnitte und fachliche Prüfwerte planen.
+
 Aktuelle Rückmeldung: Handmenüausrichtung vom Nutzer als gut bestätigt.
 Co-Produkt1.cif wurde vom Nutzer um HKL-Reflexzeilen gekürzt; jetzt 19304 Bytes
 und 476 Zeilen. Koordinaten, Bindungstabelle und anisotrope ADPs vorhanden;

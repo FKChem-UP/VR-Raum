@@ -518,6 +518,14 @@
           return;
         }
 
+        if (!(F.Menu && F.Menu.opened) && this.hit.type === "model") {
+          const grabber = this.el.components["fkc-grabber"];
+          if (!(grabber && grabber.grabbed)) {
+            F.selectModel(this.hit.el);
+            if (F.Measure && F.Measure.click(this.hit)) return;
+            if (F.AtomLabels && F.AtomLabels.toggle(this.hit)) return;
+          }
+        }
         if ((F.Menu && F.Menu.opened) || (F.HandMenu && F.HandMenu.opened)) return;
 
         const grabber = this.el.components["fkc-grabber"];

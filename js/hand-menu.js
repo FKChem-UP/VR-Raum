@@ -90,7 +90,7 @@
       this.texture = new T.CanvasTexture(this.canvas);
       this.texture.minFilter = T.LinearFilter;
       this.texture.generateMipmaps = false;
-      this.geometry = new T.PlaneGeometry(0.34, 0.40);
+      this.geometry = new T.PlaneGeometry(0.272, 0.32);
       this.material = new T.MeshBasicMaterial({
         map: this.texture, side: T.DoubleSide, depthTest: false, depthWrite: false
       });
@@ -205,7 +205,7 @@
       const structure = visual && visual.fkcStructure;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
-        structure && structure.mode, model.fkcStyle].join("|");
+        structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled].join("|");
       if (signature !== this.signature) {
         this.signature = signature;
         this.render(structure);
@@ -243,17 +243,17 @@
         ctx.fillStyle = "#203f30";
         ctx.font = "28px Arial";
         ctx.fillText(value, 28, y + 30, 710);
-        y += 45;
+        y += 36;
       };
       const button = (label, action, selected = false) => {
-        const b = {x: 28, y, w: 712, h: 62, action};
+        const b = {x: 28, y, w: 712, h: 52, action};
         ctx.fillStyle = selected ? "#b9dcc4" : "#d5e2d9";
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.fillStyle = "#173527";
         ctx.font = "29px Arial";
-        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 41, 677);
+        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 35, 677);
         this.buttons.push(b);
-        y += 72;
+        y += 60;
       };
       if (this.page === "styles") {
         text("Styles – unabhängig von der Ansicht");
@@ -291,9 +291,18 @@
         if (structure) button("Styles: " +
           (F.CIF.styles.find(style => style.id === (model.fkcStyle || "ball-stick"))).title,
           () => { this.page = "styles"; });
-        button("Labels: " + (model.fkcAtomLabels === "hover" ? "Beim Anvisieren" : "Aus"), () => {
-          F.AtomLabels.setMode(model, model.fkcAtomLabels === "hover" ? "off" : "hover");
+        const mode = model.fkcAtomLabels || "hover";
+        button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
+          F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
+        if (structure && structure.mode === "molecule") {
+          button("Distanz messen: " + (F.Measure.enabled ? "An" : "Aus"), () => {
+            F.Measure.setEnabled(!F.Measure.enabled);
+          });
+          if (F.Measure.enabled) button("Messung zurücksetzen", () => {
+            this.el.components["fkc-measurements"].reset();
+          });
+        }
         button("Modell zurücksetzen", () => F.resetTarget(model));
         button("Modellinformationen", () => { this.page = "info"; this.infoOffset = 0; });
         text("Legende: Atomsorten");

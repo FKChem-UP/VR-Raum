@@ -1426,7 +1426,7 @@
           );
 
           button(
-            "Atomlabels: " + (model.fkcAtomLabels === "hover" ? "Beim Anvisieren" : "Aus"),
+            "Atomlabels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[model.fkcAtomLabels || "hover"]),
             () => this.navigate("atom-labels"),
             "#d2e9ec"
           );
@@ -1867,13 +1867,13 @@
         } else {
           text("Original-CIF-Label und separate Modellnummer.\n" +
             "GLB-Modelle besitzen keine CIF-Atomlabels.");
-          [["off", "Aus"], ["hover", "Beim Anvisieren"]].forEach(([mode, title]) => {
+          [["off", "Aus"], ["hover", "Beim Anvisieren"], ["all", "Alle"]].forEach(([mode, title]) => {
             button(title, () => {
               const selected = this.getSelectedModel();
               if (selected !== model) return;
               F.AtomLabels.setMode(selected, mode);
               feedback("Atomlabels: " + title);
-            }, null, (model.fkcAtomLabels || "off") === mode);
+            }, null, (model.fkcAtomLabels || "hover") === mode);
           });
           text("Menü schließen und Maus oder Laser auf ein CIF-Atom richten.\n" +
             "Gelbe Hervorhebung ist vorübergehend; kein Klick nötig.");
