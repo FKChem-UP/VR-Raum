@@ -69,5 +69,41 @@ const fallback = {camera: {
 assert.equal(F.HandMenu.readViewerHead(fallback, null, position), true);
 assert.equal(cameraUpdated, true);
 assert.equal(F.HandMenu.readViewerHead({}, null, position), false);
+const ctx = {};
+for (const method of ["fillRect", "fillText", "strokeRect", "beginPath", "moveTo", "lineTo", "stroke", "arc", "fill"]) {
+  ctx[method] = function () {};
+}
+let mode = "distance";
+let enabled = false;
+F.Measure = {
+  titles: {distance: "Distanz", angle: "Winkel", torsion: "Torsion"},
+  counts: {distance: 2, angle: 3, torsion: 4},
+  get mode() { return mode; }, get enabled() { return enabled; },
+  toggleMode(value) { enabled = !(enabled && mode === value); mode = value; }
+};
+F.CIF = {styles: ["ball-stick", "space-filling", "wires", "capped-sticks"].map(id => ({id})), setStyle() {}};
+F.AtomLabels = {setMode() {}};
+const model = {
+  dataset: {title: "C60"},
+  fkcVariants: [1, 2, 3].map(id => ({id, title: "Ansicht " + id})),
+  querySelector: () => ({object3D: {traverse() {}}})
+};
+const menu = Object.assign({ctx, model, offset: 0, texture: {},
+  el: {components: {"fkc-measurements": {reset() {}}}}}, components["fkc-hand-menu"]);
+const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "Pa-3"}};
+menu.render(structure);
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
+assert.equal(menu.buttons.length, 13, "3 Ansichten, 4 Styles, Labels, 3 Messmodi, 2 Resets");
+const distanceButton = menu.buttons[8];
+const angleButton = menu.buttons[9];
+distanceButton.action();
+assert.equal(enabled, true);
+assert.equal(mode, "distance");
+angleButton.action();
+assert.equal(mode, "angle");
+assert.equal(enabled, true);
+angleButton.action();
+assert.equal(enabled, false);
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
+console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

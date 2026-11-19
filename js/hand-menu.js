@@ -244,53 +244,67 @@
         ctx.fillStyle = "#203f30";
         ctx.font = "28px Arial";
         ctx.fillText(value, 28, y + 30, 710);
-        y += 36;
+        y += 30;
       };
       const button = (label, action, selected = false) => {
-        const b = {x: 28, y, w: 712, h: 52, action};
+        const b = {x: 28, y, w: 712, h: 40, action};
         ctx.fillStyle = selected ? "#b9dcc4" : "#d5e2d9";
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.fillStyle = "#173527";
         ctx.font = "29px Arial";
-        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 35, 677);
+        ctx.fillText((selected ? "✓ " : "") + label, 43, y + 29, 677);
         this.buttons.push(b);
-        y += 60;
+        y += 46;
       };
-      if (this.page === "measure") {
-        text("Messen am CIF-Einzelmolekül");
-        ["distance", "angle", "torsion"].forEach(mode => {
-          button(F.Measure.titles[mode] + " · " + F.Measure.counts[mode] + " Atome", () => {
-            F.Measure.setMode(mode);
-          }, F.Measure.enabled && F.Measure.mode === mode);
+      // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
+      const row = entries => {
+        const w = (712 - (entries.length - 1) * 12) / entries.length;
+        entries.forEach((entry, index) => {
+          const x = 28 + index * (w + 12);
+          const selected = !!entry.selected;
+          const shift = selected ? 5 : 0;
+          ctx.fillStyle = "#8c9b92";
+          ctx.fillRect(x, y + 5, w, 92);
+          ctx.fillStyle = selected ? "#f3bcbc" : "#d5e2d9";
+          ctx.fillRect(x, y + shift, w, 87);
+          ctx.strokeStyle = selected ? "#a34444" : "#82988a";
+          ctx.lineWidth = selected ? 3 : 2;
+          ctx.strokeRect(x, y + shift, w, 87);
+          const atomCount = entry.count || 2;
+          const points = [];
+          for (let i = 0; i < atomCount; i++) {
+            points.push([x + w * (0.22 + i * 0.56 / (atomCount - 1)),
+              y + shift + 27 + (atomCount > 2 && i % 2 ? 12 : 0)]);
+          }
+          if (entry.kind !== "space-filling") {
+            ctx.strokeStyle = "#284635";
+            ctx.lineWidth = entry.kind === "capped-sticks" ? 12 : entry.kind === "wires" ? 2 : 4;
+            ctx.beginPath();
+            points.forEach(([px, py], i) => { if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+            ctx.stroke();
+          }
+          points.forEach(([px, py]) => {
+            ctx.fillStyle = "#486e56";
+            ctx.beginPath();
+            ctx.arc(px, py, entry.kind === "space-filling" ? 17 : entry.kind === "wires" ? 3 : 8, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          if (entry.kind === "angle") {
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.arc(points[1][0], points[1][1], 14, Math.PI * 1.15, Math.PI * 1.85);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#173527";
+          ctx.font = "23px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(entry.label, x + w / 2, y + shift + 73, w - 12);
+          ctx.textAlign = "left";
+          this.buttons.push({x, y, w, h: 97, action: entry.action});
         });
-        text("Winkel: zweites Atom ist der Scheitel.");
-        text("Torsion: Reihenfolge 1–2–3–4, ±180°.");
-        text("Distanz: auch eine Bindung anklicken.");
-        button("Messung zurücksetzen", () => this.el.components["fkc-measurements"].reset());
-        button("Messen beenden", () => F.Measure.setEnabled(false));
-        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
-      } else if (this.page === "styles") {
-        text("Styles – unabhängig von der Ansicht");
-        F.CIF.styles.forEach(style => button(style.title, () => {
-          F.CIF.setStyle(model, style.id);
-        }, (model.fkcStyle || "ball-stick") === style.id));
-        text("Space-Filling: C-Radius 1,70 Å.");
-        text("Ellipsoid: keine ADPs in C60-CIF.");
-        text("Polyhedral: kein Metallzentrum in C60.");
-        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
-      } else if (this.page === "info") {
-        const info = (structure ?
-          "Zelle (Å): " + structure.cellLengthsAngstrom.join(" / ") +
-          "\nWinkel (°): " + structure.cellAnglesDegrees.join(" / ") +
-          "\nRaumgruppe: " + structure.spaceGroup.name + " (" + structure.spaceGroup.number + ")\n" : "") +
-          (model.fkcInfo || "Keine weiteren Modellinformationen.");
-        F.Menu.ctx.font = "29px Arial";
-        const lines = F.Menu.wrap(info, 660);
-        lines.slice(this.infoOffset, this.infoOffset + 11).forEach(text);
-        if (this.infoOffset > 0) button("Text zurück", () => { this.infoOffset = Math.max(0, this.infoOffset - 8); });
-        if (this.infoOffset + 11 < lines.length) button("Text weiter", () => { this.infoOffset += 8; });
-        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
-      } else {
+        y += 100;
+      };
+      {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = model.fkcVariants || [];
         variants.slice(this.offset, this.offset + 3).forEach(variant => {
@@ -302,20 +316,30 @@
         if (variants.length > 3) button("Weitere Ansichten", () => {
           this.offset = this.offset + 3 < variants.length ? this.offset + 3 : 0;
         });
-        if (structure) button("Styles: " +
-          (F.CIF.styles.find(style => style.id === (model.fkcStyle || "ball-stick"))).title,
-          () => { this.page = "styles"; });
+        if (structure) {
+          text("Styles");
+          row(F.CIF.styles.map(style => ({
+            label: {"ball-stick": "Kugel–Stab", "space-filling": "Raumfüllend",
+              wires: "Wires", "capped-sticks": "Sticks"}[style.id],
+            kind: style.id,
+            selected: (model.fkcStyle || "ball-stick") === style.id,
+            action: () => F.CIF.setStyle(model, style.id)
+          })));
+        }
         const mode = model.fkcAtomLabels || "hover";
         button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
         if (structure && structure.mode === "molecule") {
-          button("Messen: " + (F.Measure.enabled ? F.Measure.titles[F.Measure.mode] : "Aus"), () => {
-            this.page = "measure";
-          });
+          text("Messen · aktiven Knopf erneut drücken: Aus");
+          row(["distance", "angle", "torsion"].map(mode => ({
+            label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode],
+            selected: F.Measure.enabled && F.Measure.mode === mode,
+            action: () => F.Measure.toggleMode(mode)
+          })));
+          button("Messung zurücksetzen", () => this.el.components["fkc-measurements"].reset());
         }
         button("Modell zurücksetzen", () => F.resetTarget(model));
-        button("Modellinformationen", () => { this.page = "info"; this.infoOffset = 0; });
         text("Legende: Atomsorten");
         if (structure) {
           const colors = new Map();
@@ -340,6 +364,10 @@
             x += 125;
           }
         } else text("GLB: keine verlässliche Elementzuordnung.");
+        y += 36;
+        // Nur Kurzinfo auf derselben Fläche; ausführlicher bestehender Modelltext
+        // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
+        if (structure) text(structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
       }
       this.texture.needsUpdate = true;
     },

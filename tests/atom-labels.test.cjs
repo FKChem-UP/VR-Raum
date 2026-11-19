@@ -42,7 +42,7 @@ mesh.material = originalMaterial;
 const component = Object.assign({
   active: null, label: {visible: false}, texture: {repeat: {set() {}}},
   labelCanvas: {getContext: () => ({measureText: text => ({width: text.length * 32}),
-    clearRect() {}, fillRect() {}, strokeRect() {}, fillText() {}})}
+    clearRect() {}, fillRect() {}, strokeRect() {}, strokeText() {}, fillText() {}})}
 }, components["fkc-atom-labels"]);
 const target = F.AtomLabels.atomFromHit(hit);
 component.show(target);

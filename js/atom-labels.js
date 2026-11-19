@@ -60,7 +60,7 @@
       });
       this.label = new T.Sprite(this.material);
       this.label.visible = false;
-      this.label.renderOrder = 1000;
+      this.label.renderOrder = 1100;
       this.label.raycast = function () {}; // Keine Auswahl-/Zeichenblockade.
       this.el.object3D.add(this.label);
 
@@ -111,15 +111,14 @@
         // Textur-Neuanlage bei jedem Atomwechsel, konstante Schriftgröße.
         this.texture.repeat.set(this.labelWidth / 768, 1);
         ctx.clearRect(0, 0, 768, 128);
-        ctx.fillStyle = "rgba(23, 42, 34, 0.65)";
-        ctx.fillRect(0, 0, this.labelWidth, 128);
-        ctx.strokeStyle = "#ffcc33";
-        ctx.lineWidth = 5;
-        ctx.strokeRect(3, 3, this.labelWidth - 6, 122);
+        ctx.strokeStyle = "#172a22";
+        ctx.lineWidth = 7;
+        ctx.lineJoin = "round";
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 56px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.strokeText(text, this.labelWidth / 2, 64, this.labelWidth - 32);
         ctx.fillText(text, this.labelWidth / 2, 64, this.labelWidth - 32);
         this.texture.needsUpdate = true;
       }
@@ -172,20 +171,19 @@
           canvas.height = 128;
           ctx = canvas.getContext("2d");
           ctx.clearRect(0, 0, canvas.width, 128);
-          ctx.fillStyle = "rgba(23, 42, 34, 0.65)";
-          ctx.fillRect(0, 0, canvas.width, 128);
-          ctx.strokeStyle = "#ffcc33";
-          ctx.lineWidth = 5;
-          ctx.strokeRect(3, 3, canvas.width - 6, 122);
+          ctx.strokeStyle = "#172a22";
+          ctx.lineWidth = 7;
+          ctx.lineJoin = "round";
           ctx.fillStyle = "#ffffff";
           ctx.font = "bold 56px Arial";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
+          ctx.strokeText(atom.cifLabel, canvas.width / 2, 64);
           ctx.fillText(atom.cifLabel, canvas.width / 2, 64);
           const texture = new T.CanvasTexture(canvas);
           const material = new T.SpriteMaterial({map: texture, depthTest: false, depthWrite: false});
           const sprite = new T.Sprite(material);
-          sprite.renderOrder = 1000;
+          sprite.renderOrder = 1100;
           sprite.raycast = function () {};
           record = {sprite, material, texture, width: canvas.width};
           this.extraLabels.set(mesh, record);
@@ -205,7 +203,10 @@
       const distance = this.position.distanceTo(this.cameraPosition);
       const height = T.MathUtils.clamp(distance * 0.25, 0.12, 0.65) / 6;
       const radius = Math.max(this.scale.x, this.scale.y, this.scale.z);
-      this.position.add(new T.Vector3(0, radius + height, 0).applyQuaternion(this.quaternion));
+      // Vor die Atomoberfläche zum Betrachter, zusätzlich etwas nach oben.
+      this.position.add(this.cameraPosition.clone().sub(this.position).normalize()
+        .multiplyScalar(Math.min(radius + height * 0.5, distance * 0.4)));
+      this.position.add(new T.Vector3(0, height * 0.55, 0).applyQuaternion(this.quaternion));
       this.el.object3D.worldToLocal(this.position);
       sprite.position.copy(this.position);
       sprite.scale.set(height * pixelWidth / 128, height, 1);

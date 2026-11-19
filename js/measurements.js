@@ -29,6 +29,11 @@
     distance, angle, torsion, counts, titles,
     enabled: false,
     mode: "distance",
+    toggleMode(mode) {
+      if (!counts[mode]) return;
+      if (this.enabled && this.mode === mode) this.setEnabled(false);
+      else this.setMode(mode);
+    },
     setMode(mode) {
       if (!counts[mode]) return;
       this.mode = mode;
@@ -62,11 +67,12 @@
       this.labelMaterial = new T.SpriteMaterial({map: this.texture, depthTest: false, depthWrite: false});
       this.label = new T.Sprite(this.labelMaterial);
       this.label.raycast = function () {};
-      this.line.renderOrder = this.label.renderOrder = 1002;
+      this.line.renderOrder = 1002;
+      this.label.renderOrder = 1101;
       this.el.object3D.add(this.line, this.label);
       this.haloGeometry = new T.SphereGeometry(1, 16, 12);
       this.haloMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
-        opacity: 0.32, depthWrite: false});
+        opacity: 0.16, depthWrite: false});
       this.halos = [];
       for (let i = 0; i < 4; i++) {
         const halo = new T.Mesh(this.haloGeometry, this.haloMaterial);
@@ -76,7 +82,7 @@
       }
       this.rodGeometry = new T.CylinderGeometry(1, 1, 1, 12);
       this.rodMaterial = new T.MeshBasicMaterial({color: "#ffcc33", transparent: true,
-        opacity: 0.65, depthTest: false, depthWrite: false});
+        opacity: 0.35, depthTest: false, depthWrite: false});
       this.rods = [];
       for (let i = 0; i < 3; i++) {
         const rod = new T.Mesh(this.rodGeometry, this.rodMaterial);
@@ -151,11 +157,13 @@
       this.labelWidth = Math.min(512, Math.max(96, Math.ceil(ctx.measureText(text).width) + 40));
       this.texture.repeat.set(this.labelWidth / 512, 1);
       ctx.clearRect(0, 0, 512, 128);
-      ctx.fillStyle = "rgba(23, 53, 39, 0.65)";
-      ctx.fillRect(0, 0, this.labelWidth, 128);
+      ctx.strokeStyle = "#173527";
+      ctx.lineWidth = 7;
+      ctx.lineJoin = "round";
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 52px Arial";
       ctx.textAlign = "center";
+      ctx.strokeText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       ctx.fillText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       this.texture.needsUpdate = true;
       F.setStatus(titles[F.Measure.mode] + ": " + text);
@@ -207,6 +215,11 @@
       this.el.camera.getWorldPosition(head);
       const width = T.MathUtils.clamp(this.meshes[0].getWorldPosition(new T.Vector3()).distanceTo(head) * 0.18, 0.10, 0.5);
       const height = width / 4;
+      const centerWorld = this.el.object3D.localToWorld(this.label.position.clone());
+      const direction = head.clone().sub(centerWorld);
+      const offset = Math.min(direction.length() * 0.3, width * 0.7);
+      centerWorld.addScaledVector(direction.normalize(), offset);
+      this.label.position.copy(this.el.object3D.worldToLocal(centerWorld));
       this.label.scale.set(height * this.labelWidth / 128, height, 1);
       this.line.visible = this.label.visible = visible;
     },

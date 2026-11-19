@@ -59,7 +59,7 @@ const component = Object.assign({
   el: {components: {"fkc-atom-labels": labels}},
   line: {visible: false}, label: {visible: false},
   canvas: {getContext: () => ({measureText: text => ({width: text.length * 20}),
-    clearRect() {}, fillRect() {}, fillText(text) { labelText = text; }})},
+    clearRect() {}, fillRect() {}, strokeText() {}, fillText(text) { labelText = text; }})},
   texture: {repeat: {set() {}}}
 }, components["fkc-measurements"]);
 F.setStatus = () => {};
@@ -93,6 +93,15 @@ visual.fkcStructure.mode = "cell";
 component.reset();
 selectAtom(0);
 assert.equal(component.points.length, 0, "Keine ungeprüfte periodische Zellmessung");
+F.Measure.setEnabled(false);
+F.Measure.toggleMode("distance");
+assert.equal(F.Measure.enabled, true);
+assert.equal(F.Measure.mode, "distance");
+F.Measure.toggleMode("angle");
+assert.equal(F.Measure.enabled, true);
+assert.equal(F.Measure.mode, "angle");
+F.Measure.toggleMode("angle");
+assert.equal(F.Measure.enabled, false, "Aktiver Button beendet Messmodus");
 console.log("Distanztest bestanden: Å-Geometrie, Symmetrie und exklusive Messmodus-Weiterleitung.");
 console.log("Winkel-/Torsionstests bestanden: 0/45/90/180°, ±90°, entartete Geometrie und Transformationsinvarianz.");
 console.log("Messauswahltests bestanden: Atom-/Bindungsklicks, Messlabels, Rücknahme, kompakte Ergebnisbreite und Zell-Ausschluss.");

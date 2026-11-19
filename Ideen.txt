@@ -221,6 +221,18 @@ IDE-34: Winkel aus drei Atomen, Torsion aus vier Atomen messen. Umgesetzt für
   -180 bis +180 Grad in Klickreihenfolge 1–2–3–4; entartete Geometrie nicht definiert.
   Handmenü mit eigener Messseite und Reset/Beenden. Zellmessungen weiterhin offen.
 
+IDE-35: Rechteckfreie Labels vor Atomen/Messverbindungen, weniger Bildüberladung.
+  Umgesetzt: weiße Schrift mit dunkler Kontur, transparenter Hintergrund, höhere
+  Renderreihenfolge und Positionsversatz zum Betrachter. Pico-Lesbarkeit nachtesten.
+
+IDE-36: Keine Handmenü-Untermenüs; direkte Symbolbuttons für Messung und Styles.
+  Messbuttons zeigen 2/3/4 verbundene Atome, Winkel zusätzlich Bogen. Aktiv:
+  eingedrückt/hellrot; erneuter Klick beendet Modus, anderer Messbutton wechselt
+  exklusiv. Vier Style-Symbole mit kurzen Beschriftungen, genau einer aktiv.
+  Labels weiterhin direkter Modusbutton, Resets direkt. Kurzinfo/Legende auf Fläche;
+  lange Modelltexte nicht mehr als Hand-Unterseite, weiterhin im bisherigen Menü.
+  Gelbe Aura blasser (0,16), Messstäbe 0,35. Umsetzung lokal, Pico-Nachtest offen.
+
 Neueste Rückmeldung: Nutzer meldet vorherigen Distanz-/Labelprototyp als funktionierend.
 Handmenü nochmals um etwa 10 % auf 0,245×0,288 m verkleinert; Nachtest offen.
 
