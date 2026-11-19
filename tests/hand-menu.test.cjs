@@ -82,6 +82,7 @@ F.Measure = {
   toggleMode(value) { enabled = !(enabled && mode === value); mode = value; }
 };
 F.CIF = {styles: ["ball-stick", "space-filling", "wires", "capped-sticks"].map(id => ({id})), setStyle() {}};
+F.CIF.availableStyles = structure => structure.polyhedra ? F.CIF.styles.concat({id: "polyhedral"}) : F.CIF.styles;
 F.AtomLabels = {setMode() {}};
 const model = {
   dataset: {title: "C60"},
@@ -112,6 +113,10 @@ menu.hoverIndex = 8;
 menu.pressedIndex = 8;
 menu.render(structure);
 assert.equal(menu.buttons.length, 13, "Hover/Druck verändert Trefferbereiche nicht");
+menu.render({mode: "coordination", atoms: new Array(7), polyhedra: [{}], spaceGroup: {name: "P -1"}});
+assert.equal(menu.buttons.length, 14, "Koordinationsansicht bietet fünf Styles und Messungen");
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
+menu.buttons[7].action(); // Polyhedral-Style direkt erreichbar.
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

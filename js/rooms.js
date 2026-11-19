@@ -300,11 +300,15 @@
       "zwischen 0,6 und 1,25 Å ergänzt, keine Wasserstoffbrücken dargestellt.\n" +
       "Space-Filling-Radien (Å): H 1,20; C 1,70; N 1,55; O 1,52; Cl 1,75; Co 2,00 " +
       "(gewählte Radiuskonvention, für Co keine Ableitung aus der CIF).\n" +
-      "ADPs gespeichert; Ellipsoid und Polyhedral noch nicht umgesetzt.",
+      "Koordinationsumgebung: ein Co mit zwei N-, zwei O- und zwei Cl-Nachbarn.\n" +
+      "Polyhedral zeigt transparente konvexe Hüllen der echten Nachbarpositionen " +
+      "in Komplex- und Koordinationsansicht; Zellpolyeder noch nicht verfügbar.\n" +
+      "ADPs gespeichert; Ellipsoid noch nicht umgesetzt.",
     variants: [
       {id: "co-complex", title: "Co – Verbindung (Komplex)",
         model: "assets/structures/Co-Produkt1.cif", cifMode: "molecule"},
-      {id: "co-cell", title: "Co – Elementarzelle", model: "assets/structures/Co-Produkt1.cif", cifMode: "cell"}
+      {id: "co-cell", title: "Co – Elementarzelle", model: "assets/structures/Co-Produkt1.cif", cifMode: "cell"},
+      {id: "co-coordination", title: "Co – Koordinationsumgebung", model: "assets/structures/Co-Produkt1.cif", cifMode: "coordination"}
     ]
   });
 

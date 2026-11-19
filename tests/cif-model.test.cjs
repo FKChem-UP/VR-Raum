@@ -87,7 +87,7 @@ const group = {
   traverse(callback) { [atomMesh, bondMesh, frameMesh].forEach(callback); }
 };
 const coordinatesBefore = JSON.stringify(molecule.atoms);
-for (const style of F.CIF.styles) {
+for (const style of F.CIF.availableStyles(molecule)) {
   F.CIF.applyStyle(group, style.id);
   assert.equal(atomMesh.scale.x, style.atomRadius);
   assert.equal(bondMesh.scale.x, style.bondRadius);
@@ -105,6 +105,49 @@ F.CIF.applyStyle(group, "ball-stick");
 assert.equal(bondMesh.visible, true, "Bindungen erscheinen nach Style-Rückwechsel");
 const coSource = fs.readFileSync(path.join(root, "assets/structures/Co-Produkt1.cif"), "utf8");
 const coCell = F.CIF.createStructure(coSource, "cell");
+const coordination = F.CIF.createStructure(coSource, "coordination");
+assert.equal(coordination.atoms.length, 7);
+assert.equal(F.CIF.availableStyles(coordination).length, 5);
+assert.equal(F.CIF.availableStyles(coCell).length, 4);
+assert.equal(F.CIF.availableStyles(molecule).length, 4);
+assert.throws(() => F.CIF.createStructure(source, "coordination"), /nicht verfügbar/);
+const polyMesh = {userData: {fkcPolyhedron: coordination.polyhedra[0]}, visible: false};
+const polyGroup = {userData: {fkcStructure: coordination}, traverse(callback) {
+  [atomMesh, bondMesh, polyMesh].forEach(callback);
+}};
+F.CIF.applyStyle(polyGroup, "polyhedral");
+assert.equal(polyMesh.visible, true);
+assert.equal(bondMesh.visible, true);
+F.CIF.applyStyle(polyGroup, "wires");
+assert.equal(polyMesh.visible, false);
+F.CIF.applyStyle(group, "polyhedral");
+assert.equal(group.userData.fkcStyle, "ball-stick", "Nicht unterstützte Ansicht fällt auf Kugel-Stab zurück");
+const octahedron = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const faces = F.CIF.polyhedronTriangles(octahedron);
+assert.equal(faces.length, 8);
+const cube = [[-1,-1,-1],[-1,-1,1],[-1,1,-1],[-1,1,1],[1,-1,-1],[1,-1,1],[1,1,-1],[1,1,1]];
+assert.equal(F.CIF.polyhedronTriangles(cube).length, 12, "Koplanare Würfelflächen nicht mehrfach triangulieren");
+assert.throws(() => F.CIF.polyhedronTriangles([[0,0,0],[1,0,0],[0,1,0],[1,1,0]]), /Entartetes/);
+const neighborPoints = coordination.polyhedra[0].neighbors.map(index => coordination.atoms[index].positionAngstrom);
+const actualFaces = F.CIF.polyhedronTriangles(neighborPoints);
+assert.equal(actualFaces.length, 8, "Verzerrtes Co-Oktaeder besitzt acht echte Flächen");
+const edges = new Map();
+const sub = (a, b) => a.map((value, axis) => value - b[axis]);
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const dot = (a, b) => a.reduce((sum, value, axis) => sum + value*b[axis], 0);
+for (const triangle of actualFaces) {
+  const [a,b,c] = triangle.map(index => neighborPoints[index]);
+  const normal = cross(sub(b,a),sub(c,a));
+  assert.ok(dot(normal, sub(coordination.atoms[0].positionAngstrom,a)) < 0, "Zentrum innerhalb, Normalen nach außen");
+  assert.ok(neighborPoints.every(point => dot(normal,sub(point,a)) < 1e-7));
+  for (let i = 0; i < 3; i++) {
+    const key = [triangle[i],triangle[(i+1)%3]].sort((a,b) => a-b).join(":");
+    edges.set(key,(edges.get(key)||0)+1);
+  }
+}
+assert.ok([...edges.values()].every(count => count === 2), "Geschlossene Hülle");
+assert.equal(edges.size, 12);
+console.log("Polyedertests bestanden: Co-Hülle, Normalen, geschlossene Kanten, koplanare Flächen und Stylewechsel.");
 for (const bond of coCell.bonds) {
   const segments = coCell.bondSegments.filter(segment => segment.bondId === bond.id);
   for (const half of [0, 1]) {

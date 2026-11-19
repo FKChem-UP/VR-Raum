@@ -346,8 +346,16 @@ trikline Zelle/mehrzeilige Felder weiterhin beim späteren Import zu unterstütz
 - Unbekannte Punkte markieren. Nutzerberichte und tatsächlich ausgeführte
   Agententests klar trennen; niemals ungeprüfte Funktion als getestet ausgeben.
 
+IDE-46: Co-Koordinationsumgebung und danach Polyhedral-Style umsetzen.
+  Nutzer hat beide Etappen ausdrücklich beauftragt. Lokal umgesetzt:
+  ein Co-Zentrum mit sechs direkten Nachbarn aus der CIF (2 N, 2 O, 2 Cl),
+  7 Atome/6 Bindungen. Polyhedral in Komplex und Koordinationsansicht,
+  transparente konvexe Hüllen aus echten Nachbarpositionen, kein Idealoktaeder.
+  Labels und Messungen im Ausschnitt erhalten. Zellpolyeder noch nicht umgesetzt.
+  Numerische und Logiktests bestanden; Pico-Nachtest der neuen Ansichten offen.
+
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
 Werkzeugmodi, Undo, Zellrahmen-Umschalter, Nachbarhervorhebung,
-Koordinationspolyeder und Schnittansichten wurden vom Agenten als sinnvolle
+Schnittansichten wurden vom Agenten als sinnvolle
 Erweiterungen vorgeschlagen. Sie sind keine separat bestätigten Nutzeraufträge.

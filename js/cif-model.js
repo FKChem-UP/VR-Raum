@@ -580,7 +580,7 @@
   }
 
   function createStructure(source, mode = "molecule") {
-    if (!["molecule", "cell"].includes(mode)) {
+    if (!["molecule", "cell", "coordination"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
     if (/_atom_site_aniso_label/i.test(source) && /\bCo01\s+Co\s/.test(source)) {
@@ -590,6 +590,7 @@
       return structure;
     }
     // Auch die Zellansicht muss die Einzelkäfigprüfungen bestehen.
+    if (mode === "coordination") fail("Koordinationsansicht für diese Struktur nicht verfügbar.");
     const molecule = extractMolecule(readStructure(source));
     if (mode === "molecule") return {...molecule, mode};
     const cell = {
@@ -608,7 +609,8 @@
     {id: "ball-stick", title: "Ball-and-Stick", atomRadius: 0.32, bondRadius: 0.10},
     {id: "space-filling", title: "Space-Filling", atomRadius: 1.70, bondRadius: 0},
     {id: "wires", title: "Wires", atomRadius: 0.025, bondRadius: 0.025},
-    {id: "capped-sticks", title: "Capped Sticks", atomRadius: 0.14, bondRadius: 0.14}
+    {id: "capped-sticks", title: "Capped Sticks", atomRadius: 0.14, bondRadius: 0.14},
+    {id: "polyhedral", title: "Polyhedral", atomRadius: 0.32, bondRadius: 0.10}
   ];
   const elements = {
     H: {color: "#eeeeee", vdw: 1.20}, C: {color: "#515151", vdw: 1.70},
@@ -617,7 +619,55 @@
     Co: {color: "#ed709b", vdw: 2.00}
   };
 
+  // Konvexe Hülle aus echten Nachbarpositionen; koplanare Flächen nur einmal
+  // triangulieren, keine idealisierten Oktaeder oder neuen chemischen Bindungen.
+  function polyhedronTriangles(points) {
+    const sub = (a, b) => a.map((value, axis) => value - b[axis]);
+    const dot = (a, b) => a.reduce((sum, value, axis) => sum + value * b[axis], 0);
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const unit = a => { const length = Math.hypot(...a); return a.map(value => value / length); };
+    if (points.length < 4 || points.some(point => point.length !== 3 || point.some(value => !Number.isFinite(value)))) {
+      throw new Error("Ungültige Polyederpunkte.");
+    }
+    const tolerance = 1e-7 * Math.max(1, ...points.map(point => Math.hypot(...sub(point, points[0]))));
+    const faces = new Map();
+    for (let a = 0; a < points.length - 2; a++) {
+      for (let b = a + 1; b < points.length - 1; b++) {
+        for (let c = b + 1; c < points.length; c++) {
+          let normal = cross(sub(points[b], points[a]), sub(points[c], points[a]));
+          if (Math.hypot(...normal) < tolerance * tolerance) continue;
+          normal = unit(normal);
+          const distances = points.map(point => dot(normal, sub(point, points[a])));
+          const positive = distances.some(value => value > tolerance);
+          const negative = distances.some(value => value < -tolerance);
+          if (positive && negative || !positive && !negative) continue;
+          if (positive) normal = normal.map(value => -value);
+          const vertices = distances.map((value, index) => Math.abs(value) <= tolerance ? index : -1).filter(index => index >= 0);
+          faces.set(vertices.join(","), {vertices, normal});
+        }
+      }
+    }
+    if (faces.size < 4) throw new Error("Entartetes Koordinationspolyeder.");
+    const triangles = [];
+    for (const {vertices, normal} of faces.values()) {
+      const center = [0, 1, 2].map(axis => vertices.reduce((sum, index) => sum + points[index][axis], 0) / vertices.length);
+      const u = unit(sub(points[vertices[0]], center));
+      const v = cross(normal, u);
+      vertices.sort((a, b) => Math.atan2(dot(sub(points[a], center), v), dot(sub(points[a], center), u)) -
+        Math.atan2(dot(sub(points[b], center), v), dot(sub(points[b], center), u)));
+      for (let i = 1; i < vertices.length - 1; i++) triangles.push([vertices[0], vertices[i], vertices[i + 1]]);
+    }
+    return triangles;
+  }
+
+  function availableStyles(structure) {
+    return styles.filter(style => style.id !== "polyhedral" || structure && structure.polyhedra && structure.polyhedra.length);
+  }
+
   function applyStyle(group, styleId) {
+    if (styleId === "polyhedral" && !availableStyles(group.userData.fkcStructure).some(style => style.id === styleId)) {
+      styleId = "ball-stick";
+    }
     const style = styles.find(entry => entry.id === styleId);
     if (!style) throw new Error("Nicht unterstützter CIF-Style: " + styleId);
     group.traverse(mesh => {
@@ -628,6 +678,8 @@
         if (!element) throw new Error("Unbekanntes Darstellungselement.");
         mesh.scale.setScalar(styleId === "space-filling" ? element.vdw :
           styleId === "ball-stick" && mesh.userData.fkcAtom.element === "H" ? 0.20 : style.atomRadius);
+      } else if (mesh.userData.fkcPolyhedron) {
+        mesh.visible = styleId === "polyhedral";
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
         mesh.scale.x = mesh.scale.z = style.bondRadius;
@@ -641,11 +693,12 @@
   }
 
   F.CIF = {
-    createStructure, styles, applyStyle, elements,
+    createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
     setStyle(root, styleId) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
-      if (!mesh || !visual.fkcStructure || root.fkcPendingVisual) return false;
+      if (!mesh || !visual.fkcStructure || root.fkcPendingVisual ||
+          !availableStyles(visual.fkcStructure).some(style => style.id === styleId)) return false;
       const scene = F.getScene();
       const labels = scene && scene.components["fkc-atom-labels"];
       if (labels) labels.clear();
@@ -663,6 +716,8 @@
     const group = new T.Group();
     group.name = (structure.name || "C60") + "-from-CIF-" + structure.mode;
     group.userData.fkcStructure = structure;
+    const polyhedronGeometries = [];
+    const polyhedronMaterials = [];
 
     const sphere = new T.SphereGeometry(1, 24, 16);
     const cylinder = new T.CylinderGeometry(1, 1, 1, 12);
@@ -774,9 +829,32 @@
       });
     }
 
+    (structure.polyhedra || []).forEach(environment => {
+      const points = environment.neighbors.map(index => structure.atoms[index].positionAngstrom);
+      const triangles = polyhedronTriangles(points);
+      const geometry = new T.BufferGeometry();
+      geometry.setAttribute("position", new T.Float32BufferAttribute(
+        triangles.flatMap(triangle => triangle.flatMap(index => points[index])), 3));
+      geometry.computeVertexNormals();
+      const material = new T.MeshStandardMaterial({
+        color: elements[structure.atoms[environment.center].element].color,
+        transparent: true, opacity: 0.20, side: T.DoubleSide, depthWrite: false,
+        roughness: 0.65, metalness: 0
+      });
+      const mesh = new T.Mesh(geometry, material);
+      mesh.name = "coordination-polyhedron-" + structure.atoms[environment.center].id;
+      mesh.userData.fkcPolyhedron = environment;
+      mesh.visible = false;
+      mesh.raycast = function () {}; // Flächen blockieren weder Atome noch Bindungen.
+      group.add(mesh);
+      polyhedronGeometries.push(geometry);
+      polyhedronMaterials.push(material);
+    });
     return {
       group,
       dispose: function () {
+        polyhedronGeometries.forEach(geometry => geometry.dispose());
+        polyhedronMaterials.forEach(material => material.dispose());
         sphere.dispose();
         cylinder.dispose();
         atomMaterials.forEach(material => material.dispose());

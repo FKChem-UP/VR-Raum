@@ -1833,7 +1833,7 @@
         const structure = visual && visual.fkcStructure;
         if (structure) {
           value = "Aktuelle CIF-Ansicht: " +
-            (structure.mode === "cell" ? "Elementarzelle" : "Einzelmolekül") +
+            ({cell: "Elementarzelle", coordination: "Koordinationsumgebung", molecule: "Molekül / Komplex"}[structure.mode] || structure.mode) +
             "\nZellparameter aus CIF (Å): " +
             structure.cellLengthsAngstrom.join(" / ") +
             "\nZellwinkel (°): " + structure.cellAnglesDegrees.join(" / ") +

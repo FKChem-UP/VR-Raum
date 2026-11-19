@@ -162,8 +162,8 @@
     select: function (hit) {
       const visual = hit.el.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
-      if (!structure || structure.mode !== "molecule") {
-        F.setStatus("Messungen zunächst nur am CIF-Einzelmolekül verfügbar.");
+      if (!structure || !["molecule", "coordination"].includes(structure.mode)) {
+        F.setStatus("Messungen nur am CIF-Molekül oder der Koordinationsumgebung verfügbar.");
         return;
       }
       const required = counts[F.Measure.mode];

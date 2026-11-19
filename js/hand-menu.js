@@ -342,6 +342,18 @@
             ctx.arc(points[1][0], points[1][1], 14, Math.PI * 1.15, Math.PI * 1.85);
             ctx.stroke();
           }
+          if (entry.kind === "polyhedral") {
+            ctx.strokeStyle = "#486e56";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y + shift + 8);
+            ctx.lineTo(x + w / 2 + 22, y + shift + 27);
+            ctx.lineTo(x + w / 2, y + shift + 46);
+            ctx.lineTo(x + w / 2 - 22, y + shift + 27);
+            ctx.lineTo(x + w / 2, y + shift + 8);
+            ctx.lineTo(x + w / 2, y + shift + 46);
+            ctx.stroke();
+          }
           ctx.fillStyle = "#173527";
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
@@ -365,11 +377,13 @@
         });
         if (structure) {
           text("Styles");
-          row(F.CIF.styles.map(style => ({
+          const available = F.CIF.availableStyles(structure);
+          const activeStyle = available.some(style => style.id === model.fkcStyle) ? model.fkcStyle : "ball-stick";
+          row(available.map(style => ({
             label: {"ball-stick": "Kugel–Stab", "space-filling": "Raumfüllend",
-              wires: "Wires", "capped-sticks": "Sticks"}[style.id],
+              wires: "Wires", "capped-sticks": "Sticks", polyhedral: "Polyeder"}[style.id],
             kind: style.id,
-            selected: (model.fkcStyle || "ball-stick") === style.id,
+            selected: activeStyle === style.id,
             action: () => F.CIF.setStyle(model, style.id)
           })));
         }
@@ -377,7 +391,7 @@
         button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
-        if (structure && structure.mode === "molecule") {
+        if (structure && ["molecule", "coordination"].includes(structure.mode)) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           row(["distance", "angle", "torsion"].map(mode => ({
             label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode],

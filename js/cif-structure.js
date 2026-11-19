@@ -228,10 +228,32 @@
       spaceGroup: {name: structure.spaceGroup, number: "2"},
       hydrogenBondRule: "Eindeutiger C/N/O-Nachbar zwischen 0,6 und 1,25 Å; geometrisch ergänzt."
     };
+    if (mode === "coordination") {
+      const complex = createCoStructure(source, "molecule");
+      const environment = complex.polyhedra[0];
+      const indexes = [environment.center, ...environment.neighbors];
+      const remap = new Map(indexes.map((index, i) => [index, i]));
+      const origin = complex.atoms[environment.center].positionAngstrom;
+      return {...complex, mode, name: "Co-Produkt1 – Koordinationsumgebung",
+        atoms: indexes.map(index => ({...complex.atoms[index],
+          positionAngstrom: complex.atoms[index].positionAngstrom.map((value, axis) => value - origin[axis])})),
+        bonds: complex.bonds.filter(bond => (bond.a === environment.center || bond.b === environment.center) &&
+          remap.has(bond.a) && remap.has(bond.b)).map(bond => ({...bond, a: remap.get(bond.a), b: remap.get(bond.b)})),
+        polyhedra: [{center: 0, neighbors: [1, 2, 3, 4, 5, 6]}],
+        description: "Ein Co-Zentrum mit zwei N-, zwei O- und zwei Cl-Nachbarn aus CIF-Bindungen einschließlich Symmetrieabbild."};
+    }
     if (mode === "molecule") {
       const complex = reconstructCoHeavy(structure, true);
+      const polyhedra = [];
+      complex.atoms.forEach((atom, center) => {
+        if (atom.element !== "Co") return;
+        const neighbors = complex.bonds.filter(bond => bond.a === center || bond.b === center)
+          .map(bond => bond.a === center ? bond.b : bond.a);
+        if (neighbors.length !== 6 || new Set(neighbors).size !== 6) throw new Error("Co-Koordinationszahl ist nicht sechs.");
+        polyhedra.push({center, neighbors});
+      });
       const center = [0, 1, 2].map(axis => complex.atoms.reduce((sum, atom) => sum + atom.positionAngstrom[axis], 0) / complex.atoms.length);
-      return {...base, atoms: complex.atoms.map(atom => ({...atom,
+      return {...base, polyhedra, atoms: complex.atoms.map(atom => ({...atom,
         positionAngstrom: atom.positionAngstrom.map((value, axis) => value - center[axis])})),
         bonds: complex.bonds.map((bond, i) => ({...bond, id: "co-bond-" + (i + 1),
           distanceAngstrom: bond.reportedDistanceAngstrom})),

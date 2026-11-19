@@ -30,6 +30,28 @@ const cubic = api.cellMatrix([2, 2, 2], [90, 90, 90]);
 const point = api.cartesian([0.5, 0.5, 0.5], cubic);
 assert.ok(point.every(value => Math.abs(value - 1) < 1e-10));
 const complex = api.reconstructCoHeavy(structure);
+const coordination = api.createCoStructure(source, "coordination");
+const fullComplex = api.createCoStructure(source, "molecule");
+assert.equal(coordination.atoms.length, 7);
+assert.equal(coordination.bonds.length, 6);
+assert.equal(coordination.atoms[0].element, "Co");
+assert.ok(coordination.atoms[0].positionAngstrom.every(value => value === 0));
+assert.equal(coordination.atoms.filter(atom => atom.element === "N").length, 2);
+assert.equal(coordination.atoms.filter(atom => atom.element === "O").length, 2);
+assert.equal(coordination.atoms.filter(atom => atom.element === "Cl").length, 2);
+assert.equal(new Set(coordination.atoms.map(atom => atom.id)).size, 7);
+assert.equal(fullComplex.polyhedra.length, 2);
+for (const atom of coordination.atoms) {
+  const original = fullComplex.atoms.find(entry => entry.id === atom.id);
+  assert.equal(original.cifLabel, atom.cifLabel);
+  assert.equal(original.modelNumber, atom.modelNumber);
+  assert.deepEqual(original.cellShift, atom.cellShift);
+}
+for (const bond of coordination.bonds) {
+  assert.equal(bond.a, 0);
+  assert.ok(Math.abs(Math.hypot(...coordination.atoms[bond.b].positionAngstrom) - bond.distanceAngstrom) < 0.005);
+}
+console.log("Co-Koordinationsansicht bestanden: 7 Atome, 6 Bindungen, originale IDs und Symmetrieabbilder.");
 for (const mode of ["molecule", "cell"]) {
   const model = api.createCoStructure(source, mode);
   console.log("Co-Modell", mode, model.atoms.length, "Atome", model.bonds.length, "Bindungen", model.excludedSites || "");
