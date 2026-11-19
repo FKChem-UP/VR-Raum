@@ -19,7 +19,7 @@
 
   F.AtomLabels = {
     atomFromHit,
-    text: atom => atom.cifLabel + " · Atom " + atom.modelNumber,
+    text: atom => atom.cifLabel,
     setMode(root, mode) {
       if (!root || !["off", "hover"].includes(mode)) return;
       root.fkcAtomLabels = mode;

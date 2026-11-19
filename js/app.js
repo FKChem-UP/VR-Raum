@@ -511,7 +511,7 @@
             const roomId = this.hit.el.dataset.roomId;
 
             if (roomId && F.app) {
-              F.app.changeRoom(roomId);
+              if (F.RoomEntry) F.RoomEntry.begin(this.hit, this);
             }
           }
 
@@ -755,7 +755,8 @@
             hit.el.dataset.roomId &&
             !(F.Menu && F.Menu.opened)
           ) {
-            this.changeRoom(hit.el.dataset.roomId);
+            // Poster werden ausschließlich durch RoomEntry-Haltebestätigung betreten.
+            return;
           }
 
           return;

@@ -16,7 +16,7 @@ const atom = {cifLabel: "C0", modelNumber: 17, id: "atom-17"};
 const mesh = {visible: true, parent: rootObject, userData: {fkcAtom: atom}};
 const hit = {type: "model", el: root, mesh};
 assert.equal(F.AtomLabels.atomFromHit(hit).atom, atom);
-assert.equal(F.AtomLabels.text(atom), "C0 · Atom 17");
+assert.equal(F.AtomLabels.text(atom), "C0");
 assert.equal(F.AtomLabels.atomFromHit(null), null);
 assert.equal(F.AtomLabels.atomFromHit({...hit, type: "action"}), null);
 assert.equal(F.AtomLabels.atomFromHit({...hit, mesh: {...mesh, userData: {}}}), null);
