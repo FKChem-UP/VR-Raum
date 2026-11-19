@@ -50,6 +50,20 @@
     laserHand,
     gate,
     readViewerHead,
+    size: "standard",
+    sizes: {small: 0.85, standard: 1, large: 1.15},
+    setSize(size) {
+      if (!Object.prototype.hasOwnProperty.call(this.sizes, size)) return;
+      this.size = size;
+      const scene = F.getScene();
+      const menu = scene && scene.components["fkc-hand-menu"];
+      if (menu) {
+        menu.root.object3D.scale.setScalar(this.sizes[size]);
+        menu.root.object3D.updateWorldMatrix(true, true);
+        menu.signature = "";
+      }
+      F.invalidateHits();
+    },
     setLaserHand(hand) {
       if (!["left", "right"].includes(hand)) return;
       F.Settings.laserHand = hand;
@@ -202,6 +216,7 @@
       // 10 cm vom Kopf weg vor der Hand, statt zwischen Hand und Gesicht.
       this.position.addScaledVector(this.toHead, -0.10);
       const object = this.root.object3D;
+      object.scale.setScalar(F.HandMenu.sizes[F.HandMenu.size]);
       object.position.copy(this.position);
       scene.object3D.worldToLocal(object.position);
       // +Z der Menüfläche zeigt exakt zum Viewer-/Augenmittelpunkt.
@@ -233,7 +248,8 @@
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
-        F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex].join("|");
+        F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
+        F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor].join("|");
       if (signature !== this.signature) {
         this.signature = signature;
         this.render(structure);
@@ -270,7 +286,7 @@
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
-      ctx.fillText("Modellwerkzeuge", 28, 48, 710);
+      ctx.fillText(this.page === "settings" ? "Modelleinstellungen" : "Modellwerkzeuge", 28, 48, 610);
       ctx.font = "28px Arial";
       ctx.fillText(model.dataset.title || "3D-Modell", 28, 88, 710);
       let y = 115;
@@ -365,6 +381,27 @@
         });
         y += 100;
       };
+      if (this.page === "settings") {
+        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
+        text("Handmenügröße · gilt für die Sitzung");
+        for (const [size, title] of [["small", "Kleiner (85 %)"], ["standard", "Standard (100 %)"], ["large", "Größer (115 %)"]]) {
+          button(title, () => F.HandMenu.setSize(size), F.HandMenu.size === size);
+        }
+        if (structure) {
+          text("Bindungsfarben · ausgewähltes CIF-Modell");
+          for (const [mode, title] of [["auto", "Style-Standard"], ["element", "Endatomfarben"], ["uniform", "Einheitliche Farbe"]]) {
+            button(title, () => F.CIF.setBondAppearance(model, mode), (model.fkcBondColorMode || "auto") === mode);
+          }
+          text("Farbwahl aktiviert einheitliche Bindungsfarbe");
+          for (const [color, title] of [["#949494", "Grau"], ["#eeeeee", "Weiß"], ["#333333", "Dunkelgrau"], ["#ff9d38", "Orange"]]) {
+            button(title, () => F.CIF.setBondAppearance(model, "uniform", color),
+              model.fkcBondColorMode === "uniform" && (model.fkcBondColor || "#949494") === color);
+          }
+          text("Atomfarben und Messfarben bleiben unverändert.");
+        } else text("Bindungsfarben nur bei CIF-Modellen verfügbar.");
+        this.texture.needsUpdate = true;
+        return;
+      }
       {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = model.fkcVariants || [];
@@ -433,6 +470,15 @@
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
         if (structure) text(structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
       }
+      // Eigenständiger Headerbutton, kein zusätzlicher Platz in Werkzeugzeilen.
+      const gearIndex = this.buttons.length;
+      const gearPressed = this.pressedIndex === gearIndex;
+      ctx.fillStyle = gearPressed ? "#f3bcbc" : this.hoverIndex === gearIndex ? "#fff0b8" : "#d5e2d9";
+      ctx.fillRect(664, 14 + (gearPressed ? 4 : 0), 76, 54);
+      ctx.fillStyle = "#173527";
+      ctx.font = "38px Arial";
+      ctx.fillText("⚙", 681, 55 + (gearPressed ? 4 : 0));
+      this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.page = "settings"; }});
       this.texture.needsUpdate = true;
     },
 

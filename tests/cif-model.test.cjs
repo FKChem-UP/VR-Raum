@@ -79,6 +79,8 @@ const atomMesh = {
 const bondMesh = {userData: {fkcBond: molecule.bonds[0]}, scale: {y: 1.4}, visible: true};
 const coloredMaterial = {};
 const neutralMaterial = {};
+let neutralColor;
+neutralMaterial.color = {set(value) { neutralColor = value; }};
 bondMesh.userData.fkcElementMaterial = coloredMaterial;
 bondMesh.userData.fkcNeutralMaterial = neutralMaterial;
 const frameMesh = {userData: {}, scale: {x: 0.035}, visible: true};
@@ -87,6 +89,27 @@ const group = {
   traverse(callback) { [atomMesh, bondMesh, frameMesh].forEach(callback); }
 };
 const coordinatesBefore = JSON.stringify(molecule.atoms);
+F.getScene = () => ({components: {}});
+F.invalidateHits = () => {};
+const colorVisual = {fkcStructure: molecule, getObject3D: () => group};
+const colorRoot = {querySelector: () => colorVisual};
+assert.equal(F.CIF.setBondAppearance(colorRoot, "uniform", "#ff9d38"), true);
+assert.equal(neutralColor, "#ff9d38");
+assert.equal(bondMesh.material, neutralMaterial);
+F.CIF.applyStyle(group, "wires");
+assert.equal(bondMesh.material, neutralMaterial, "Einheitliche Farbe bleibt auch in Wires");
+assert.equal(neutralColor, "#ff9d38");
+assert.equal(F.CIF.setBondAppearance(colorRoot, "element"), true);
+F.CIF.applyStyle(group, "ball-stick");
+assert.equal(bondMesh.material, coloredMaterial, "Endatomfarben auch in Kugel-Stab");
+assert.equal(atomMesh.userData.fkcAtom, molecule.atoms[0]);
+assert.equal(F.CIF.setBondAppearance(colorRoot, "unknown"), false);
+assert.equal(F.CIF.setBondAppearance(colorRoot, "uniform", "invalid"), false);
+colorRoot.fkcPendingVisual = {};
+assert.equal(F.CIF.setBondAppearance(colorRoot, "auto"), false);
+delete colorRoot.fkcPendingVisual;
+F.CIF.setBondAppearance(colorRoot, "auto");
+assert.equal(neutralColor, "#949494");
 for (const style of F.CIF.availableStyles(molecule)) {
   F.CIF.applyStyle(group, style.id);
   assert.equal(atomMesh.scale.x, style.atomRadius);

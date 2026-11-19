@@ -360,10 +360,15 @@ IDE-47: Handmenüüberschriften Styles/Messen/Legende nicht von nachfolgenden
   physische Menügröße unverändert. Layouttest; neuer Pico-Nachtest offen.
 IDE-48: Zahnrad am Handmenü mit separater Einstellungsseite erwünscht:
   Menügröße größer/kleiner, Bindungsfarbe; eventuell Umgebungsradius und
-  H-Brücken-Grenzwerte. Noch nicht umgesetzt. Ausnahme vom früheren Wunsch
+  H-Brücken-Grenzwerte. Zahnrad mit Größe und Bindungsfarbe lokal umgesetzt:
+  85/100/115 % sitzungsweit; CIF-Farbmodi Style-Standard/Endatomfarben/Einheitlich
+  und Grau/Weiß/Dunkelgrau/Orange pro Modell, bei Variantenwechsel erhalten.
+  GLB nur Menügröße; Radius-/H-Brückenoptionen später. Pico-Nachtest offen.
+  Ausnahme vom früheren Wunsch
   nach keinerlei Unterseiten: Arbeitswerkzeuge bleiben direkt, Einstellungen
   könnten getrennt sein. Globale Komfort-/Lasereinstellungen bleiben Hauptmenü.
-  Bindungsfarbe: einheitlicher Farbwert vs. Endatomfarben als Modus klären.
+  Bindungsfarbe: einheitlicher Farbwert oder Endatomfarben unabhängig vom Style
+  wählbar; Style-Standard stellt bisheriges Verhalten wieder her.
 IDE-49: Umgebung einblenden, Kandidaten auswählen und beim Ausschalten nur
   übernommene Ergänzungen behalten; H-Brücken anzeigen ebenfalls ausdrücklich
   gewünscht. Umgebungsidee schon früher beschrieben, weiter offen. Empfehlung:

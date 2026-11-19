@@ -98,7 +98,7 @@ const menu = Object.assign({ctx, model, offset: 0, texture: {},
 const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "Pa-3"}};
 menu.render(structure);
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
-assert.equal(menu.buttons.length, 13, "3 Ansichten, 4 Styles, Labels, 3 Messmodi, 2 Resets");
+assert.equal(menu.buttons.length, 14, "3 Ansichten, 4 Styles, Labels, 3 Messmodi, 2 Resets, Zahnrad");
 const distanceButton = menu.buttons[8];
 const angleButton = menu.buttons[9];
 distanceButton.action();
@@ -116,9 +116,9 @@ assert.equal(menu.buttonIndex({x: 0, y: 0}), -1);
 menu.hoverIndex = 8;
 menu.pressedIndex = 8;
 menu.render(structure);
-assert.equal(menu.buttons.length, 13, "Hover/Druck verändert Trefferbereiche nicht");
+assert.equal(menu.buttons.length, 14, "Hover/Druck verändert Trefferbereiche nicht");
 menu.render({mode: "coordination", atoms: new Array(7), polyhedra: [{}], spaceGroup: {name: "P -1"}});
-assert.equal(menu.buttons.length, 14, "Koordinationsansicht bietet fünf Styles und Messungen");
+assert.equal(menu.buttons.length, 15, "Koordinationsansicht bietet fünf Styles, Messungen und Zahnrad");
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
 menu.buttons[7].action(); // Polyhedral-Style direkt erreichbar.
 for (const entry of drawnTexts.filter(entry => /^(Styles|Messen|Legende)/.test(entry.text))) {
@@ -127,6 +127,36 @@ for (const entry of drawnTexts.filter(entry => /^(Styles|Messen|Legende)/.test(e
     "Überschrift inklusive Unterlängen mit Abstand zur nächsten Fläche: " + entry.text);
 }
 assert.ok(drawnTexts.every(entry => entry.y <= 890), "Auch Legende und Kurzinfo passen auf die Menüfläche");
+F.invalidateHits = () => {};
+let menuScale = 1;
+menu.root = {object3D: {scale: {setScalar(value) { menuScale = value; }}, updateWorldMatrix() {}}};
+F.getScene = () => ({components: {"fkc-hand-menu": menu}});
+menu.buttons.at(-1).action();
+assert.equal(menu.page, "settings");
+const bondChanges = [];
+F.CIF.setBondAppearance = (...args) => bondChanges.push(args);
+menu.render(structure);
+assert.equal(menu.buttons.length, 11, "Zurück, drei Größen, drei Farbmodi, vier Farben");
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
+menu.buttons[1].action();
+assert.equal(menuScale, 0.85);
+menu.buttons[3].action();
+assert.equal(menuScale, 1.15);
+F.HandMenu.setSize("invalid");
+assert.equal(menuScale, 1.15);
+menu.buttons[2].action();
+assert.equal(menuScale, 1);
+menu.buttons[5].action();
+assert.equal(bondChanges.at(-1)[1], "element");
+menu.buttons[10].action();
+assert.equal(bondChanges.at(-1)[1], "uniform");
+assert.equal(bondChanges.at(-1)[2], "#ff9d38");
+menu.buttons[0].action();
+assert.equal(menu.page, "model");
+menu.render(null);
+menu.buttons.at(-1).action();
+menu.render(null);
+assert.equal(menu.buttons.length, 4, "GLB bietet Menügröße, aber keine CIF-Bindungsfarben");
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

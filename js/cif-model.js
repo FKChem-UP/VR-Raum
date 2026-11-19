@@ -684,8 +684,12 @@
         mesh.visible = style.bondRadius > 0;
         mesh.scale.x = mesh.scale.z = style.bondRadius;
         if (mesh.userData.fkcElementMaterial) {
-          mesh.material = ["wires", "capped-sticks"].includes(styleId)
+          const mode = group.userData.fkcBondColorMode || "auto";
+          mesh.material = (mode === "element" || mode === "auto" && ["wires", "capped-sticks"].includes(styleId))
             ? mesh.userData.fkcElementMaterial : mesh.userData.fkcNeutralMaterial;
+          if (mesh.userData.fkcNeutralMaterial.color) {
+            mesh.userData.fkcNeutralMaterial.color.set(mode === "uniform" ? group.userData.fkcBondColor || "#949494" : "#949494");
+          }
         }
       }
     });
@@ -694,6 +698,19 @@
 
   F.CIF = {
     createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
+    setBondAppearance(root, mode, color) {
+      if (!["auto", "element", "uniform"].includes(mode) || color !== undefined && !/^#[0-9a-f]{6}$/i.test(color)) return false;
+      const visual = root && root.querySelector(".model-visual");
+      const mesh = visual && visual.getObject3D("mesh");
+      if (!mesh || !visual.fkcStructure || root.fkcPendingVisual) return false;
+      root.fkcBondColorMode = mode;
+      if (color !== undefined) root.fkcBondColor = color;
+      mesh.userData.fkcBondColorMode = mode;
+      mesh.userData.fkcBondColor = root.fkcBondColor || "#949494";
+      applyStyle(mesh, mesh.userData.fkcStyle || "ball-stick");
+      F.invalidateHits();
+      return true;
+    },
     setStyle(root, styleId) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
@@ -923,6 +940,8 @@
         const structure = createStructure(source, this.data.mode);
         const built = buildMesh(structure);
         const root = this.el.closest(".interactable");
+        built.group.userData.fkcBondColorMode = root && root.fkcBondColorMode || "auto";
+        built.group.userData.fkcBondColor = root && root.fkcBondColor || "#949494";
         applyStyle(built.group, (root && root.fkcStyle) || "ball-stick");
 
         this.built = built;
