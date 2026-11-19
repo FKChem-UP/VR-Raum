@@ -40,6 +40,10 @@ Nutzer bestätigt Handmenü mit beiden Händen. Neu: Handmenü parallel zur Kame
 
 Neue CIFs im Strukturordner bleiben unverändert und noch nicht angebunden. Co-Produkt1 enthält trikline Zelle und anisotrope ADPs; bisheriger Importer unterstützt beides noch nicht. Ellipsoid und Polyhedral nicht implementiert. YBa-CIF benötigt wegen Teilbesetzungen und Bezug auf dotierte Studie fachliche Prüfung.
 
-Nächstes Arbeitspaket: **Menüausrichtung, Labels bei offenem Menü und Styles validieren**, danach begrenzten Co-Produkt1-Import planen. Vorlesungszuordnung der neuen Modelle anhand aktueller Raumdaten klären.
+Aktuelle Nutzerbestätigung: vier Styles und Atomlabels bei geöffnetem Handmenü funktionieren auf dem VR-Headset. Menübewegung wurde weiterhin als störend gemeldet. Neue Korrektur: Menüfront auf WebXR-Viewerposition (Augenmittelpunkt) ausgerichtet, Welt-Oben verhindert Controllerrollbewegung; Abstand zur Hand entlang der Richtung zum Kopf statt entlang mitrotierender Handflächenachse. Nachtest noch offen.
+
+Nächstes Arbeitspaket: **Augenmittelpunkt-Ausrichtung auf Pico nachtesten**, anschließend **Distanzmessung am CIF-C60-Einzelkäfig** planen/umsetzen: zwei Atome per Trigger wählen, Distanz in Å, auch nicht gebundene Atome, Rücknahme/Neustart/Beenden, keine gleichzeitige Zeichenaktion. Noch kein Messcode umgesetzt. Winkel und periodische Zellmessungen danach; Co-Produkt1-Import als separate spätere Etappe. Vorlesungszuordnung neuer Modelle vor Anbindung klären.
+
+Fortsetzung nach Kontextkomprimierung oder neuem Chat: zuerst diese Übersicht, `.clinerules/01-project.md`, `Ideen.txt` und `docs/VR_REDESIGN_PLAN.md` lesen, Git-Status prüfen und betroffene aktuelle Quelldateien vollständig lesen. Frühere Chat-/Dateiinhalte nicht als vollständig verfügbar voraussetzen. Keine Commits/Pushes oder Asset-Löschungen ohne Zustimmung.
 
 Zukunftsideen werden in der Umbauplanung gesammelt: unabhängige Darstellungsstile (Ball-and-Stick, Space-filling, Wires), weitere Strukturansichten und Verbindungen sowie mögliche spätere GLB-Ablösung. Aktuell keine Asset-Löschung. Nach überprüften Etappen den Nutzer ausdrücklich auf den nötigen GitHub-Desktop-Commit hinweisen; Commit/Push nur mit ausdrücklicher Zustimmung ausführen.

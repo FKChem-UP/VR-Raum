@@ -148,10 +148,14 @@ IDE-20: CIF-Dateien aller Strukturen im Begrüßungsraum sammeln, um später der
 IDE-21: Handmenü ohne zusätzliche Aufwärts-/Linksneigung zur Augenebene ausrichten.
   Status: Nutzer bestätigt Handmenü mit beiden Händen; Neigung als störend gemeldet.
   Ausrichtung jetzt parallel zur Kameraebene implementiert, Pico-Nachtest offen.
+  Neuere Präzisierung: Menü soll exakt zum Punkt zwischen den Augen zeigen,
+  nicht mit der Controllerorientierung rollen. Viewerpose/Welt-Oben und
+  rotationsunabhängiger Positionsversatz jetzt umgesetzt; Nachtest offen.
 
 IDE-22: Atomlabels auch bei geöffnetem Handmenü beim Anvisieren anzeigen.
   Status: Sperre entfernt; Treffer auf ausgewähltes Modell zusätzlich erlaubt.
   Zeichnen und Raumaktionen bleiben beim Handmenü gesperrt; Gerätetest offen.
+  Neuere Rückmeldung: Funktion mit VR-Headset vom Nutzer bestätigt.
 
 IDE-23: Begriff "Styles" wie in Mercury übernehmen: Ball-and-Stick, Space-Filling,
   Wires, Capped Sticks, Ellipsoid für Nicht-H-Atome aus ADPs und Polyhedral um
@@ -159,6 +163,7 @@ IDE-23: Begriff "Styles" wie in Mercury übernehmen: Ball-and-Stick, Space-Filli
   dünne Stäbe mit kleinen Atomknoten; Capped Sticks als dickere Stäbe mit runden
   Atomkappen. Keine Zusicherung identischer Mercury-Darstellung.
   Ellipsoid/Polyhedral noch offen; keine Daten oder Metallzentren in C60-CIF.
+  Neuere Rückmeldung: vier verfügbare Styles mit VR-Headset vom Nutzer bestätigt.
 
 IDE-24: Neue CIFs für Begrüßungsmodelle verwenden, alternativ zunächst Co-Produkt1
   als begrenztes Testmodell. Dateien vorhanden: Co-Produkt1.cif, Cu.cif, H2O.cif,

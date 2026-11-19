@@ -34,4 +34,40 @@ assert.equal(F.HandMenu.laserHand(), "left");
 F.HandMenu.setLaserHand("right");
 assert.equal(F.HandMenu.laserHand(), "right");
 assert.ok(components["fkc-hand-menu"]);
+// Viewerpose muss Vorrang vor einer möglicherweise versetzten XR-Kamera haben.
+const position = {
+  copy(value) { this.value = value; return this; },
+  applyMatrix4(matrix) { this.matrix = matrix; return this; }
+};
+const reference = {};
+const matrixWorld = {};
+let rigUpdated = false;
+const rig = {object3D: {
+  matrixWorld,
+  updateWorldMatrix() { rigUpdated = true; }
+}};
+const viewerPosition = {x: 0.1, y: 1.6, z: 0.2};
+const scene = {
+  renderer: {xr: {getReferenceSpace: () => reference}},
+  frame: {getViewerPose(space) {
+    assert.equal(space, reference);
+    return {transform: {position: viewerPosition}};
+  }},
+  camera: {getWorldPosition() { throw new Error("Keine XR-Kamera statt Viewerpose verwenden"); }}
+};
+assert.equal(F.HandMenu.readViewerHead(scene, rig, position), true);
+assert.equal(position.value, viewerPosition);
+assert.equal(position.matrix, matrixWorld);
+assert.equal(rigUpdated, true);
+scene.frame.getViewerPose = () => null;
+assert.equal(F.HandMenu.readViewerHead(scene, rig, position), false);
+let cameraUpdated = false;
+const fallback = {camera: {
+  updateWorldMatrix() { cameraUpdated = true; },
+  getWorldPosition(out) { out.copy(viewerPosition); }
+}};
+assert.equal(F.HandMenu.readViewerHead(fallback, null, position), true);
+assert.equal(cameraUpdated, true);
+assert.equal(F.HandMenu.readViewerHead({}, null, position), false);
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
+console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

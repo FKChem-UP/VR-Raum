@@ -27,10 +27,29 @@
       model.classList.contains("interactable") ? model : null;
   }
 
+  function readViewerHead(scene, rig, position) {
+    const xr = scene.renderer && scene.renderer.xr;
+    const reference = xr && xr.getReferenceSpace && xr.getReferenceSpace();
+    const frame = scene.frame && typeof scene.frame.getViewerPose === "function"
+      ? scene.frame : xr && xr.getFrame && xr.getFrame();
+    if (frame && reference && rig) {
+      const pose = frame.getViewerPose(reference);
+      if (!pose) return false; // Trackingverlust: keine alte Augenposition verwenden.
+      rig.object3D.updateWorldMatrix(true, false);
+      position.copy(pose.transform.position).applyMatrix4(rig.object3D.matrixWorld);
+      return true;
+    }
+    if (!scene.camera) return false;
+    scene.camera.updateWorldMatrix(true, false);
+    scene.camera.getWorldPosition(position);
+    return true;
+  }
+
   F.HandMenu = {
     opened: false,
     laserHand,
     gate,
+    readViewerHead,
     setLaserHand(hand) {
       if (!["left", "right"].includes(hand)) return;
       F.Settings.laserHand = hand;
@@ -64,8 +83,6 @@
       this.toHead = new T.Vector3();
       this.quaternion = new T.Quaternion();
       this.rigQuaternion = new T.Quaternion();
-      this.headQuaternion = new T.Quaternion();
-      this.sceneQuaternion = new T.Quaternion();
       this.canvas = document.createElement("canvas");
       this.canvas.width = WIDTH;
       this.canvas.height = HEIGHT;
@@ -144,7 +161,7 @@
         return;
       }
       if (!this.readPose(hand, source)) { this.hide(); return; }
-      scene.camera.getWorldPosition(this.head);
+      if (!readViewerHead(scene, F.getRig(), this.head)) { this.hide(); return; }
       this.toHead.copy(this.head).sub(this.position);
       const distance = this.toHead.length();
       // Näherung der Handinnenseite aus der Grip-Orientierung, kein Handtracking.
@@ -173,16 +190,15 @@
         this.signature = "";
       }
       // An der Hand verankert, zum Kopf ausgerichtet für lesbare Beschriftung.
-      this.position.addScaledVector(this.normal, 0.07);
+      // Abstand von der Hand zum Betrachter statt mitrotierender Handflächenachse.
+      this.position.addScaledVector(this.toHead, 0.07);
       const object = this.root.object3D;
       object.position.copy(this.position);
       scene.object3D.worldToLocal(object.position);
-      // Parallel zur Augen-/Kameraebene statt schräg zur seitlichen Handposition.
-      // Kopfrollwinkel wird übernommen, keine zusätzliche Links-/Aufwärtsneigung.
-      scene.camera.getWorldQuaternion(this.headQuaternion);
-      scene.object3D.getWorldQuaternion(this.sceneQuaternion);
-      object.quaternion.copy(this.sceneQuaternion.invert())
-        .multiply(this.headQuaternion);
+      // +Z der Menüfläche zeigt exakt zum Viewer-/Augenmittelpunkt.
+      // Welt-Oben verhindert Rollbewegungen durch die Controllerorientierung.
+      object.up.set(0, 1, 0);
+      object.lookAt(this.head);
       object.visible = true;
       object.updateWorldMatrix(true, true);
       const visual = model.querySelector(".model-visual");
