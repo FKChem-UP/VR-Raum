@@ -665,6 +665,7 @@
   }
 
   function applyStyle(group, styleId) {
+    if (group.userData.fkcEnvironment) group.userData.fkcEnvironment.refresh = true;
     if (styleId === "polyhedral" && !availableStyles(group.userData.fkcStructure).some(style => style.id === styleId)) {
       styleId = "ball-stick";
     }
@@ -698,6 +699,82 @@
 
   F.CIF = {
     createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
+    environmentState(root) {
+      const visual = root && root.querySelector(".model-visual");
+      const group = visual && visual.getObject3D("mesh");
+      return group && group.userData.fkcEnvironment;
+    },
+    setEnvironment(root, enabled, radius) {
+      const visual = root && root.querySelector(".model-visual");
+      const group = visual && visual.getObject3D("mesh");
+      if (!group || !visual.fkcStructure.environmentCell || root.fkcPendingVisual) return false;
+      if (radius !== undefined && ![1.5, 2, 3, 4, 5].includes(radius)) return false;
+      const state = group.userData.fkcEnvironment;
+      state.radius = radius === undefined ? state.radius : radius;
+      if (enabled && F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
+      state.enabled = !!enabled;
+      const candidates = F.CIFStructure.environmentCandidates(visual.fkcStructure, state.radius);
+      state.available = new Set(candidates.map(candidate => candidate.id));
+      for (const candidate of candidates) {
+        if (state.records.has(candidate.id)) continue;
+        const built = buildMesh(candidate);
+        const materials = new Map();
+        built.group.traverse(mesh => {
+          if (!mesh.isMesh) return;
+          for (const key of ["material", "fkcElementMaterial", "fkcNeutralMaterial"]) {
+            const source = key === "material" ? mesh.material : mesh.userData[key];
+            if (!source) continue;
+            if (!materials.has(source)) materials.set(source, source.clone());
+            if (key === "material") mesh.material = materials.get(source);
+            else mesh.userData[key] = materials.get(source);
+          }
+          mesh.userData.fkcEnvironmentId = candidate.id;
+        });
+        group.add(built.group);
+        state.records.set(candidate.id, {built, materials, candidate});
+      }
+      this.updateEnvironment(group);
+      F.invalidateHits();
+      F.setStatus("Umgebung: " + candidates.length + " Kandidaten, " + state.selected.size + " übernommen.");
+      return true;
+    },
+    updateEnvironment(group) {
+      const state = group.userData.fkcEnvironment;
+      if (!state) return;
+      for (const [id, record] of state.records) {
+        const selected = state.selected.has(id);
+        record.built.group.visible = selected || state.enabled && state.available.has(id);
+        record.built.group.userData.fkcBondColorMode = group.userData.fkcBondColorMode;
+        record.built.group.userData.fkcBondColor = group.userData.fkcBondColor;
+        applyStyle(record.built.group, group.userData.fkcStyle || "ball-stick");
+        for (const material of record.materials.values()) {
+          material.transparent = !selected;
+          material.opacity = selected ? 1 : 0.25;
+          material.depthWrite = selected;
+        }
+      }
+      state.refresh = false;
+    },
+    clickEnvironment(hit) {
+      const id = hit.mesh && hit.mesh.userData.fkcEnvironmentId;
+      if (!id) return false;
+      const state = this.environmentState(hit.el);
+      if (!state) return false;
+      // Ergänzungen in dieser Etappe nicht als Basis-Bondindices messen.
+      if (!state.enabled) { F.setStatus("Umgebung einschalten, um Ergänzungen abzuwählen."); return true; }
+      if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+      const visual = hit.el.querySelector(".model-visual");
+      this.updateEnvironment(visual.getObject3D("mesh"));
+      F.invalidateHits();
+      F.setStatus(state.selected.size + " Umgebungsbestandteile übernommen.");
+      return true;
+    },
+    resetEnvironment(root) {
+      const state = this.environmentState(root);
+      if (!state) return;
+      state.selected.clear();
+      this.setEnvironment(root, false);
+    },
     setBondAppearance(root, mode, color) {
       if (!["auto", "element", "uniform"].includes(mode) || color !== undefined && !/^#[0-9a-f]{6}$/i.test(color)) return false;
       const visual = root && root.querySelector(".model-visual");
@@ -708,6 +785,7 @@
       mesh.userData.fkcBondColorMode = mode;
       mesh.userData.fkcBondColor = root.fkcBondColor || "#949494";
       applyStyle(mesh, mesh.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(mesh);
       F.invalidateHits();
       return true;
     },
@@ -720,10 +798,18 @@
       const labels = scene && scene.components["fkc-atom-labels"];
       if (labels) labels.clear();
       applyStyle(mesh, styleId);
+      this.updateEnvironment(mesh);
       root.fkcStyle = styleId;
       // Anzeigegröße/Griffbereich an geänderte Atomradien anpassen.
       const normalize = visual.components["fkc-normalize"];
-      if (normalize) normalize.normalize();
+      if (normalize) {
+        // Umgebung darf die Basis beim Stylewechsel nicht unerwartet verkleinern.
+        const environment = mesh.userData.fkcEnvironment;
+        const records = environment ? [...environment.records.values()] : [];
+        records.forEach(record => mesh.remove(record.built.group));
+        try { normalize.normalize(); }
+        finally { records.forEach(record => mesh.add(record.built.group)); }
+      }
       F.invalidateHits();
       return true;
     }
@@ -733,6 +819,9 @@
     const group = new T.Group();
     group.name = (structure.name || "C60") + "-from-CIF-" + structure.mode;
     group.userData.fkcStructure = structure;
+    if (structure.environmentCell) group.userData.fkcEnvironment = {
+      enabled: false, radius: 3, selected: new Set(), records: new Map(), available: new Set()
+    };
     const polyhedronGeometries = [];
     const polyhedronMaterials = [];
 
@@ -870,6 +959,11 @@
     return {
       group,
       dispose: function () {
+        const environment = group.userData.fkcEnvironment;
+        if (environment) for (const record of environment.records.values()) {
+          record.materials.forEach(material => material.dispose());
+          record.built.dispose();
+        }
         polyhedronGeometries.forEach(geometry => geometry.dispose());
         polyhedronMaterials.forEach(material => material.dispose());
         sphere.dispose();

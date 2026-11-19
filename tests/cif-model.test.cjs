@@ -171,6 +171,30 @@ for (const triangle of actualFaces) {
 assert.ok([...edges.values()].every(count => count === 2), "Geschlossene Hülle");
 assert.equal(edges.size, 12);
 console.log("Polyedertests bestanden: Co-Hülle, Normalen, geschlossene Kanten, koplanare Flächen und Stylewechsel.");
+const environmentRecordGroup = {userData: {}, traverse() {}};
+const previewMaterial = {};
+const environmentState = {enabled: true, radius: 3, selected: new Set(),
+  available: new Set(["candidate"]), records: new Map([["candidate", {
+    built: {group: environmentRecordGroup}, materials: new Map([[{}, previewMaterial]])
+  }]])};
+const environmentGroup = {userData: {fkcEnvironment: environmentState, fkcStyle: "wires"}};
+const environmentRoot = {querySelector: () => ({getObject3D: () => environmentGroup})};
+F.setStatus = () => {};
+F.CIF.updateEnvironment(environmentGroup);
+assert.equal(environmentRecordGroup.visible, true);
+assert.equal(previewMaterial.opacity, 0.25);
+assert.equal(F.CIF.clickEnvironment({el: environmentRoot, mesh: {userData: {fkcEnvironmentId: "candidate"}}}), true);
+assert.equal(previewMaterial.opacity, 1);
+environmentState.enabled = false;
+F.CIF.updateEnvironment(environmentGroup);
+assert.equal(environmentRecordGroup.visible, true, "Übernahme bleibt nach Vorschau-Aus");
+environmentState.enabled = true;
+F.CIF.clickEnvironment({el: environmentRoot, mesh: {userData: {fkcEnvironmentId: "candidate"}}});
+environmentState.enabled = false;
+F.CIF.updateEnvironment(environmentGroup);
+assert.equal(environmentRecordGroup.visible, false, "Nicht übernommener Kandidat verschwindet");
+assert.equal(F.CIF.clickEnvironment({el: environmentRoot, mesh: {userData: {}}}), false);
+console.log("Umgebungsauswahl bestanden: Vorschau, Übernahme, Abwahl und Ausblenden.");
 for (const bond of coCell.bonds) {
   const segments = coCell.bondSegments.filter(segment => segment.bondId === bond.id);
   for (const half of [0, 1]) {

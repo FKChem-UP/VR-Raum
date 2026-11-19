@@ -52,6 +52,29 @@ for (const bond of coordination.bonds) {
   assert.ok(Math.abs(Math.hypot(...coordination.atoms[bond.b].positionAngstrom) - bond.distanceAngstrom) < 0.005);
 }
 console.log("Co-Koordinationsansicht bestanden: 7 Atome, 6 Bindungen, originale IDs und Symmetrieabbilder.");
+const environment3 = api.environmentCandidates(fullComplex, 3);
+const environment5 = api.environmentCandidates(fullComplex, 5);
+assert.ok(environment3.length > 0);
+assert.ok(environment5.length >= environment3.length);
+assert.equal(new Set(environment5.map(candidate => candidate.id)).size, environment5.length);
+assert.ok(environment3.every(candidate => environment5.some(entry => entry.id === candidate.id)));
+assert.ok(environment5.some(candidate => candidate.atoms.length === 64));
+assert.ok(environment5.some(candidate => candidate.atoms.length === 3));
+assert.ok(environment5.some(candidate => candidate.atoms.length === 1));
+for (const candidate of environment5) {
+  assert.ok([1, 3, 64].includes(candidate.atoms.length), "Vollständige Bestandteile");
+  assert.ok(candidate.minimumDistanceAngstrom <= 5 + 1e-8);
+  for (const bond of candidate.bonds) {
+    const a = candidate.atoms[bond.a].positionAngstrom;
+    const b = candidate.atoms[bond.b].positionAngstrom;
+    assert.ok(Math.abs(Math.hypot(...b.map((value,axis) => value-a[axis]))-bond.distanceAngstrom) < 0.005);
+  }
+  assert.ok(candidate.atoms.every(atom => !fullComplex.atoms.some(original =>
+    original.cifLabel === atom.cifLabel && original.fractional.every((value,axis) => Math.abs(value-atom.fractional[axis]) < 1e-7))));
+}
+assert.throws(() => api.environmentCandidates(coordination, 3), /nur für/);
+assert.throws(() => api.environmentCandidates(fullComplex, 9), /nur für/);
+console.log("Umgebung numerisch bestanden:", environment3.length, "Kandidaten bei 3 Å;", environment5.length, "bei 5 Å.");
 for (const mode of ["molecule", "cell"]) {
   const model = api.createCoStructure(source, mode);
   console.log("Co-Modell", mode, model.atoms.length, "Atome", model.bonds.length, "Bindungen", model.excludedSites || "");

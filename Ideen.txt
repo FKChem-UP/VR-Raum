@@ -374,6 +374,14 @@ IDE-49: Umgebung einblenden, Kandidaten auswählen und beim Ausschalten nur
   gewünscht. Umgebungsidee schon früher beschrieben, weiter offen. Empfehlung:
   zunächst periodische Umgebungskandidaten/Radius/Übernahme, danach fachliche
   Donor-Akzeptor- und Winkelregeln für H-Brücken, nicht nur ein Distanzlimit.
+  Erste Umgebungsversion lokal umgesetzt, nur Co-Komplex: ganze Bestandteile
+  (Komplex, Wasser, Chlorid) aus periodischer Bindungsstruktur. Radius
+  1,5/2/3/4/5 Å im Zahnrad, Vorschau 25 % deckend, Trigger Übernahme/Abwahl,
+  Aus entfernt nur ungewählte Vorschau. Ergänzungen zurücksetzen vorhanden.
+  Keine Atom-Einzelauswahl, Messung an Ergänzungen oder H-Brücken bisher.
+  Numerische/Logiktests bestanden, Pico-Performance/Bedienung offen.
+IDE-50: Schwarz als zusätzliche einheitliche Bindungsfarbe anbieten.
+  #000000 ergänzt; Farbpalette jetzt als kompakte direkte Buttonreihe.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------

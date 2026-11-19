@@ -253,7 +253,8 @@
         polyhedra.push({center, neighbors});
       });
       const center = [0, 1, 2].map(axis => complex.atoms.reduce((sum, atom) => sum + atom.positionAngstrom[axis], 0) / complex.atoms.length);
-      return {...base, polyhedra, atoms: complex.atoms.map(atom => ({...atom,
+      return {...base, polyhedra, environmentCell: createCoStructure(source, "cell"), originAngstrom: center,
+        atoms: complex.atoms.map(atom => ({...atom,
         positionAngstrom: atom.positionAngstrom.map((value, axis) => value - center[axis])})),
         bonds: complex.bonds.map((bond, i) => ({...bond, id: "co-bond-" + (i + 1),
           distanceAngstrom: bond.reportedDistanceAngstrom})),
@@ -301,5 +302,85 @@
     }
     return {...base, atoms, bonds, cellAtomCount: atoms.length};
   }
-  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure};
+  function environmentCandidates(base, radius) {
+    if (!base.environmentCell || base.mode !== "molecule" || ![1.5, 2, 3, 4, 5].includes(radius)) {
+      throw new Error("Umgebung nur für Co-Komplex und unterstützte Reichweiten verfügbar.");
+    }
+    const cell = base.environmentCell;
+    const adjacency = cell.atoms.map(() => []);
+    for (const bond of cell.bonds) {
+      const shift = bond.deltaFractional.map((value, axis) =>
+        Math.round(value - cell.atoms[bond.b].fractional[axis] + cell.atoms[bond.a].fractional[axis]));
+      adjacency[bond.a].push({index: bond.b, shift, bond});
+      adjacency[bond.b].push({index: bond.a, shift: shift.map(value => -value), bond});
+    }
+    const templates = [];
+    const visited = new Set();
+    for (let seed = 0; seed < cell.atoms.length; seed++) {
+      if (visited.has(seed)) continue;
+      const states = [{index: seed, shift: [0, 0, 0]}];
+      const indexes = new Map([[seed, 0]]);
+      const bonds = [];
+      const seenBonds = new Set();
+      for (let i = 0; i < states.length; i++) {
+        const state = states[i];
+        visited.add(state.index);
+        for (const edge of adjacency[state.index]) {
+          const shift = edge.shift.map((value, axis) => value + state.shift[axis]);
+          if (indexes.has(edge.index)) {
+            if (states[indexes.get(edge.index)].shift.some((value, axis) => value !== shift[axis])) {
+              throw new Error("Umgebung ganzer Bestandteile nicht für periodische Netzwerke verfügbar.");
+            }
+          } else { indexes.set(edge.index, states.length); states.push({index: edge.index, shift}); }
+          if (!seenBonds.has(edge.bond.id)) {
+            seenBonds.add(edge.bond.id);
+            bonds.push({...edge.bond, a: i, b: indexes.get(edge.index)});
+          }
+        }
+      }
+      templates.push({states, bonds});
+    }
+    const inverse = position => {
+      const z = position[2] / cell.cellMatrix[2][2];
+      const y = (position[1] - z * cell.cellMatrix[2][1]) / cell.cellMatrix[1][1];
+      const x = (position[0] - y * cell.cellMatrix[1][0] - z * cell.cellMatrix[2][0]) / cell.cellMatrix[0][0];
+      return [x, y, z];
+    };
+    const unitAxes = [[1,0,0],[0,1,0],[0,0,1]].map(inverse);
+    const margins = [0,1,2].map(axis => radius * Math.hypot(...unitAxes.map(point => point[axis])));
+    const physicalKey = (label, fractional) => label + ":" + fractional.map(value => Math.round(value * 1e7)).join(",");
+    const baseKeys = new Set(base.atoms.map(atom => physicalKey(atom.cifLabel, atom.fractional)));
+    const bounds = [0,1,2].map(axis => [Math.min(...base.atoms.map(atom => atom.fractional[axis])) - margins[axis],
+      Math.max(...base.atoms.map(atom => atom.fractional[axis])) + margins[axis]]);
+    const candidates = [];
+    const seen = new Set();
+    for (const template of templates) {
+      const fractions = template.states.map(state => cell.atoms[state.index].fractional.map((value, axis) => value + state.shift[axis]));
+      const ranges = bounds.map(([min,max], axis) => [Math.ceil(min - Math.max(...fractions.map(point => point[axis]))),
+        Math.floor(max - Math.min(...fractions.map(point => point[axis])))]);
+      for (let x = ranges[0][0]; x <= ranges[0][1]; x++) for (let y = ranges[1][0]; y <= ranges[1][1]; y++) for (let z = ranges[2][0]; z <= ranges[2][1]; z++) {
+        const translation = [x,y,z];
+        const points = fractions.map(point => point.map((value, axis) => value + translation[axis]));
+        const keys = points.map((point, i) => physicalKey(cell.atoms[template.states[i].index].cifLabel, point));
+        if (keys.some(key => baseKeys.has(key))) continue;
+        const id = keys.slice().sort().join("|");
+        if (seen.has(id)) continue;
+        const atoms = points.map((fractional, i) => ({...cell.atoms[template.states[i].index], fractional,
+          id: "environment:" + keys[i], modelNumber: base.atoms.length + i + 1,
+          cellShift: template.states[i].shift.map((value, axis) => value + translation[axis]),
+          positionAngstrom: cartesian(fractional, cell.cellMatrix).map((value, axis) => value - base.originAngstrom[axis])}));
+        let minimum = Infinity;
+        for (const atom of atoms) for (const original of base.atoms) {
+          minimum = Math.min(minimum, Math.hypot(...atom.positionAngstrom.map((value, axis) => value - original.positionAngstrom[axis])));
+        }
+        if (minimum > radius + 1e-8) continue;
+        seen.add(id);
+        candidates.push({id, minimumDistanceAngstrom: minimum, atoms,
+          bonds: template.bonds.map(bond => ({...bond, id: "environment:" + id + ":" + bond.id})),
+          mode: "molecule", name: atoms.length === 1 ? "Ion" : atoms.length === 3 ? "Wasser" : "Nachbarkomplex"});
+      }
+    }
+    return candidates.sort((a,b) => a.minimumDistanceAngstrom - b.minimumDistanceAngstrom);
+  }
+  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, environmentCandidates};
 })(window.FKCVR = window.FKCVR || {});
