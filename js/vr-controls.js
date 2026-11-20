@@ -739,7 +739,8 @@ window.FKCVR = window.FKCVR || {};
         trigger: false,
         grip: false,
         reset: false,
-        menu: false
+        menu: false,
+        help: false
       };
 
       this.lineEntity = F.create("a-entity", {}, this.el.sceneEl);
@@ -783,18 +784,21 @@ window.FKCVR = window.FKCVR || {};
       };
 
       this.resetAction = () => {
-        if (F.Menu && F.Menu.opened) return;
-
-        const target = F.resolveTarget(this.el);
-        if (target) {
-          this.el.sceneEl.lastSelectedTarget = target;
-          F.resetTarget(target);
-        }
+        if (this.data.hand !== "right" || (F.Menu && F.Menu.opened)) return;
+        const laser = document.getElementById((F.HandMenu ? F.HandMenu.laserHand() : "right") + "Hand");
+        const tools = laser && laser.components["fkc-controller"];
+        if (!tools) return;
+        tools.updateRay();
+        if (!tools.source) return;
+        const hit = F.findHit(tools.raycaster, true);
+        if (hit?.type !== "model") return;
+        this.el.sceneEl.lastSelectedTarget = hit.el;
+        F.resetTarget(hit.el);
       };
 
       this.menuAction = () => {
         if (
-          this.states.menu ||
+          this.data.hand !== "left" || this.states.menu ||
           !this.el.sceneEl.is("vr-mode") ||
           !F.Menu
         ) return;
@@ -829,16 +833,31 @@ window.FKCVR = window.FKCVR || {};
         this.states.menu = false;
       };
 
+      this.helpAction = () => {
+        if (this.data.hand === "right" && this.el.sceneEl.is("vr-mode") && F.PicoModels) {
+          F.PicoModels.help = !F.PicoModels.help;
+        }
+      };
+      this.helpEvent = () => {
+        const gp = F.getSource(this.el.sceneEl, this.data.hand)?.gamepad;
+        if (gp?.mapping === "xr-standard" || this.states.help) return;
+        this.states.help = true;
+        this.helpAction();
+      };
+      this.helpRelease = () => {
+        const gp = F.getSource(this.el.sceneEl, this.data.hand)?.gamepad;
+        if (gp?.mapping !== "xr-standard") this.states.help = false;
+      };
+
 
       this.disconnect = this.disconnect.bind(this);
 
       this.el.addEventListener("triggerdown", this.triggerDown);
       this.el.addEventListener("triggerup", this.triggerUp);
       this.el.addEventListener("abuttondown", this.resetEvent);
-      this.el.addEventListener("xbuttondown", this.resetEvent);
-      this.el.addEventListener("bbuttondown", this.menuEvent);
+      this.el.addEventListener("bbuttondown", this.helpEvent);
       this.el.addEventListener("ybuttondown", this.menuEvent);
-      this.el.addEventListener("bbuttonup", this.menuRelease);
+      this.el.addEventListener("bbuttonup", this.helpRelease);
       this.el.addEventListener("ybuttonup", this.menuRelease);
 
       this.el.addEventListener("controllerdisconnected", this.disconnect);
@@ -956,14 +975,17 @@ window.FKCVR = window.FKCVR || {};
       this.states.grip = grip;
 
       if (gp.mapping === "xr-standard") {
-        const reset = F.buttonPressed(gp, 4);
-        const menu = F.buttonPressed(gp, 5);
+        const reset = this.data.hand === "right" && F.buttonPressed(gp, 4);
+        const menu = this.data.hand === "left" && F.buttonPressed(gp, 5);
+        const help = this.data.hand === "right" && F.buttonPressed(gp, 5);
 
         if (reset && !this.states.reset) this.resetAction();
         if (menu && !this.states.menu) this.menuAction();
+        if (help && !this.states.help) this.helpAction();
 
         this.states.reset = reset;
         this.states.menu = menu;
+        this.states.help = help;
       }
     },
 
@@ -1045,10 +1067,9 @@ window.FKCVR = window.FKCVR || {};
       this.el.removeEventListener("triggerdown", this.triggerDown);
       this.el.removeEventListener("triggerup", this.triggerUp);
       this.el.removeEventListener("abuttondown", this.resetEvent);
-      this.el.removeEventListener("xbuttondown", this.resetEvent);
-      this.el.removeEventListener("bbuttondown", this.menuEvent);
-       this.el.removeEventListener("ybuttondown", this.menuEvent);
-      this.el.removeEventListener("bbuttonup", this.menuRelease);
+      this.el.removeEventListener("bbuttondown", this.helpEvent);
+      this.el.removeEventListener("ybuttondown", this.menuEvent);
+      this.el.removeEventListener("bbuttonup", this.helpRelease);
       this.el.removeEventListener("ybuttonup", this.menuRelease);
 
       this.el.removeEventListener("controllerdisconnected", this.disconnect);

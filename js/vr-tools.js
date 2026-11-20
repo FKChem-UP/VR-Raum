@@ -167,16 +167,16 @@
         !effectivelyVisible(target.mesh)
       ) return false;
 
-      if (F.Tutorial && F.Tutorial.active) {
-        return (target.type === "action" && (target.el.dataset.fkcTutorial === "true" ||
-          (F.HandMenu && F.HandMenu.opened && target.el.dataset.fkcHandMenu === "true"))) ||
-          (target.type === "model" && target.el.modelReady && F.Tutorial.allowsModel(target.el));
-      }
       if (menuOpen) {
         return (
           target.type === "action" &&
           target.el.dataset.fkcMenu === "true"
         );
+      }
+      if (F.Tutorial && F.Tutorial.active) {
+        return (target.type === "action" && (target.el.dataset.fkcTutorial === "true" ||
+          (F.HandMenu && F.HandMenu.opened && target.el.dataset.fkcHandMenu === "true"))) ||
+          (target.type === "model" && target.el.modelReady && F.Tutorial.allowsModel(target.el));
       }
 
       if (handMenuOpen) {
@@ -1815,8 +1815,8 @@
           "Allgemeine Einstellungen: Laser, Zeichnen, Komfort.",
           "3D-Modell: Informationen, Darstellung, Modellreset.",
           "Wände, Poster, Boden und Modelle sind bemalbar.",
-          "A/X: gehaltenes oder anvisiertes Objekt zurücksetzen.",
-          "B/Y: Menü öffnen oder schließen.",
+          "A: anvisiertes Modell zurücksetzen.",
+          "Y: Hauptmenü · B: Steuerhilfe.",
           "Raumwahltafeln: Laser + Trigger.",
           "Nach dem Menü: beide Sticks kurz neutral stellen."
         ].join("\n"));
@@ -1997,7 +1997,7 @@
       ctx.fillStyle = "#607668";
       ctx.font = "23px Arial";
       ctx.fillText(
-        "B/Y schließt · Einstellungen / 3D-Modell · Version Menü-2",
+        "Y schließt · Einstellungen / 3D-Modell · Version Menü-2",
         55, 1160, 914
       );
 
@@ -2106,7 +2106,7 @@
             "Grip: greifen · 2 Hände: skalieren",
             "Handmenü: Laser / Malstift wechseln",
             "Malfarbe/Deckkraft: Handmenü-Zahnrad",
-            "B/Y: Einstellungen & 3D-Modell"
+            "Y: Hauptmenü · B: Steuerhilfe"
           ])
         );
       }

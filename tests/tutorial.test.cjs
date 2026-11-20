@@ -72,4 +72,15 @@ const records = [{root: target, visual: {}, measurementMode: "angle"},
 assert.equal(F.Tutorial.hasMeasurement(records, target, "angle"), false);
 assert.equal(F.Tutorial.hasMeasurement(records, target, "distance"), true);
 assert.equal(F.Tutorial.hasMeasurement(undefined, target, "distance"), false);
+const paused = {el: {is: () => true}, phase: "training", step: 4,
+  board: {object3D: {visible: true}}, cursor: {visible: true}, previous: {}};
+F.app.activeRoom = {};
+F.getRig = () => null;
+F.HandMenu = {readViewerHead: () => true};
+F.Menu.opened = true;
+components["fkc-tutorial"].tick.call(paused);
+assert.equal(F.Menu.opened, true, "Hauptmenü bleibt im Tutorial geöffnet");
+assert.equal(paused.board.object3D.visible, false);
+assert.equal(paused.cursor.visible, false);
+assert.equal(paused.step, 4, "Tutorial pausiert beim Öffnen des Hauptmenüs");
 console.log("Tutorialtest bestanden: Schildüberquerung, Trefferbuttons, Wiederherstellung und manueller Start.");

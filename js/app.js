@@ -569,7 +569,7 @@
 
         this.pollButtons();
 
-        // Beide Hände bleiben zum Greifen/Reset und für B/Y aktiv.
+        // Beide Hände bleiben zum Greifen und für ihre Tastenkürzel aktiv.
         // Nur die gewählte Hand zeigt einen Laser und zeichnet per Trigger.
         if (F.HandMenu && this.data.hand !== F.HandMenu.laserHand()) {
           this.stroke = null;
@@ -848,7 +848,7 @@
 
         F.setStatus(
           window.isSecureContext
-            ? config.title + " geöffnet. B/Y öffnet das Menü."
+            ? config.title + " geöffnet. Y: Hauptmenü · B: Steuerhilfe."
             : config.title + " geöffnet. WebXR benötigt HTTPS oder localhost."
         );
 

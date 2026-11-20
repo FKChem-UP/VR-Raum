@@ -8,24 +8,15 @@
   const helpText = "Steuerhilfe";
   const hideHelpText = "Steuerhilfe ausblenden";
 
-  // xr-standard: Slot 3 ist der Klick des Thumbsticks, nicht dessen Achsen.
-  function helpPress(state, source) {
-    const gp = source && source.gamepad;
-    const available = !!(gp && gp.mapping === "xr-standard" && gp.buttons[3]);
-    const down = available && F.buttonPressed(gp, 3);
-    const toggle = available && state.source === source && down && !state.down;
-    Object.assign(state, {source, available, down});
-    return toggle;
-  }
-
-  function controlLabels(hand, help, helpAvailable, tutorialStep, laserHand, painting) {
+  function controlLabels(hand, help, tutorialStep, laserHand, painting) {
     const labels = {};
     if (help) {
       labels.grip = "Greifen / Skalieren";
-      labels.trigger = hand === laserHand ? (painting ? "Zeichnen / Auswählen" : "Auswählen / Messen") : "Trigger ohne Laser";
+      if (hand === laserHand) labels.trigger = painting ? "Zeichnen / Auswählen" : "Auswählen / Messen";
+      else labels.palm = "Handfläche drehen, um Menü zu öffnen";
       labels.joystick = hand === "left" ? "Bewegen" : "Drehen";
-      labels[hand === "left" ? "X" : "A"] = "Zurücksetzen";
-      labels[hand === "left" ? "Y" : "B"] = "Hauptmenü";
+      if (hand === "left") labels.Y = "Hauptmenü";
+      else labels.A = "Modell zurücksetzen";
     }
     if (tutorialStep === "question") {
       if (hand === laserHand) labels.trigger = "Trigger: Auswählen";
@@ -34,7 +25,7 @@
     } else if (tutorialStep === 1 || tutorialStep === 2) {
       labels.grip = tutorialStep === 1 ? "Grip: Greifen" : "Grip: Skalieren";
     }
-    if (hand === "right" && helpAvailable) labels.help = help ? hideHelpText : helpText;
+    if (hand === "right") labels.B = help ? hideHelpText : helpText;
     return labels;
   }
   function build(hand) {
@@ -127,15 +118,18 @@
       trigger: [mirror * 0.026, 0.025, -0.043],
       grip: [-mirror * 0.046, 0.031, 0.026],
       joystick: [mirror * 0.043, 0.048, -0.026],
-      [names[0]]: [-mirror * 0.041, 0.057, 0.007],
-      [names[1]]: [-mirror * 0.047, 0.057, -0.043],
-      help: [0.044, 0.080, -0.050]
+      [names[0]]: [-mirror * 0.058, 0.061, 0.013],
+      [names[1]]: [-mirror * 0.060, 0.070, -0.064],
+      palm: [0, 0.035, 0.095]
     };
     function showLabels(texts) {
       for (const [name, anchor] of Object.entries(anchors)) {
         const text = texts[name];
         let label = labels.get(name);
-        if (!text) { if (label) label.sprite.visible = false; continue; }
+        if (!text) {
+          if (label) label.sprite.visible = label.leader.visible = false;
+          continue;
+        }
         if (!label) {
           const canvas = document.createElement("canvas");
           canvas.width = 512;
@@ -146,13 +140,26 @@
           sprite.position.set(...anchor);
           sprite.renderOrder = 10020;
           sprite.raycast = function () {};
+          const button = controls.get(name)?.mesh.position;
+          const point = button ? [button.x, button.y, button.z] : [0, 0, 0.052];
+          const geometry = new T.BufferGeometry();
+          geometry.setAttribute("position", new T.Float32BufferAttribute([...point, ...anchor], 3));
+          const lineMaterial = new T.LineBasicMaterial({color: "#ff2020", transparent: true,
+            depthTest: false, depthWrite: false, toneMapped: false});
+          const leader = new T.Line(geometry, lineMaterial);
+          leader.name = "controller-help-line-" + name;
+          leader.renderOrder = sprite.renderOrder - 1;
+          leader.raycast = function () {};
+          group.add(leader);
           group.add(sprite);
+          geometries.add(geometry);
+          materials.add(lineMaterial);
           textures.add(texture);
           materials.add(mat);
-          label = {canvas, texture, sprite, text: null};
+          label = {canvas, texture, sprite, leader, text: null};
           labels.set(name, label);
         }
-        label.sprite.visible = true;
+        label.sprite.visible = label.leader.visible = true;
         if (label.text === text) continue;
         label.text = text;
         const ctx = label.canvas.getContext("2d");
@@ -186,7 +193,7 @@
     };
   }
   F.PicoModels = {
-    build, buttons, helpPress, controlLabels,
+    build, buttons, controlLabels,
     help: false,
     tutorialStep: -1,
     highlights: {left: [], right: []},
@@ -216,9 +223,7 @@
       this.quaternion = new T.Quaternion();
       this.parentQuaternion = new T.Quaternion();
       this.hidden = new Map();
-      this.helpButton = {};
       this.exit = () => {
-        this.helpButton = {};
         F.PicoModels.help = false;
         this.restore();
       };
@@ -233,10 +238,6 @@
       const scene = this.el.sceneEl;
       const source = F.getSource(scene, this.data.hand);
       const models = F.PicoModels;
-      if (this.data.hand === "right") {
-        if (helpPress(this.helpButton, source)) models.help = !models.help;
-        if (!this.helpButton.available) models.help = false;
-      }
       const xr = scene.renderer && scene.renderer.xr;
       const frame = scene.frame && typeof scene.frame.getPose === "function" ? scene.frame : xr && xr.getFrame && xr.getFrame();
       const reference = xr && xr.getReferenceSpace && xr.getReferenceSpace();
@@ -262,10 +263,10 @@
       this.built.group.position.copy(this.position);
       this.built.group.quaternion.copy(this.quaternion);
       this.built.group.visible = true;
-      const active = models.highlights[this.data.hand];
-      this.built.highlight(this.helpButton.available ? [...active, "joystick"] : active);
-      this.built.showLabels(controlLabels(this.data.hand, models.help, this.helpButton.available,
-        models.tutorialStep, F.HandMenu.laserHand(), F.Draw && F.Draw.mode === "paint"));
+      const texts = controlLabels(this.data.hand, models.help, models.tutorialStep,
+        F.HandMenu.laserHand(), F.Draw && F.Draw.mode === "paint");
+      this.built.highlight([...models.highlights[this.data.hand], ...Object.keys(texts)]);
+      this.built.showLabels(texts);
     },
     remove: function () {
       this.restore();

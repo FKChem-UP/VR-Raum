@@ -136,6 +136,7 @@
       this.board.object3D.position.set(phase === "question" ? 0 : 0.8, this.head.y,
         phase === "question" ? 5.1 : 2.75);
       this.board.object3D.rotation.set(0, 0, 0);
+      this.board.object3D.visible = true;
       this.cursor.visible = false;
       this.previous = null;
       this.target.object3D.visible = phase !== "question";
@@ -213,7 +214,13 @@
         if (!this.hiddenOverlays.has(object)) this.hiddenOverlays.set(object, object.visible);
         object.visible = false;
       });
-      if (F.Menu.opened) F.Menu.close();
+      // Hauptmenü hat Vorrang, danach dieselbe Aufgabe fortsetzen.
+      this.board.object3D.visible = !F.Menu.opened;
+      if (F.Menu.opened) {
+        this.cursor.visible = false;
+        this.previous = null;
+        return;
+      }
       const menu = this.el.components["fkc-hand-menu"];
       if (menu && (this.phase !== "training" || this.step < 3)) menu.hide();
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");

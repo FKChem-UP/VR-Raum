@@ -36,6 +36,7 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/pico-controller-m
     SphereGeometry: Resource, CylinderGeometry: Resource, PlaneGeometry: Resource,
     BufferGeometry: Geometry, Float32BufferAttribute: Float32Array,
     MeshStandardMaterial: Material, MeshBasicMaterial: Material, CanvasTexture: Texture,
+    Line: Object3D, LineBasicMaterial: Material,
     Sprite: class extends Object3D { constructor(material) { super(null, material); } }, SpriteMaterial: Material}}
 });
 for (const hand of ["left", "right"]) {
@@ -67,13 +68,21 @@ for (const hand of ["left", "right"]) {
   assert.ok([...built.controls.values()].every(entry => entry.material.color.value === entry.color));
   built.showLabels({joystick: "Bewegen"});
   const sprite = built.group.children.at(-1);
+  const leader = built.group.children.at(-2);
   assert.equal(sprite.visible, true);
+  assert.equal(leader.name, "controller-help-line-joystick");
+  assert.equal(leader.visible, true);
+  assert.ok(Array.from(leader.geometry.position.slice(0, 3)).every((value, i) =>
+    Math.abs(value - [stick.x, stick.y, stick.z][i]) < 1e-7));
   assert.ok(sprite.scale.x > 0);
   built.showLabels({});
   assert.equal(sprite.visible, false);
+  assert.equal(leader.visible, false);
   built.dispose();
   assert.equal(sprite.material.disposed, true);
   assert.equal(sprite.material.map.disposed, true);
+  assert.equal(leader.geometry.disposed, true);
+  assert.equal(leader.material.disposed, true);
   assert.ok([...built.controls.values()].every(entry => entry.material.disposed));
 }
 F.PicoModels.tutorial(0);
@@ -84,35 +93,29 @@ assert.equal(F.PicoModels.setHighlights("left", ["A"]), false);
 assert.equal(F.PicoModels.setHighlights("right", ["trigger", "A", "B"]), true);
 F.PicoModels.tutorial(-1);
 assert.equal(F.PicoModels.highlights.right.length, 0);
-const {controlLabels, helpPress} = F.PicoModels;
-const source = {gamepad: {mapping: "xr-standard", buttons: [{}, {}, {}, {pressed: false}]}};
-const state = {};
-assert.equal(helpPress(state, source), false);
-assert.equal(state.available, true);
-source.gamepad.buttons[3].pressed = true;
-assert.equal(helpPress(state, source), true);
-assert.equal(helpPress(state, source), false, "Halten schaltet nur einmal um");
-source.gamepad.buttons[3].pressed = false;
-assert.equal(helpPress(state, source), false);
-source.gamepad.buttons[3].pressed = true;
-assert.equal(helpPress(state, source), true);
-assert.equal(helpPress(state, null), false);
-assert.equal(state.available, false);
-assert.equal(helpPress(state, source), false, "Beim Wiederverbinden mit gehaltener Taste nicht umschalten");
-assert.equal(helpPress(state, {gamepad: {mapping: "", buttons: source.gamepad.buttons}}), false);
-assert.equal(state.available, false);
-assert.equal(controlLabels("right", false, true, -1, "right").help, "Steuerhilfe");
-assert.equal(controlLabels("right", true, true, -1, "right").help, "Steuerhilfe ausblenden");
-assert.equal(controlLabels("left", true, false, -1, "left", true).trigger, "Zeichnen / Auswählen");
-assert.equal(controlLabels("left", false, false, 0, "right").joystick, "Bewegen");
-assert.equal(controlLabels("right", false, true, 0, "right").joystick, "Drehen");
+const {controlLabels} = F.PicoModels;
+assert.equal(controlLabels("right", false, -1, "right").B, "Steuerhilfe");
+const right = controlLabels("right", true, -1, "right");
+assert.equal(right.B, "Steuerhilfe ausblenden");
+assert.equal(right.A, "Modell zurücksetzen");
+assert.equal(right.palm, undefined);
+const left = controlLabels("left", true, -1, "right");
+assert.equal(left.Y, "Hauptmenü");
+assert.equal(left.X, undefined);
+assert.equal(left.trigger, undefined);
+assert.match(left.palm, /Handfläche drehen/);
+assert.equal(controlLabels("right", true, -1, "left").trigger, undefined);
+assert.match(controlLabels("right", true, -1, "left").palm, /Handfläche drehen/);
+assert.equal(controlLabels("left", true, -1, "left", true).trigger, "Zeichnen / Auswählen");
+assert.equal(controlLabels("left", false, 0, "right").joystick, "Bewegen");
+assert.equal(controlLabels("right", false, 0, "right").joystick, "Drehen");
 for (laserHand of ["left", "right"]) {
   const otherHand = laserHand === "left" ? "right" : "left";
   F.PicoModels.tutorial("question");
   assert.equal(F.PicoModels.highlights[laserHand][0], "trigger");
   assert.equal(F.PicoModels.highlights[otherHand].length, 0);
-  assert.equal(controlLabels(laserHand, false, true, "question", laserHand).trigger, "Trigger: Auswählen");
-  assert.equal(controlLabels(otherHand, false, true, "question", laserHand).trigger, undefined);
+  assert.equal(controlLabels(laserHand, false, "question", laserHand).trigger, "Trigger: Auswählen");
+  assert.equal(controlLabels(otherHand, false, "question", laserHand).trigger, undefined);
 }
 F.PicoModels.tutorial(-1);
 console.log("Pico-Modelltest bestanden: zwei Modelle, getrennte Tastenmaterialien, unabhängiges Rotlicht und Ressourcenabbau.");
