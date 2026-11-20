@@ -27,7 +27,7 @@
       model.classList.contains("interactable") ? model : null;
   }
 
-  function readViewerHead(scene, rig, position) {
+  function readViewerHead(scene, rig, position, forward, orientation) {
     const xr = scene.renderer && scene.renderer.xr;
     const reference = xr && xr.getReferenceSpace && xr.getReferenceSpace();
     const frame = scene.frame && typeof scene.frame.getViewerPose === "function"
@@ -37,11 +37,14 @@
       if (!pose) return false; // Trackingverlust: keine alte Augenposition verwenden.
       rig.object3D.updateWorldMatrix(true, false);
       position.copy(pose.transform.position).applyMatrix4(rig.object3D.matrixWorld);
+      if (forward) forward.set(0, 0, -1).applyQuaternion(orientation.copy(pose.transform.orientation))
+        .transformDirection(rig.object3D.matrixWorld);
       return true;
     }
     if (!scene.camera) return false;
     scene.camera.updateWorldMatrix(true, false);
     scene.camera.getWorldPosition(position);
+    if (forward) scene.camera.getWorldDirection(forward);
     return true;
   }
 

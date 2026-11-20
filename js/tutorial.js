@@ -2,6 +2,17 @@
 
 (function (F) {
   const T = AFRAME.THREE;
+  const source = "assets/structures/Co-Produkt1.cif";
+  const modelPosition = [0.9, 1.3, 3.5];
+  const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
+    "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen"];
+  const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
+    "Halte einen Grip und verschiebe das Modell mindestens 15 cm.",
+    "Halte beide Grips und zieh die Hände auseinander (140 %).",
+    "Lass beide Grips los. Dreh die Hand ohne Laser zu dir.",
+    "Wähle im Handmenü unter Ansicht: Koordination.",
+    "Wähle Distanz und klicke zwei Atome oder eine Bindung an.",
+    "Wähle Winkel und klicke drei Atome an: Das zweite ist der Scheitel."];
   function crossed(previous, current, width = 1.4, height = 0.8) {
     if (!previous || previous.z <= 0 || current.z > 0) return false;
     const t = previous.z / (previous.z - current.z);
@@ -10,11 +21,19 @@
   }
   F.Tutorial = {
     active: false, crossed,
-    allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active; },
-    progress(step, near, moved, hands, scale) {
+    allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active && root.object3D.visible; },
+    hasMeasurement(records, root, mode) {
+      const visual = root.querySelector(".model-visual");
+      return !!visual && (records || []).some(record => record.root === root && record.visual === visual && record.measurementMode === mode);
+    },
+    progress(step, near, moved, hands, scale, tools = {}) {
       if (step === 0 && near) return 1;
       if (step === 1 && hands >= 1 && moved >= 0.15) return 2;
       if (step === 2 && hands === 2 && scale >= 1.4) return 3;
+      if (step === 3 && tools.handMenu) return 4;
+      if (step === 4 && tools.coordination) return 5;
+      if (step === 5 && tools.coordination && tools.distance) return 6;
+      if (step === 6 && tools.coordination && tools.angle) return 7;
       return step;
     },
     start() {
@@ -32,6 +51,10 @@
       this.previous = null;
       this.head = new T.Vector3();
       this.local = new T.Vector3();
+      this.forward = new T.Vector3();
+      this.orientation = new T.Quaternion();
+      this.modelWorld = new T.Vector3();
+      this.trainingBackground = new T.Color("#edf0f3");
       this.group = F.create("a-entity", {}, this.el);
       this.group.object3D.visible = false;
       this.canvas = document.createElement("canvas");
@@ -52,14 +75,22 @@
       this.shell.raycast = function () {};
       this.shell.renderOrder = 80;
       this.group.object3D.add(this.shell);
-      this.target = F.create("a-entity", {id: "tutorial-co-model", class: "interactable", position: "3 1.3 4"}, this.group);
+      this.floor = F.create("a-plane", {width: 18, height: 16, rotation: "-90 0 0",
+        material: {shader: "flat", color: "#d5dce2"}}, this.group);
+      this.grid = new T.GridHelper(16, 16, "#b3bec8", "#bfc9d2");
+      this.grid.position.y = 0.002;
+      this.group.object3D.add(this.grid);
+      this.target = F.create("a-entity", {id: "tutorial-co-model", class: "interactable"}, this.group);
       this.target.dataset.title = "Tutorial: Co-Komplex";
       this.target.fkcModelSize = 0.7;
+      this.target.fkcVariantAlignment = "individual";
+      this.target.fkcVariants = [
+        {id: "tutorial-complex", title: "Co-Komplex", model: source, cifMode: "molecule"},
+        {id: "tutorial-coordination", title: "Co-Koordinationsansicht", model: source, cifMode: "coordination"}
+      ];
       this.target.modelReady = false;
       this.body = F.create("a-entity", {class: "manip-body"}, this.target);
       F.create("a-box", {class: "hitbox", width: 0.76, height: 0.76, depth: 0.76, visible: false}, this.body);
-      this.visual = F.create("a-entity", {class: "model-visual",
-        "fkc-normalize": {targetSize: 0.7, padding: 0.06}}, this.body);
       this.target.setAttribute("fkc-manipulable", "");
       F.create("a-entity", {light: {type: "ambient", intensity: 0.7}}, this.group);
       F.create("a-entity", {position: "-2 5 6", light: {type: "directional", intensity: 0.7}}, this.group);
@@ -79,11 +110,17 @@
       if (F.PicoModels) F.PicoModels.tutorial(phase === "training" ? 0 : -1);
       if (phase === "training") {
         this.step = 0;
-        this.target.object3D.position.set(3, 1.3, 4);
+        this.target.object3D.position.set(...modelPosition);
+        this.target.homePosition = this.target.object3D.position.clone();
         this.body.object3D.scale.setScalar(1);
         this.body.object3D.quaternion.identity();
         this.taskOrigin = this.target.object3D.position.clone();
-        F.loadModelVisual(this.visual, "assets/structures/Co-Produkt1.cif", "molecule");
+        this.target.fkcVariantId = "tutorial-complex";
+        this.target.modelReady = false;
+        const visual = F.create("a-entity", {class: "model-visual",
+          "fkc-normalize": {targetSize: 0.7, padding: 0.06}}, this.body);
+        F.loadModelVisual(visual, source, "molecule");
+        if (F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
       }
       F.Tutorial.active = true;
       this.group.object3D.visible = true;
@@ -91,13 +128,16 @@
       this.board.object3D.rotation.set(0, 0, 0);
       this.previous = null;
       this.target.object3D.visible = phase !== "question";
-      this.shellMaterial.opacity = phase === "question" ? 0.82 : 1;
-      this.shellMaterial.color.set(phase === "question" ? "#ffffff" : "#dbe1e6");
-      this.shell.renderOrder = phase === "question" ? 80 : -100;
+      this.shell.visible = phase === "question";
+      this.floor.object3D.visible = this.grid.visible = phase !== "question";
       this.room = document.getElementById("room-root");
       if (phase !== "question" && this.room) {
         if (this.roomVisible === undefined) this.roomVisible = this.room.object3D.visible;
         this.room.object3D.visible = false;
+      }
+      if (phase === "training") {
+        this.previousBackground = this.el.object3D.background;
+        this.el.object3D.background = this.trainingBackground;
       }
       this.render();
       F.invalidateHits();
@@ -109,16 +149,17 @@
       ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" : "Tutorial · Aufgaben", 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?", "Nein oder durch das Schild gehen: überspringen."] :
-        this.phase === "done" ? ["Alle drei Aufgaben abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] :
-          ["1 · Bewegen und drehen · links gehen, rechts drehen",
-            "2 · Grip halten und das Modell bewegen (15 cm)",
-            "3 · Beide Grips halten, Hände auseinanderziehen",
-            this.step === 0 ? "Gehe zur Seite zum Co-Modell (unter 90 cm)." :
-              this.step === 1 ? "Fasse das Co-Modell an und verschiebe es." : "Vergrößere das Modell auf mindestens 140 %."];
+        this.phase === "done" ? ["Alle sieben Aufgaben abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] : tasks;
+      const training = this.phase === "training";
       lines.forEach((line, i) => {
-        ctx.fillStyle = this.phase === "training" && i < 3 ? (i < this.step ? "#397c40" : i === this.step ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((this.phase === "training" && i < this.step && i < 3 ? "✓ " : "") + line, 50, 180 + i * 55, 924);
+        ctx.fillStyle = training ? (i < this.step ? "#397c40" : i === this.step ? "#b34a21" : "#65717b") : "#203f30";
+        ctx.fillText((training ? (i < this.step ? "✓ " : `${i + 1} · `) : "") + line, 50, training ? 153 + i * 41 : 180 + i * 55, 924);
       });
+      if (training) {
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "#203f30";
+        ctx.fillText(hints[this.step], 50, 451, 924);
+      }
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
         [{x: 80, w: 860, title: this.phase === "done" ? "Zum Begrüßungsraum" : "Tutorial beenden", action: () => this.close()}];
@@ -137,7 +178,7 @@
     tick: function () {
       if (!this.el.is("vr-mode")) return;
       if (!F.app || !F.app.activeRoom || F.app.pendingSpawn) return;
-      if (!F.HandMenu.readViewerHead(this.el, F.getRig(), this.head)) return;
+      if (!F.HandMenu.readViewerHead(this.el, F.getRig(), this.head, this.forward, this.orientation)) return;
       if (this.pending) {
         if (F.app.currentId !== "welcome") F.app.changeRoom("welcome");
         F.app.positionAtSpawn({x: 0, z: 6.5});
@@ -146,16 +187,15 @@
         return;
       }
       if (!F.Tutorial.active) return;
-      // Die Demo verwendet eigene tiefenunabhängige Sprites. Diese übermalen
-      // sonst sogar deckende Flächen; nur fremde Overlay-Sprites temporär sperren.
-      this.el.object3D.traverse(object => {
+      // Nur die Raum-Demo ausblenden, nicht die Messlabels des Tutorials.
+      if (this.phase === "question" && this.room) this.room.object3D.traverse(object => {
         if (!object.isSprite || !object.material || object.material.depthTest !== false) return;
         if (!this.hiddenOverlays.has(object)) this.hiddenOverlays.set(object, object.visible);
         object.visible = false;
       });
       if (F.Menu.opened) F.Menu.close();
       const menu = this.el.components["fkc-hand-menu"];
-      if (menu) menu.hide();
+      if (menu && (this.phase !== "training" || this.step < 3)) menu.hide();
       if (this.phase === "question") {
         this.board.object3D.updateWorldMatrix(true, false);
         this.local.copy(this.head);
@@ -165,25 +205,36 @@
       } else {
         // Seitliches Aufgabenfeld folgt der horizontalen Blickrichtung, nicht
         // einem alten Weltpunkt, der nach dem Hinlaufen hinter dem Nutzer liegt.
-        const forward = new T.Vector3();
-        this.el.camera.getWorldDirection(forward);
+        const forward = this.forward;
         forward.y = 0;
         if (forward.lengthSq() > 1e-6) {
           forward.normalize();
           const right = new T.Vector3(-forward.z, 0, forward.x);
-          this.board.object3D.position.copy(this.head).addScaledVector(forward, 1.8).addScaledVector(right, -1.1);
+          // Beim Üben mit dem Handmenü bleibt dessen Seite frei.
+          const side = this.step >= 3 && F.HandMenu.laserHand() === "right" ? 1 : -1;
+          this.board.object3D.position.copy(this.head).addScaledVector(forward, 2.1).addScaledVector(right, side * 0.95);
           this.board.object3D.lookAt(this.head);
         }
         if (this.phase === "training" && this.target.modelReady) {
           const manip = this.target.components["fkc-manipulable"];
-          const position = this.target.object3D.getWorldPosition(new T.Vector3());
+          const position = this.target.object3D.getWorldPosition(this.modelWorld);
+          const visual = this.target.querySelector(".model-visual");
+          const structure = visual && visual.fkcStructure;
+          const measurements = this.el.components["fkc-measurements"];
+          const records = measurements && measurements.saved;
+          if (this.step === 3 && this.el.lastSelectedModel !== this.target) F.selectModel(this.target);
+          const menuOpen = !!(menu && F.HandMenu.opened && menu.model === this.target);
           const next = F.Tutorial.progress(this.step,
             Math.hypot(this.head.x - position.x, this.head.z - position.z) < 0.9,
-            position.distanceTo(this.taskOrigin), manip ? manip.hands.length : 0, this.body.object3D.scale.x);
+            position.distanceTo(this.taskOrigin), manip ? manip.hands.length : 0, this.body.object3D.scale.x, {
+              handMenu: menuOpen, coordination: !!structure && structure.mode === "coordination" && !this.target.fkcPendingVisual,
+              distance: F.Tutorial.hasMeasurement(records, this.target, "distance"),
+              angle: F.Tutorial.hasMeasurement(records, this.target, "angle")
+            });
           if (next !== this.step) {
             this.step = next;
             if (F.PicoModels) F.PicoModels.tutorial(next);
-            if (next === 3) this.phase = "done";
+            if (next === tasks.length) this.phase = "done";
             this.render();
           }
         }
@@ -195,9 +246,22 @@
         for (const [object, visible] of this.hiddenOverlays) object.visible = visible;
         this.hiddenOverlays.clear();
       }
-      if (this.target) F.releaseModel(this.target);
+      if (this.target) {
+        F.releaseModel(this.target);
+        if (returnToSpawn) {
+          const menu = this.el.components["fkc-hand-menu"];
+          if (menu) menu.hide();
+          if (F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
+          for (const visual of this.body.querySelectorAll(".model-visual, .pending-visual")) visual.remove();
+          this.target.fkcPendingVisual = null;
+          this.target.modelReady = false;
+          if (this.el.lastSelectedModel === this.target) this.el.lastSelectedModel = null;
+          if (this.el.lastSelectedTarget === this.target) this.el.lastSelectedTarget = null;
+        }
+      }
       if (this.room && this.roomVisible !== undefined) this.room.object3D.visible = this.roomVisible;
       this.roomVisible = undefined;
+      if (returnToSpawn) this.el.object3D.background = this.previousBackground;
       F.Tutorial.active = false;
       if (F.PicoModels) F.PicoModels.tutorial(-1);
       this.group.object3D.visible = false;
@@ -211,7 +275,8 @@
       this.el.removeEventListener("enter-vr", this.enter);
       this.el.removeEventListener("exit-vr", this.exit);
       this.group.remove();
-      [this.geometry, this.material, this.texture, this.shellGeometry, this.shellMaterial].forEach(resource => resource.dispose());
+      [this.geometry, this.material, this.texture, this.shellGeometry, this.shellMaterial,
+        this.grid.geometry, this.grid.material].forEach(resource => resource.dispose());
     }
   });
 })(window.FKCVR);

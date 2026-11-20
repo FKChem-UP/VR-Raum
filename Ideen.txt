@@ -445,6 +445,12 @@ IDE-66: Weiße Pico4-Ultra-Controller statt Hände, Raum für Kontrast dimmen.
   Tracking/Greifen weiterhin hand-controls. Tutorial Joystick/Grip-Hinweise.
   Rendering-/Passform-Nachtest offen, keine externen Assets heruntergeladen.
 
+IDE-67: Tutorial-Laserpunkt und Aufgabenschild sichtbar machen, Co-Modell nur
+  leicht versetzen und einen hellen Boden ergänzen. Lokal umgesetzt; Pico-Test offen.
+IDE-68: Tutorial um Handmenü, Koordinationsansicht, Distanz und Winkel erweitern.
+  Nutzt die vorhandenen Modell- und Messwerkzeuge, insgesamt sieben Aufgaben.
+  Lokal umgesetzt; den vollständigen Ablauf auf Pico nachtesten.
+
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
 Werkzeugmodi, Undo, Zellrahmen-Umschalter, Nachbarhervorhebung,
