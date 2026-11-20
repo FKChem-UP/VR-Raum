@@ -617,7 +617,7 @@ window.FKCVR = window.FKCVR || {};
     },
 
     start: function () {
-      if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened) || (F.Tutorial && F.Tutorial.active)) return;
+      if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened)) return;
 
       this.el.object3D.getWorldPosition(this.position);
 
@@ -626,6 +626,7 @@ window.FKCVR = window.FKCVR || {};
 
       this.el.sceneEl.querySelectorAll(".interactable").forEach(root => {
         const manip = root.components["fkc-manipulable"];
+        if (F.Tutorial && F.Tutorial.active && !F.Tutorial.allowsModel(root)) return;
         if (!root.modelReady || !manip || manip.hands.length >= 2) return;
 
         const hitbox = root.querySelector(".hitbox");
@@ -649,6 +650,7 @@ window.FKCVR = window.FKCVR || {};
           tools.updateRay();
           const hit = F.findHit(tools.raycaster, true);
           if (hit && hit.type === "model" && hit.el.modelReady &&
+              !(F.Tutorial && F.Tutorial.active) &&
               hit.el.components["fkc-manipulable"].hands.length === 0) {
             this.pulling = hit.el;
             this.pullTime = 0;

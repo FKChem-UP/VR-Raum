@@ -427,6 +427,16 @@ IDE-63: Tutorialfrage einmal pro VR-Sitzung, zusätzlich Hauptmenüstart.
   Erste Etappe lokal umgesetzt mit Zielkugel und Text, Abschluss bei 80 cm.
   Gewünschte Pico4-Ultra-Controllergrafik/rote Joysticks noch offen (Assets).
   Weitere Tutorialschritte folgen später, Pico-Nachtest erforderlich.
+IDE-64: Tutorialschild darf Na/Cl-Labels nicht durchlassen; Aufgabenfeld
+  sichtbar halten, Kugel durch Co-Komplex ersetzen. Lokal angepasst:
+  deckende zuletzt gerenderte Fläche/fremde Overlay-Sprites ausgeblendet,
+  hellgrauer Raum, Co seitlich, Aufgabenfeld blicknah seitlich.
+IDE-65: Tutorial drei Aufgaben: bewegen/drehen und hingehen, Grip anfassen
+  und bewegen, mit zwei Grips vergrößern. Lokal mit automatischem Fortschritt
+  (<90 cm, >=15 cm Bewegung mit Grip, >=140 % mit zwei Grips), Pico-Test offen.
+IDE-66: Weiße Pico4-Ultra-Controller statt Hände, Raum für Kontrast dimmen.
+  Kein lokales Controllerasset gefunden. Nutzer wählte ausdrücklich Hände
+  vorerst behalten und liefert später Asset. Keine Ersatzcontroller eingefügt.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------

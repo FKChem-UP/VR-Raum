@@ -10,6 +10,13 @@
   }
   F.Tutorial = {
     active: false, crossed,
+    allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active; },
+    progress(step, near, moved, hands, scale) {
+      if (step === 0 && near) return 1;
+      if (step === 1 && hands >= 1 && moved >= 0.15) return 2;
+      if (step === 2 && hands === 2 && scale >= 1.4) return 3;
+      return step;
+    },
     start() {
       const scene = F.getScene();
       if (!scene.is("vr-mode")) { F.setStatus("Tutorial bitte mit VR-Brille starten."); return; }
@@ -31,11 +38,12 @@
       this.canvas.width = 1024; this.canvas.height = 640;
       this.texture = new T.CanvasTexture(this.canvas);
       this.geometry = new T.PlaneGeometry(1.4, 0.875);
-      this.material = new T.MeshBasicMaterial({map: this.texture, side: T.DoubleSide, depthTest: false});
+      this.material = new T.MeshBasicMaterial({map: this.texture, side: T.DoubleSide,
+        transparent: true, opacity: 1, depthTest: false, depthWrite: false});
       this.board = F.create("a-entity", {class: "vr-action"}, this.group);
       this.board.dataset.fkcTutorial = "true";
       const mesh = new T.Mesh(this.geometry, this.material);
-      mesh.renderOrder = 200;
+      mesh.renderOrder = 10000; // Deckende Canvasfläche zuletzt über Demo-Labels zeichnen.
       this.board.setObject3D("mesh", mesh);
       this.shellGeometry = new T.SphereGeometry(60, 24, 16);
       this.shellMaterial = new T.MeshBasicMaterial({color: "#ffffff", side: T.BackSide,
@@ -44,7 +52,18 @@
       this.shell.raycast = function () {};
       this.shell.renderOrder = 80;
       this.group.object3D.add(this.shell);
-      this.target = F.create("a-sphere", {radius: 0.3, color: "#4a85b8", position: "0 1.2 2"}, this.group);
+      this.target = F.create("a-entity", {id: "tutorial-co-model", class: "interactable", position: "3 1.3 4"}, this.group);
+      this.target.dataset.title = "Tutorial: Co-Komplex";
+      this.target.fkcModelSize = 0.7;
+      this.target.modelReady = false;
+      this.body = F.create("a-entity", {class: "manip-body"}, this.target);
+      F.create("a-box", {class: "hitbox", width: 0.76, height: 0.76, depth: 0.76, visible: false}, this.body);
+      this.visual = F.create("a-entity", {class: "model-visual",
+        "fkc-normalize": {targetSize: 0.7, padding: 0.06}}, this.body);
+      this.target.setAttribute("fkc-manipulable", "");
+      F.create("a-entity", {light: {type: "ambient", intensity: 0.7}}, this.group);
+      F.create("a-entity", {position: "-2 5 6", light: {type: "directional", intensity: 0.7}}, this.group);
+      this.hiddenOverlays = new Map();
       this.enter = () => { this.close(); this.pending = "question"; };
       this.exit = () => { this.pending = null; this.close(); };
       this.el.addEventListener("enter-vr", this.enter);
@@ -57,13 +76,22 @@
       const handMenu = this.el.components["fkc-hand-menu"];
       if (handMenu) handMenu.hide();
       this.phase = phase;
+      if (phase === "training") {
+        this.step = 0;
+        this.target.object3D.position.set(3, 1.3, 4);
+        this.body.object3D.scale.setScalar(1);
+        this.body.object3D.quaternion.identity();
+        this.taskOrigin = this.target.object3D.position.clone();
+        F.loadModelVisual(this.visual, "assets/structures/Co-Produkt1.cif", "molecule");
+      }
       F.Tutorial.active = true;
       this.group.object3D.visible = true;
-      this.board.object3D.position.set(phase === "question" ? 0 : -0.9, this.head.y, 5.1);
+      this.board.object3D.position.set(0, this.head.y, 5.1);
       this.board.object3D.rotation.set(0, 0, 0);
       this.previous = null;
       this.target.object3D.visible = phase !== "question";
       this.shellMaterial.opacity = phase === "question" ? 0.82 : 1;
+      this.shellMaterial.color.set(phase === "question" ? "#ffffff" : "#dbe1e6");
       this.shell.renderOrder = phase === "question" ? 80 : -100;
       this.room = document.getElementById("room-root");
       if (phase !== "question" && this.room) {
@@ -77,12 +105,19 @@
       const ctx = this.canvas.getContext("2d");
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 1024, 640);
       ctx.fillStyle = "#203f30"; ctx.font = "bold 64px Arial";
-      ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" : "1 · Bewegen und drehen", 50, 100);
+      ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" : "Tutorial · Aufgaben", 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?", "Nein oder durch das Schild gehen: überspringen."] :
-        this.phase === "done" ? ["Du hast das Ziel erreicht.", "Weitere Tutorialschritte folgen später."] :
-          ["Linker Joystick: bewegen", "Rechter Joystick: drehen", "Gehe bis auf 80 cm an die blaue Kugel.", "Bei Unwohlsein: Tutorial beenden."];
-      lines.forEach((line, i) => ctx.fillText(line, 50, 180 + i * 55, 924));
+        this.phase === "done" ? ["Alle drei Aufgaben abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] :
+          ["1 · Bewegen und drehen · links gehen, rechts drehen",
+            "2 · Grip halten und das Modell bewegen (15 cm)",
+            "3 · Beide Grips halten, Hände auseinanderziehen",
+            this.step === 0 ? "Gehe zur Seite zum Co-Modell (unter 90 cm)." :
+              this.step === 1 ? "Fasse das Co-Modell an und verschiebe es." : "Vergrößere das Modell auf mindestens 140 %."];
+      lines.forEach((line, i) => {
+        ctx.fillStyle = this.phase === "training" && i < 3 ? (i < this.step ? "#397c40" : i === this.step ? "#b34a21" : "#65717b") : "#203f30";
+        ctx.fillText((this.phase === "training" && i < this.step && i < 3 ? "✓ " : "") + line, 50, 180 + i * 55, 924);
+      });
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
         [{x: 80, w: 860, title: this.phase === "done" ? "Zum Begrüßungsraum" : "Tutorial beenden", action: () => this.close()}];
@@ -110,6 +145,13 @@
         return;
       }
       if (!F.Tutorial.active) return;
+      // Die Demo verwendet eigene tiefenunabhängige Sprites. Diese übermalen
+      // sonst sogar deckende Flächen; nur fremde Overlay-Sprites temporär sperren.
+      this.el.object3D.traverse(object => {
+        if (!object.isSprite || !object.material || object.material.depthTest !== false) return;
+        if (!this.hiddenOverlays.has(object)) this.hiddenOverlays.set(object, object.visible);
+        object.visible = false;
+      });
       if (F.Menu.opened) F.Menu.close();
       const menu = this.el.components["fkc-hand-menu"];
       if (menu) menu.hide();
@@ -119,12 +161,39 @@
         this.board.object3D.worldToLocal(this.local);
         if (crossed(this.previous, this.local)) this.close();
         this.previous = this.local.clone();
-      } else if (this.phase === "training" && Math.hypot(this.head.x, this.head.z - 2) < 0.8) {
-        this.phase = "done"; this.render();
+      } else {
+        // Seitliches Aufgabenfeld folgt der horizontalen Blickrichtung, nicht
+        // einem alten Weltpunkt, der nach dem Hinlaufen hinter dem Nutzer liegt.
+        const forward = new T.Vector3();
+        this.el.camera.getWorldDirection(forward);
+        forward.y = 0;
+        if (forward.lengthSq() > 1e-6) {
+          forward.normalize();
+          const right = new T.Vector3(-forward.z, 0, forward.x);
+          this.board.object3D.position.copy(this.head).addScaledVector(forward, 1.8).addScaledVector(right, -1.1);
+          this.board.object3D.lookAt(this.head);
+        }
+        if (this.phase === "training" && this.target.modelReady) {
+          const manip = this.target.components["fkc-manipulable"];
+          const position = this.target.object3D.getWorldPosition(new T.Vector3());
+          const next = F.Tutorial.progress(this.step,
+            Math.hypot(this.head.x - position.x, this.head.z - position.z) < 0.9,
+            position.distanceTo(this.taskOrigin), manip ? manip.hands.length : 0, this.body.object3D.scale.x);
+          if (next !== this.step) {
+            this.step = next;
+            if (next === 3) this.phase = "done";
+            this.render();
+          }
+        }
       }
     },
     close: function () {
       const returnToSpawn = this.phase === "training" || this.phase === "done";
+      if (this.hiddenOverlays) {
+        for (const [object, visible] of this.hiddenOverlays) object.visible = visible;
+        this.hiddenOverlays.clear();
+      }
+      if (this.target) F.releaseModel(this.target);
       if (this.room && this.roomVisible !== undefined) this.room.object3D.visible = this.roomVisible;
       this.roomVisible = undefined;
       F.Tutorial.active = false;

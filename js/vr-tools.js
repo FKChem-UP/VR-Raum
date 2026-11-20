@@ -168,7 +168,8 @@
       ) return false;
 
       if (F.Tutorial && F.Tutorial.active) {
-        return target.type === "action" && target.el.dataset.fkcTutorial === "true";
+        return (target.type === "action" && target.el.dataset.fkcTutorial === "true") ||
+          (target.type === "model" && F.Tutorial.allowsModel(target.el));
       }
       if (menuOpen) {
         return (
