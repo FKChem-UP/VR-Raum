@@ -302,11 +302,7 @@
     }
     return {...base, atoms, bonds, cellAtomCount: atoms.length};
   }
-  function environmentCandidates(base, radius) {
-    if (!base.environmentCell || base.mode !== "molecule" || ![1.5, 2, 3, 4, 5].includes(radius)) {
-      throw new Error("Umgebung nur für Co-Komplex und unterstützte Reichweiten verfügbar.");
-    }
-    const cell = base.environmentCell;
+  function cellComponents(cell) {
     const adjacency = cell.atoms.map(() => []);
     for (const bond of cell.bonds) {
       const shift = bond.deltaFractional.map((value, axis) =>
@@ -340,6 +336,38 @@
       }
       templates.push({states, bonds});
     }
+    return templates;
+  }
+  function completeCell(cell) {
+    const atoms = [];
+    const bonds = [];
+    for (const template of cellComponents(cell)) {
+      const fractions = template.states.map(state => cell.atoms[state.index].fractional.map((value, axis) => value + state.shift[axis]));
+      const shifts = new Map(fractions.map(point => {
+        const shift = point.map(value => -Math.floor(value));
+        return [shift.join(","), shift];
+      }));
+      for (const shift of shifts.values()) {
+        const offset = atoms.length;
+        fractions.forEach((point, i) => {
+          const fractional = point.map((value, axis) => value + shift[axis]);
+          const original = cell.atoms[template.states[i].index];
+          atoms.push({...original, fractional, positionAngstrom: cartesian(fractional, cell.cellMatrix),
+            id: "complete:" + original.id + ":" + fractional.map(value => Math.round(value * 1e7)).join(","),
+            modelNumber: atoms.length + 1});
+        });
+        template.bonds.forEach(bond => bonds.push({...bond, id: "complete:" + offset + ":" + bond.id,
+          a: offset + bond.a, b: offset + bond.b}));
+      }
+    }
+    return {...cell, mode: "cell-complete", atoms, bonds};
+  }
+  function environmentCandidates(base, radius) {
+    if (!base.environmentCell || base.mode !== "molecule" || ![1.5, 2, 2.5, 3, 4, 5].includes(radius)) {
+      throw new Error("Umgebung nur für Co-Komplex und unterstützte Reichweiten verfügbar.");
+    }
+    const cell = base.environmentCell;
+    const templates = cellComponents(cell);
     const inverse = position => {
       const z = position[2] / cell.cellMatrix[2][2];
       const y = (position[1] - z * cell.cellMatrix[2][1]) / cell.cellMatrix[1][1];
@@ -382,5 +410,5 @@
     }
     return candidates.sort((a,b) => a.minimumDistanceAngstrom - b.minimumDistanceAngstrom);
   }
-  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, environmentCandidates};
+  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, environmentCandidates, completeCell};
 })(window.FKCVR = window.FKCVR || {});

@@ -53,6 +53,18 @@ for (const bond of coordination.bonds) {
 }
 console.log("Co-Koordinationsansicht bestanden: 7 Atome, 6 Bindungen, originale IDs und Symmetrieabbilder.");
 const environment3 = api.environmentCandidates(fullComplex, 3);
+const environment25 = api.environmentCandidates(fullComplex, 2.5);
+assert.ok(environment25.every(candidate => environment3.some(entry => entry.id === candidate.id)));
+const completed = api.completeCell(api.createCoStructure(source, "cell"));
+assert.equal(completed.mode, "cell-complete");
+assert.ok(completed.atoms.length > 72);
+assert.equal(new Set(completed.atoms.map(atom => atom.id)).size, completed.atoms.length);
+for (const bond of completed.bonds) {
+  const a = completed.atoms[bond.a].positionAngstrom;
+  const b = completed.atoms[bond.b].positionAngstrom;
+  assert.ok(Math.abs(Math.hypot(...b.map((value,axis) => value-a[axis]))-bond.distanceAngstrom) < 0.005);
+}
+console.log("Vervollständigte Co-Zelle:", completed.atoms.length, "Atome,", completed.bonds.length, "Bindungen.");
 const environment5 = api.environmentCandidates(fullComplex, 5);
 assert.ok(environment3.length > 0);
 assert.ok(environment5.length >= environment3.length);

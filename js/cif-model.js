@@ -673,16 +673,22 @@
     if (!style) throw new Error("Nicht unterstützter CIF-Style: " + styleId);
     group.traverse(mesh => {
       if (mesh.userData.fkcAtom) {
+        mesh.visible = !(group.userData.fkcHideHydrogen && mesh.userData.fkcAtom.element === "H");
         // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
         // Die übrigen Radien sind rein visuelle Darstellungsradien.
         const element = elements[mesh.userData.fkcAtom.element];
         if (!element) throw new Error("Unbekanntes Darstellungselement.");
         mesh.scale.setScalar(styleId === "space-filling" ? element.vdw :
-          styleId === "ball-stick" && mesh.userData.fkcAtom.element === "H" ? style.atomRadius / 2 : style.atomRadius);
+          styleId === "ball-stick" ? style.atomRadius * (group.userData.fkcAtomScale || 1) *
+            (mesh.userData.fkcAtom.element === "H" ? 0.5 : 1) : style.atomRadius);
       } else if (mesh.userData.fkcPolyhedron) {
         mesh.visible = styleId === "polyhedral";
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
+        const structure = group.userData.fkcStructure;
+        const bond = mesh.userData.fkcBond;
+        if (group.userData.fkcHideHydrogen && structure &&
+            [bond.a, bond.b].some(index => structure.atoms[index] && structure.atoms[index].element === "H")) mesh.visible = false;
         mesh.scale.x = mesh.scale.z = style.bondRadius * (styleId === "ball-stick" ? group.userData.fkcBondThickness || 1 : 1);
         if (mesh.userData.fkcElementMaterial) {
           const mode = styleId === "ball-stick" ? group.userData.fkcBondColorMode || "auto" : "auto";
@@ -699,6 +705,45 @@
 
   F.CIF = {
     createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
+    setAtomOptions(root, hideHydrogen, atomScale) {
+      if (atomScale !== undefined && ![0.5, 0.75, 1].includes(atomScale)) return false;
+      const visual = root && root.querySelector(".model-visual");
+      const group = visual && visual.getObject3D("mesh");
+      if (!group || !visual.fkcStructure || root.fkcPendingVisual) return false;
+      const labels = F.getScene().components["fkc-atom-labels"];
+      if (labels) labels.clear();
+      if (hideHydrogen !== undefined) root.fkcHideHydrogen = !!hideHydrogen;
+      if (atomScale !== undefined) root.fkcAtomScale = atomScale;
+      group.userData.fkcHideHydrogen = root.fkcHideHydrogen;
+      group.userData.fkcAtomScale = root.fkcAtomScale || 1;
+      applyStyle(group, group.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(group);
+      F.invalidateHits();
+      return true;
+    },
+    setCompleteCell(root, enabled) {
+      const visual = root && root.querySelector(".model-visual");
+      const component = visual && visual.components["fkc-cif-model"];
+      if (!component || !component.built || !["cell", "cell-complete"].includes(visual.fkcStructure.mode) ||
+          !visual.fkcStructure.cellMatrix || !visual.fkcStructure.name.startsWith("Co-Produkt1")) return false;
+      const cell = component.originalCell || visual.fkcStructure;
+      component.originalCell = cell;
+      const structure = enabled ? F.CIFStructure.completeCell(cell) : cell;
+      const built = buildMesh(structure);
+      Object.assign(built.group.userData, {fkcHideHydrogen: root.fkcHideHydrogen,
+        fkcAtomScale: root.fkcAtomScale || 1, fkcBondThickness: root.fkcBondThickness || 1,
+        fkcBondColorMode: root.fkcBondColorMode || "auto", fkcBondColor: root.fkcBondColor || "#949494"});
+      applyStyle(built.group, root.fkcStyle || "ball-stick");
+      F.releaseModel(root);
+      const labels = F.getScene().components["fkc-atom-labels"];
+      if (labels) labels.clear();
+      component.built.dispose();
+      component.built = built;
+      visual.fkcStructure = structure;
+      visual.setObject3D("mesh", built.group);
+      F.invalidateHits();
+      return true;
+    },
     setBondThickness(root, factor) {
       if (![0.5, 0.75, 1].includes(factor)) return false;
       const visual = root && root.querySelector(".model-visual");
@@ -720,7 +765,7 @@
       const visual = root && root.querySelector(".model-visual");
       const group = visual && visual.getObject3D("mesh");
       if (!group || !visual.fkcStructure.environmentCell || root.fkcPendingVisual) return false;
-      if (radius !== undefined && ![1.5, 2, 3, 4, 5].includes(radius)) return false;
+      if (radius !== undefined && ![1.5, 2, 2.5, 3, 4, 5].includes(radius)) return false;
       const state = group.userData.fkcEnvironment;
       state.radius = radius === undefined ? state.radius : radius;
       if (enabled && F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
@@ -759,6 +804,8 @@
         record.built.group.userData.fkcBondColorMode = group.userData.fkcBondColorMode;
         record.built.group.userData.fkcBondColor = group.userData.fkcBondColor;
         record.built.group.userData.fkcBondThickness = group.userData.fkcBondThickness;
+        record.built.group.userData.fkcHideHydrogen = group.userData.fkcHideHydrogen;
+        record.built.group.userData.fkcAtomScale = group.userData.fkcAtomScale;
         applyStyle(record.built.group, group.userData.fkcStyle || "ball-stick");
         for (const material of record.materials.values()) {
           material.transparent = !selected;
@@ -915,8 +962,8 @@
       group.add(mesh);
     }
 
-    if (structure.mode === "cell") {
-      structure.bondSegments.forEach(segment => rod(
+    if (structure.mode === "cell" || structure.mode === "cell-complete") {
+      if (structure.mode === "cell") structure.bondSegments.forEach(segment => rod(
         segment.startAngstrom, segment.endAngstrom,
         segment.id, bondMaterial, 0.10, segment,
         atomMaterials.get(structure.atoms[segment.half === 0 ? segment.a : segment.b].element)
@@ -936,7 +983,8 @@
             frameMaterial, 0.035);
         }));
       });
-    } else {
+    }
+    if (structure.mode !== "cell") {
       structure.bonds.forEach(bond => {
         const start = structure.atoms[bond.a].positionAngstrom;
         const end = structure.atoms[bond.b].positionAngstrom;
@@ -1050,6 +1098,8 @@
         built.group.userData.fkcBondColorMode = root && root.fkcBondColorMode || "auto";
         built.group.userData.fkcBondColor = root && root.fkcBondColor || "#949494";
         built.group.userData.fkcBondThickness = root && root.fkcBondThickness || 1;
+        built.group.userData.fkcHideHydrogen = root && root.fkcHideHydrogen;
+        built.group.userData.fkcAtomScale = root && root.fkcAtomScale || 1;
         applyStyle(built.group, (root && root.fkcStyle) || "ball-stick");
 
         this.built = built;

@@ -394,6 +394,17 @@ IDE-53: Umgebung Aus/1,5/2/3/4/5 Å direkt im Handmenü statt Einstellungsseite.
 IDE-54: H-Brücken gestrichelt rot darstellen. Nutzer möchte zunächst eigene
   H-Brückenregeln/Referenzdaten liefern (Rückfrage beantwortet). Daher keine
   automatische O/N/Cl-Kandidatenregel implementieren, H-Brücken warten.
+IDE-55: Umgebung 2,5 Å, H-Atome ausblenden, kleinere Ball-and-Stick-Atome.
+  Lokal ergänzt; H-Aus auch H-Bindungen und Umgebung, Atomgröße 50/75/100 %.
+IDE-56: Grip zieht entferntes anvisiertes Modell langsam, zunehmend schneller
+  zur Hand, dann normales Greifen. Lokal als Prototyp, Loslassen stoppt,
+  Geschwindigkeit begrenzt. Keine Kollisionen berücksichtigt; Pico-Test offen.
+IDE-57: Malen entfernen oder Laser/Malmodus-Schalter, Standard Laser,
+  Malfarbe transparent als Textmarker statt Text übermalen. Noch nicht umgesetzt;
+  Agent empfiehlt Schalter und Rücksprache statt Entfernung.
+IDE-58: Co-Zellmoleküle vervollständigen auch außerhalb Zelle. Lokaler Button,
+  200 Atome/220 Bindungen aus vollständigen die Zelle berührenden Komponenten,
+  Rahmen und Maßstab erhalten, An/Aus reversibel. Pico-Nachtest offen.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------

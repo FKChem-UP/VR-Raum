@@ -123,6 +123,15 @@ atomMesh.userData.fkcAtom = {element: "H"};
 F.CIF.applyStyle(group, "ball-stick");
 assert.equal(atomMesh.scale.x, 0.16);
 atomMesh.userData.fkcAtom = molecule.atoms[0];
+assert.equal(F.CIF.setAtomOptions(colorRoot, true, 0.5), true);
+atomMesh.userData.fkcAtom = {element: "H"};
+F.CIF.applyStyle(group, "ball-stick");
+assert.equal(atomMesh.visible, false);
+assert.equal(atomMesh.scale.x, 0.08);
+F.CIF.setAtomOptions(colorRoot, false, 1);
+assert.equal(atomMesh.visible, true);
+assert.equal(F.CIF.setAtomOptions(colorRoot, undefined, 2), false);
+atomMesh.userData.fkcAtom = molecule.atoms[0];
 for (const style of F.CIF.availableStyles(molecule)) {
   F.CIF.applyStyle(group, style.id);
   assert.equal(atomMesh.scale.x, style.atomRadius);

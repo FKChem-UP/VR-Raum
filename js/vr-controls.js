@@ -71,7 +71,7 @@ window.FKCVR = window.FKCVR || {};
 
     scene.querySelectorAll("[fkc-grabber]").forEach(hand => {
       const grabber = hand.components["fkc-grabber"];
-      if (grabber && grabber.grabbed === root) grabber.end();
+      if (grabber && (grabber.grabbed === root || grabber.pulling === root)) grabber.end();
     });
   };
 
@@ -617,7 +617,7 @@ window.FKCVR = window.FKCVR || {};
     },
 
     start: function () {
-      if (this.grabbed || (F.Menu && F.Menu.opened)) return;
+      if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened)) return;
 
       this.el.object3D.getWorldPosition(this.position);
 
@@ -643,12 +643,56 @@ window.FKCVR = window.FKCVR || {};
         }
       });
 
+      if (!best) {
+        const tools = this.el.components["fkc-controller"];
+        if (tools && tools.source && tools.updateRay && F.findHit) {
+          tools.updateRay();
+          const hit = F.findHit(tools.raycaster, true);
+          if (hit && hit.type === "model" && hit.el.modelReady &&
+              hit.el.components["fkc-manipulable"].hands.length === 0) {
+            this.pulling = hit.el;
+            this.pullTime = 0;
+            F.selectModel(hit.el);
+          }
+        }
+      }
       if (best && best.components["fkc-manipulable"].start(this.el)) {
         this.grabbed = best;
       }
     },
 
+    tick: function (time, delta) {
+      if (!this.pulling) return;
+      const target = this.pulling;
+      const tools = this.el.components["fkc-controller"];
+      const manip = target.components["fkc-manipulable"];
+      if (!target.isConnected || !target.modelReady || !tools || !tools.source ||
+          !F.buttonPressed(tools.source.gamepad, 1) || !manip || manip.hands.length || F.Menu && F.Menu.opened) {
+        this.pulling = null;
+        return;
+      }
+      this.el.object3D.getWorldPosition(this.position);
+      const hitbox = target.querySelector(".hitbox");
+      hitbox.object3D.updateWorldMatrix(true, true);
+      this.bounds.setFromObject(hitbox.object3D);
+      this.bounds.clampPoint(this.position, this.closest);
+      const distance = this.position.distanceTo(this.closest);
+      if (distance <= 0.10) {
+        this.pulling = null;
+        if (manip.start(this.el)) this.grabbed = target;
+        return;
+      }
+      const seconds = Math.min(0.05, Math.max(0, (delta || 0) / 1000));
+      this.pullTime += seconds;
+      const step = F.pullStep(distance, this.pullTime, seconds);
+      const offset = this.position.clone().sub(this.closest).normalize().multiplyScalar(step);
+      const world = target.object3D.getWorldPosition(new V()).add(offset);
+      manip.setPosition(world);
+      F.invalidateHits();
+    },
+
     end: function () {
+      this.pulling = null;
       if (!this.grabbed) return;
 
       const manip = this.grabbed.components["fkc-manipulable"];
@@ -664,6 +708,9 @@ window.FKCVR = window.FKCVR || {};
       this.el.removeEventListener("controllerdisconnected", this.end);
     }
   });
+
+  F.pullStep = (distance, elapsed, seconds) => Math.min(Math.max(0, distance - 0.08),
+    Math.min(2.5, 0.12 + 0.65 * Math.max(0, elapsed) ** 2) * Math.max(0, seconds));
 
   AFRAME.registerComponent("fkc-controller", {
     schema: {

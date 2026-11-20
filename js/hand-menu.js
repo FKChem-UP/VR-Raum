@@ -247,7 +247,7 @@
       const structure = visual && visual.fkcStructure;
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
-        model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
+        model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
@@ -302,7 +302,7 @@
         y += 44;
       };
       const button = (label, action, selected = false) => {
-        const compact = this.page === "settings" || structure && structure.environmentCell;
+        const compact = this.page === "settings" || !!structure;
         const b = {x: 28, y, w: 712, h: compact ? 32 : 40, action};
         const index = this.buttons.length;
         const pressed = this.pressedIndex === index;
@@ -323,7 +323,7 @@
       };
       // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
       const row = entries => {
-        const compactRow = !!(structure && structure.environmentCell);
+        const compactRow = !!structure;
         const height = compactRow ? 67 : 87;
         const w = (712 - (entries.length - 1) * 12) / entries.length;
         entries.forEach((entry, index) => {
@@ -408,6 +408,10 @@
           row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %",
             selected: (model.fkcBondThickness || 1) === factor,
             action: () => F.CIF.setBondThickness(model, factor)})));
+          text("Atomgröße · nur Ball-and-Stick");
+          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %",
+            selected: (model.fkcAtomScale || 1) === factor,
+            action: () => F.CIF.setAtomOptions(model, undefined, factor)})));
         } else text("Bindungsfarben nur bei CIF-Modellen verfügbar.");
         this.texture.needsUpdate = true;
         return;
@@ -440,6 +444,12 @@
         button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
+        if (structure) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
+          () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen));
+        if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
+          button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
+            () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
+        }
         if (structure && ["molecule", "coordination"].includes(structure.mode)) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           row(["distance", "angle", "torsion"].map(mode => ({
@@ -453,7 +463,7 @@
         if (structure && structure.environmentCell) {
           const state = F.CIF.environmentState(model);
           text("Umgebung (Å) · " + state.selected.size + " übernommen");
-          row([null, 1.5, 2, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","),
+          row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","),
             selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
             action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
