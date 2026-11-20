@@ -261,7 +261,11 @@
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
+      const cue = this.page === "model" && F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
+      // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
+      const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
+        cue, pulse,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
@@ -271,7 +275,7 @@
       const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
       if (modeSignature !== this.signature) {
         this.signature = modeSignature;
-        this.render(structure);
+        this.render(structure, cue, pulse);
       }
     },
 
@@ -297,7 +301,7 @@
         y >= b.y && y <= b.y + b.h);
     },
 
-    render: function (structure) {
+    render: function (structure, cue, pulse = 0) {
       const ctx = this.ctx;
       const model = this.model;
       const painting = F.Draw && F.Draw.mode === "paint";
@@ -319,7 +323,18 @@
         // nächsten Button-/Legendenfläche, damit diese den Text nicht übermalt.
         y += 40;
       };
-      const button = (label, action, selected = false) => {
+      const outlineCue = (id, x, y, width, height) => {
+        if (!cue || id !== cue) return;
+        ctx.strokeStyle = "#a66a00";
+        ctx.lineWidth = 8;
+        ctx.strokeRect(x + 5, y + 5, width - 10, height - 10);
+        ctx.strokeStyle = "#ffdf38";
+        ctx.globalAlpha = 0.45 + pulse * 0.06875;
+        ctx.lineWidth = 5;
+        ctx.strokeRect(x + 5, y + 5, width - 10, height - 10);
+        ctx.globalAlpha = 1;
+      };
+      const button = (label, action, selected = false, cueId = null) => {
         const compact = this.page === "settings" || !!structure;
         const b = {x: 28, y, w: 712, h: compact ? 32 : 40, action};
         const index = this.buttons.length;
@@ -333,6 +348,7 @@
         ctx.strokeStyle = hovered ? "#b57c00" : "#82988a";
         ctx.lineWidth = hovered ? 4 : 2;
         ctx.strokeRect(b.x, b.y + shift, b.w, b.h);
+        outlineCue(cueId, b.x, b.y + shift, b.w, b.h);
         ctx.fillStyle = "#173527";
         ctx.font = "29px Arial";
         ctx.fillText((selected ? "✓ " : "") + label, 43, y + (compact ? 25 : 29) + shift, 677);
@@ -358,6 +374,7 @@
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
           ctx.strokeRect(x, y + shift, w, height);
+          outlineCue(entry.cueId, x, y + shift, w, height);
           const plain = ["plain", "variant", "color", "opacity"].includes(entry.kind);
           const atomCount = entry.kind === "atom-size" ? 1 : entry.count || 2;
           const points = [];
@@ -479,7 +496,7 @@
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
           label: variant.cifMode === "coordination" ? "Koordination" : variant.cifMode === "cell" ? "Zelle" :
             /\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül",
-          kind: "variant", selected: variant.id === model.fkcVariantId, action: () => {
+          kind: "variant", cueId: "variant:" + variant.id, selected: variant.id === model.fkcVariantId, action: () => {
             if (!model.fkcPendingVisual) F.switchVariant(model, variant.id);
           }
         })));
@@ -504,7 +521,7 @@
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
         if (structure) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
-          () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen));
+          () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen), false, "hide-hydrogen");
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
             () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
@@ -517,7 +534,7 @@
         if (structure && ["molecule", "coordination"].includes(structure.mode)) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           row(["distance", "angle", "torsion"].map(mode => ({
-            label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode],
+            label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode], cueId: "measure:" + mode,
             selected: F.Measure.enabled && F.Measure.mode === mode,
             action: () => F.Measure.toggleMode(mode)
           })));
@@ -528,6 +545,7 @@
           const state = F.CIF.environmentState(model);
           text("Umgebung (Å) · " + state.selected.size + " übernommen");
           row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","), kind: "environment", radius,
+            cueId: "environment:" + (radius ?? "off"),
             selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
             action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));

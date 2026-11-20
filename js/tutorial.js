@@ -9,7 +9,7 @@
   const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
     "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen",
     "Zum Molekül wechseln", "H-Atome ausblenden", "Umgebung bei 3 Å anzeigen",
-    "Ein transparentes Molekül übernehmen", "Umgebung wieder ausblenden"];
+    "Ein transparentes Molekül anklicken", "Umgebung wieder ausblenden"];
   const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
     "Halte einen Grip und verschiebe das Modell mindestens 15 cm.",
     "Halte beide Grips und zieh die Hände auseinander (140 %).",
@@ -23,6 +23,8 @@
     "Klicke mit dem Trigger auf ein transparentes Molekül, nicht auf ein einzelnes Ion.",
     "Wähle bei Umgebung Aus. Das übernommene Molekül soll sichtbar bleiben."];
   const palm = hand => hand === "left" ? "rechte Handfläche" : "linke Handfläche";
+  const menuTargets = {4: "variant:tutorial-coordination", 5: "measure:distance", 6: "measure:angle",
+    7: "variant:tutorial-complex", 8: "hide-hydrogen", 9: "environment:3", 11: "environment:off"};
   function hasSelectedMolecule(environment) {
     return !!environment && [...environment.selected].some(id =>
       environment.records.get(id)?.candidate?.atoms.length > 1);
@@ -36,6 +38,15 @@
   F.Tutorial = {
     active: false, crossed, hasSelectedMolecule, palm,
     allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active && root.object3D.visible; },
+    menuTarget(scene, root) {
+      if (!this.allowsModel(root) || F.Menu?.opened || root.fkcPendingVisual) return null;
+      const tutorial = scene.components["fkc-tutorial"];
+      if (!tutorial || tutorial.phase !== "training" || tutorial.target !== root) return null;
+      const target = menuTargets[tutorial.step];
+      // Nicht zum erneuten Klick auffordern: Er würde den Messmodus abschalten.
+      if (F.Measure?.enabled && target === "measure:" + F.Measure.mode) return null;
+      return target || null;
+    },
     hasMeasurement(records, root, mode) {
       const visual = root.querySelector(".model-visual");
       return !!visual && (records || []).some(record => record.root === root && record.visual === visual && record.measurementMode === mode);

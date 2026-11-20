@@ -57,6 +57,25 @@ F.Tutorial.active = true;
 assert.equal(F.Tutorial.allowsModel({id: "tutorial-co-model", object3D: {visible: true}}), true);
 assert.equal(F.Tutorial.allowsModel({id: "tutorial-co-model", object3D: {visible: false}}), false);
 assert.equal(F.Tutorial.allowsModel({id: "welcome-model"}), false);
+const trainingRoot = {id: "tutorial-co-model", object3D: {visible: true}};
+const training = {phase: "training", target: trainingRoot, step: 4};
+const scene = {components: {"fkc-tutorial": training}};
+for (const [step, expected] of [[4, "variant:tutorial-coordination"], [5, "measure:distance"],
+  [6, "measure:angle"], [7, "variant:tutorial-complex"], [8, "hide-hydrogen"],
+  [9, "environment:3"], [10, null], [11, "environment:off"]]) {
+  training.step = step;
+  assert.equal(F.Tutorial.menuTarget(scene, trainingRoot), expected);
+}
+training.step = 5;
+F.Measure = {enabled: true, mode: "distance"};
+assert.equal(F.Tutorial.menuTarget(scene, trainingRoot), null, "Aktive Messung nicht versehentlich ausschalten");
+training.step = 4;
+trainingRoot.fkcPendingVisual = {};
+assert.equal(F.Tutorial.menuTarget(scene, trainingRoot), null);
+delete trainingRoot.fkcPendingVisual;
+F.Tutorial.active = false;
+assert.equal(F.Tutorial.menuTarget(scene, trainingRoot), null);
+F.Tutorial.active = true;
 const next = (step, tools) => F.Tutorial.progress(step, false, 0, 0, 1, tools);
 assert.equal(next(3, {coordination: true}), 3, "Erst das Handmenü öffnen");
 assert.equal(next(3, {handMenu: true}), 4);
