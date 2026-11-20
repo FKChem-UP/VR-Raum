@@ -57,7 +57,29 @@ const environment25 = api.environmentCandidates(fullComplex, 2.5);
 assert.ok(environment25.every(candidate => environment3.some(entry => entry.id === candidate.id)));
 const completed = api.completeCell(api.createCoStructure(source, "cell"));
 assert.equal(completed.mode, "cell-complete");
-assert.ok(completed.atoms.length > 72);
+assert.equal(completed.atoms.length, 200);
+assert.equal(completed.bonds.length, 220);
+assert.equal(structure.hydrogenContacts.length, 8, "Nur explizite CIF-H-Brücken");
+const contactCell = api.createCoStructure(source, "cell");
+assert.equal(contactCell.hydrogenContacts.length, 16, "Zwei Symmetrieabbilder je CIF-Kontakt");
+assert.ok(completed.hydrogenContacts.length > 0);
+for (const view of [contactCell, completed]) {
+  for (const contact of view.hydrogenContacts) {
+    const start = view.atoms[contact.a];
+    const end = view.atoms[contact.b];
+    assert.equal(start.element, "H");
+    assert.equal(start.cifLabel, contact.hydrogenLabel);
+    assert.equal(end.cifLabel, contact.acceptorLabel);
+    assert.ok(end.fractional.every((value, axis) => {
+      const difference = value - start.fractional[axis] - contact.deltaFractional[axis];
+      return Math.abs(difference - (view.mode === "cell" ? Math.round(difference) : 0)) < 1e-7;
+    }));
+  }
+}
+const contact = contactCell.hydrogenContacts.find(entry => entry.hydrogenLabel === "H1A");
+assert.equal(contact.acceptorSymmetry, "2_656");
+assert.ok(Math.abs(Math.hypot(...api.cartesian(contact.deltaFractional, contactCell.cellMatrix)) - 2.38) < 0.006);
+assert.equal(fullComplex.hydrogenContacts, undefined, "Keine Anzeige im isolierten Komplex oder Tutorial");
 assert.equal(new Set(completed.atoms.map(atom => atom.id)).size, completed.atoms.length);
 for (const bond of completed.bonds) {
   const a = completed.atoms[bond.a].positionAngstrom;
@@ -98,7 +120,7 @@ for (const mode of ["molecule", "cell"]) {
   } else {
     assert.equal(model.atoms.length, 64);
     assert.equal(model.bonds.length, 72);
-    assert.equal(model.excludedSites.join(","), "O1,H3,H2,Cl03");
+    assert.equal([...model.excludedSites].sort().join(","), "Cl2,H1A,H1B,O3");
     assert.equal(model.atoms.filter(atom => atom.element === "Co").length, 2);
     assert.ok(model.atoms.some(atom => atom.element === "H"));
     for (const bond of model.bonds) {

@@ -262,7 +262,7 @@
       const structure = visual && visual.fkcStructure;
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
-        model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
+        model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
@@ -508,6 +508,11 @@
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
             () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
+        }
+        if (structure && structure.hydrogenContacts && structure.hydrogenContacts.length) {
+          const enabled = !!model.fkcShowHydrogenContacts;
+          button("H-Brücken: " + (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
+            () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }
         if (structure && ["molecule", "coordination"].includes(structure.mode)) {
           text("Messen · aktiven Knopf erneut drücken: Aus");

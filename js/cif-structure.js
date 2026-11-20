@@ -89,8 +89,7 @@
     });
   }
 
-  function read(source) {
-    const parsed = parse(source);
+  function read(source, parsed = parse(source)) {
     const rows = tag => (parsed.loops.find(loop => loop.names.includes(tag)) || {rows: []}).rows;
     const lengths = ["a", "b", "c"].map(axis => numeric(parsed.values["_cell_length_" + axis]));
     const angles = ["alpha", "beta", "gamma"].map(axis => numeric(parsed.values["_cell_angle_" + axis]));
@@ -108,16 +107,17 @@
         uAnisoCIF: adps.get(row._atom_site_label) || null};
     });
     const sites = new Map(atoms.map(atom => [atom.cifLabel, atom]));
-    function image(label, code) {
+    function fractionalImage(label, code) {
       const atom = sites.get(label);
       if (!atom) throw new Error("Unbekanntes Bindungsatom: " + label);
-      if (!code || code === ".") return atom.positionAngstrom.slice();
+      if (!code || code === ".") return atom.fractional.slice();
       const match = /^(\d+)_([0-9]{3})$/.exec(code);
       if (!match || !operations[Number(match[1]) - 1]) throw new Error("Unbekannter Symmetriecode: " + code);
       const fractional = symmetryPoint(atom.fractional, operations[Number(match[1]) - 1]);
       if (fractional.length !== 3) throw new Error("Symmetrieoperation ohne drei Koordinaten.");
-      return cartesian(fractional.map((value, i) => value + Number(match[2][i]) - 5), matrix);
+      return fractional.map((value, i) => value + Number(match[2][i]) - 5);
     }
+    const image = (label, code) => cartesian(fractionalImage(label, code), matrix);
     const bonds = rows("_geom_bond_atom_site_label_1").map(row => {
       const a = row._geom_bond_atom_site_label_1;
       const b = row._geom_bond_atom_site_label_2;
@@ -128,8 +128,16 @@
         calculatedDistanceAngstrom: Math.hypot(...end.map((value, i) => value - start[i])),
         startAngstrom: start, endAngstrom: end};
     });
+    const hydrogenContacts = rows("_geom_hbond_atom_site_label_h").map(row => ({
+      donorLabel: row._geom_hbond_atom_site_label_d,
+      hydrogenLabel: row._geom_hbond_atom_site_label_h,
+      acceptorLabel: row._geom_hbond_atom_site_label_a,
+      acceptorSymmetry: row._geom_hbond_site_symmetry_a,
+      start: fractionalImage(row._geom_hbond_atom_site_label_h, row._geom_hbond_site_symmetry_h),
+      end: fractionalImage(row._geom_hbond_atom_site_label_a, row._geom_hbond_site_symmetry_a)
+    }));
     const volume = matrix[0][0] * matrix[1][1] * matrix[2][2];
-    return {atoms, bonds, operations, lengths, angles, matrix, volume,
+    return {atoms, bonds, hydrogenContacts, operations, lengths, angles, matrix, volume,
       spaceGroup: parsed.values["_space_group_name_h-m_alt"], parsed};
   }
   function reconstructCoHeavy(structure, includeHydrogen = false) {
@@ -191,14 +199,14 @@
       description: includeHydrogen ? "Zusammenhängende Co-Einheit einschließlich geometrisch zugeordneter H-Atome." :
         "Zusammenhängende Nicht-H-Einheit aus expliziten CIF-Bindungen; keine H-Zuordnung."};
   }
-  function createCoStructure(source, mode) {
-    const structure = read(source);
+  function createCoStructure(source, mode, parsed = parse(source)) {
+    const structure = read(source, parsed);
     // Nur die vorliegende, vollständig besetzte Co-Teststruktur freigeben.
     if (structure.spaceGroup !== "P -1" || structure.atoms.length !== 36 ||
         structure.atoms.some(atom => atom.occupancy !== 1)) {
       throw new Error("Nicht unterstützte Co-Teststruktur.");
     }
-    const hydrogenBonds = [];
+    const covalentHydrogenBonds = [];
     for (const hydrogen of structure.atoms.filter(atom => atom.element === "H")) {
       const candidates = [];
       for (const parent of structure.atoms.filter(atom => ["C", "N", "O"].includes(atom.element))) {
@@ -215,13 +223,13 @@
       candidates.sort((a, b) => a.length - b.length);
       if (candidates.length !== 1) throw new Error("H-Zuordnung nicht eindeutig: " + hydrogen.cifLabel);
       const candidate = candidates[0];
-      hydrogenBonds.push({a: hydrogen.cifLabel, b: candidate.parent.cifLabel,
+      covalentHydrogenBonds.push({a: hydrogen.cifLabel, b: candidate.parent.cifLabel,
         symmetry2: (candidate.op + 1) + "_" + candidate.shift.map(value => value + 5).join(""),
         reportedDistanceAngstrom: candidate.length, calculatedDistanceAngstrom: candidate.length,
         startAngstrom: hydrogen.positionAngstrom.slice(), endAngstrom: candidate.position,
         inferredHydrogen: true});
     }
-    structure.bonds.push(...hydrogenBonds);
+    structure.bonds.push(...covalentHydrogenBonds);
     const base = {
       mode, name: "Co-Produkt1", cellLengthsAngstrom: structure.lengths,
       cellAnglesDegrees: structure.angles, cellMatrix: structure.matrix,
@@ -229,7 +237,7 @@
       hydrogenBondRule: "Eindeutiger C/N/O-Nachbar zwischen 0,6 und 1,25 Å; geometrisch ergänzt."
     };
     if (mode === "coordination") {
-      const complex = createCoStructure(source, "molecule");
+      const complex = createCoStructure(source, "molecule", parsed);
       const environment = complex.polyhedra[0];
       const indexes = [environment.center, ...environment.neighbors];
       const remap = new Map(indexes.map((index, i) => [index, i]));
@@ -253,7 +261,7 @@
         polyhedra.push({center, neighbors});
       });
       const center = [0, 1, 2].map(axis => complex.atoms.reduce((sum, atom) => sum + atom.positionAngstrom[axis], 0) / complex.atoms.length);
-      return {...base, polyhedra, environmentCell: createCoStructure(source, "cell"), originAngstrom: center,
+      return {...base, polyhedra, environmentCell: createCoStructure(source, "cell", parsed), originAngstrom: center,
         atoms: complex.atoms.map(atom => ({...atom,
         positionAngstrom: atom.positionAngstrom.map((value, axis) => value - center[axis])})),
         bonds: complex.bonds.map((bond, i) => ({...bond, id: "co-bond-" + (i + 1),
@@ -300,7 +308,13 @@
           distanceAngstrom: bond.calculatedDistanceAngstrom});
       });
     }
-    return {...base, atoms, bonds, cellAtomCount: atoms.length};
+    const hydrogenContacts = structure.hydrogenContacts.flatMap(contact => structure.operations.map(operation => {
+      const start = symmetryPoint(contact.start, operation);
+      const end = symmetryPoint(contact.end, operation);
+      return {...contact, a: locate(contact.hydrogenLabel, start), b: locate(contact.acceptorLabel, end),
+        deltaFractional: end.map((value, axis) => value - start[axis])};
+    })).filter(contact => contact.a >= 0 && contact.b >= 0);
+    return {...base, atoms, bonds, hydrogenContacts, cellAtomCount: atoms.length};
   }
   function cellComponents(cell) {
     const adjacency = cell.atoms.map(() => []);
@@ -360,7 +374,19 @@
           a: offset + bond.a, b: offset + bond.b}));
       }
     }
-    return {...cell, mode: "cell-complete", atoms, bonds};
+    // Nur Kontakte einzeichnen, deren tatsächliches H- und Akzeptorabbild
+    // in der vervollständigten Darstellung vorkommt. Nicht in die Zelle falten.
+    const hydrogenContacts = (cell.hydrogenContacts || []).flatMap(contact => {
+      const hydrogen = cell.atoms[contact.a];
+      return atoms.flatMap((atom, a) => {
+        if (atom.cifLabel !== hydrogen.cifLabel || atom.symmetryIndex !== hydrogen.symmetryIndex) return [];
+        const end = atom.fractional.map((value, axis) => value + contact.deltaFractional[axis]);
+        const b = atoms.findIndex(candidate => candidate.cifLabel === contact.acceptorLabel &&
+          candidate.fractional.every((value, axis) => Math.abs(value - end[axis]) < 1e-7));
+        return b < 0 ? [] : [{...contact, a, b}];
+      });
+    });
+    return {...cell, mode: "cell-complete", atoms, bonds, hydrogenContacts};
   }
   function environmentCandidates(base, radius) {
     if (!base.environmentCell || base.mode !== "molecule" || ![1.5, 2, 2.5, 3, 4, 5].includes(radius)) {

@@ -537,8 +537,8 @@
    * Jedes Teilstück wird anhand seines Mittelpunkts in [0, 1]^3
    * zurückverschoben. Dadurch entstehen keine langen Querstreben.
    */
-  function cellBondSegments(structure) {
-    return structure.bonds.flatMap(bond => {
+  function cellBondSegments(structure, bonds = structure.bonds) {
+    return bonds.flatMap(bond => {
       const start = structure.atoms[bond.a].fractional;
       const delta = bond.deltaFractional;
       const cuts = [0, 0.5, 1];
@@ -572,9 +572,37 @@
           a: bond.a,
           b: bond.b,
           half: (begin + end) / 2 < 0.5 ? 0 : 1,
+          from: begin, to: end,
           startAngstrom: point(begin),
           endAngstrom: point(end)
         };
+      });
+    });
+  }
+
+  // Erzeuge kurze sichtbare Teilstücke; die Lücken laufen über Zellflächen
+  // hinweg im selben Rhythmus weiter. Keine Bindungs- oder Trefferobjekte.
+  function hydrogenContactDashes(structure) {
+    if (!["cell", "cell-complete"].includes(structure.mode)) return [];
+    return (structure.hydrogenContacts || []).flatMap(contact => {
+      const start = structure.atoms[contact.a].positionAngstrom;
+      const end = structure.atoms[contact.b].positionAngstrom;
+      const segments = structure.mode === "cell" ? cellBondSegments(structure, [contact]) :
+        [{from: 0, to: 1, startAngstrom: start, endAngstrom: end}];
+      const length = Math.hypot(...F.CIFStructure.cartesian(contact.deltaFractional, structure.cellMatrix));
+      if (length < EPS) return [];
+      const period = 0.34 / length;
+      const dash = 0.20 / length;
+      return segments.flatMap(segment => {
+        const points = [];
+        const point = t => segment.startAngstrom.map((value, axis) => value +
+          (segment.endAngstrom[axis] - value) * (t - segment.from) / (segment.to - segment.from));
+        for (let t = Math.floor(segment.from / period) * period; t < segment.to; t += period) {
+          const a = Math.max(t, segment.from);
+          const b = Math.min(t + dash, segment.to);
+          if (b - a > EPS) points.push([point(a), point(b)]);
+        }
+        return points;
       });
     });
   }
@@ -583,11 +611,17 @@
     if (!["molecule", "cell", "coordination"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
-    if (/_atom_site_aniso_label/i.test(source) && /\bCo01\s+Co\s/.test(source)) {
+    if (/^[ \t]*_atom_site_aniso_label(?:[ \t\r\n]|$)/im.test(source)) {
       if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
-      const structure = F.CIFStructure.createCoStructure(source, mode);
-      if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
-      return structure;
+      const parsed = F.CIFStructure.parse(source);
+      const sites = parsed.loops.find(loop => loop.names.includes("_atom_site_label") &&
+        loop.names.includes("_atom_site_type_symbol") && loop.names.includes("_atom_site_fract_x"));
+      // Das Elementsymbol ist unabhängig vom frei vergebenen CIF-Atomlabel.
+      if (sites && sites.rows.some(row => row._atom_site_type_symbol === "Co")) {
+        const structure = F.CIFStructure.createCoStructure(source, mode, parsed);
+        if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
+        return structure;
+      }
     }
     // Auch die Zellansicht muss die Einzelkäfigprüfungen bestehen.
     if (mode === "coordination") fail("Koordinationsansicht für diese Struktur nicht verfügbar.");
@@ -672,7 +706,9 @@
     const style = styles.find(entry => entry.id === styleId);
     if (!style) throw new Error("Nicht unterstützter CIF-Style: " + styleId);
     group.traverse(mesh => {
-      if (mesh.userData.fkcAtom) {
+      if (mesh.userData.fkcHydrogenContacts) {
+        mesh.visible = !!group.userData.fkcShowHydrogenContacts && !group.userData.fkcHideHydrogen;
+      } else if (mesh.userData.fkcAtom) {
         mesh.visible = !(group.userData.fkcHideHydrogen && mesh.userData.fkcAtom.element === "H");
         // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
         // Die übrigen Radien sind rein visuelle Darstellungsradien.
@@ -704,7 +740,16 @@
   }
 
   F.CIF = {
-    createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
+    createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements, hydrogenContactDashes,
+    setHydrogenContacts(root, enabled) {
+      const visual = root && root.querySelector(".model-visual");
+      const mesh = visual && visual.getObject3D("mesh");
+      if (!mesh || !visual.fkcStructure?.hydrogenContacts?.length || root.fkcPendingVisual) return false;
+      root.fkcShowHydrogenContacts = !!enabled;
+      mesh.userData.fkcShowHydrogenContacts = root.fkcShowHydrogenContacts;
+      applyStyle(mesh, mesh.userData.fkcStyle || "ball-stick");
+      return true;
+    },
     setAtomOptions(root, hideHydrogen, atomScale) {
       if (atomScale !== undefined && ![0.5, 0.75, 1].includes(atomScale)) return false;
       const visual = root && root.querySelector(".model-visual");
@@ -731,6 +776,7 @@
       const structure = enabled ? F.CIFStructure.completeCell(cell) : cell;
       const built = buildMesh(structure);
       Object.assign(built.group.userData, {fkcHideHydrogen: root.fkcHideHydrogen,
+        fkcShowHydrogenContacts: root.fkcShowHydrogenContacts,
         fkcAtomScale: root.fkcAtomScale || 1, fkcBondThickness: root.fkcBondThickness || 1,
         fkcBondColorMode: root.fkcBondColorMode || "auto", fkcBondColor: root.fkcBondColor || "#949494"});
       applyStyle(built.group, root.fkcStyle || "ball-stick");
@@ -1017,9 +1063,24 @@
       polyhedronGeometries.push(geometry);
       polyhedronMaterials.push(material);
     });
+    const dashes = hydrogenContactDashes(structure);
+    let contactLines;
+    if (dashes.length) {
+      const geometry = new T.BufferGeometry();
+      geometry.setAttribute("position", new T.Float32BufferAttribute(dashes.flat(2), 3));
+      contactLines = new T.LineSegments(geometry, new T.LineBasicMaterial({color: "#df2525"}));
+      contactLines.userData.fkcHydrogenContacts = true;
+      contactLines.visible = false;
+      contactLines.raycast = function () {};
+      group.add(contactLines);
+    }
     return {
       group,
       dispose: function () {
+        if (contactLines) {
+          contactLines.geometry.dispose();
+          contactLines.material.dispose();
+        }
         const environment = group.userData.fkcEnvironment;
         if (environment) for (const record of environment.records.values()) {
           record.materials.forEach(material => material.dispose());
@@ -1099,6 +1160,7 @@
         built.group.userData.fkcBondColor = root && root.fkcBondColor || "#949494";
         built.group.userData.fkcBondThickness = root && root.fkcBondThickness || 1;
         built.group.userData.fkcHideHydrogen = root && root.fkcHideHydrogen;
+        built.group.userData.fkcShowHydrogenContacts = root && root.fkcShowHydrogenContacts;
         built.group.userData.fkcAtomScale = root && root.fkcAtomScale || 1;
         applyStyle(built.group, (root && root.fkcStyle) || "ball-stick");
 
