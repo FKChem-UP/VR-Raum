@@ -5,15 +5,28 @@
   const source = "assets/structures/Co-Produkt1.cif";
   const modelPosition = [-0.65, 1.3, 3.5];
   const boardWidth = 1.4, boardHeight = 0.875;
+  const tasksPerPage = 6;
   const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
-    "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen"];
+    "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen",
+    "Zum Molekül wechseln", "H-Atome ausblenden", "Umgebung bei 3 Å anzeigen",
+    "Ein transparentes Molekül übernehmen", "Umgebung wieder ausblenden"];
   const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
     "Halte einen Grip und verschiebe das Modell mindestens 15 cm.",
     "Halte beide Grips und zieh die Hände auseinander (140 %).",
     "Lass beide Grips los. Dreh die Hand ohne Laser zu dir.",
     "Wähle im Handmenü unter Ansicht: Koordination.",
     "Wähle Distanz und klicke zwei Atome oder eine Bindung an.",
-    "Wähle Winkel und klicke drei Atome an: Das zweite ist der Scheitel."];
+    "Wähle Winkel und klicke drei Atome an: Das zweite ist der Scheitel.",
+    "Wähle im Handmenü unter Ansicht: Molekül.",
+    "Drücke im Handmenü auf H-Atome, um sie auszublenden.",
+    "Wähle bei Umgebung den Button 3 (Ångström).",
+    "Klicke mit dem Trigger auf ein transparentes Molekül, nicht auf ein einzelnes Ion.",
+    "Wähle bei Umgebung Aus. Das übernommene Molekül soll sichtbar bleiben."];
+  const palm = hand => hand === "left" ? "rechte Handfläche" : "linke Handfläche";
+  function hasSelectedMolecule(environment) {
+    return !!environment && [...environment.selected].some(id =>
+      environment.records.get(id)?.candidate?.atoms.length > 1);
+  }
   function crossed(previous, current, width = 1.4, height = 0.8) {
     if (!previous || previous.z <= 0 || current.z > 0) return false;
     const t = previous.z / (previous.z - current.z);
@@ -21,7 +34,7 @@
       Math.abs(previous.y + t * (current.y - previous.y)) <= height / 2;
   }
   F.Tutorial = {
-    active: false, crossed,
+    active: false, crossed, hasSelectedMolecule, palm,
     allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active && root.object3D.visible; },
     hasMeasurement(records, root, mode) {
       const visual = root.querySelector(".model-visual");
@@ -35,6 +48,11 @@
       if (step === 4 && tools.coordination) return 5;
       if (step === 5 && tools.coordination && tools.distance) return 6;
       if (step === 6 && tools.coordination && tools.angle) return 7;
+      if (step === 7 && tools.molecule) return 8;
+      if (step === 8 && tools.molecule && tools.hydrogenHidden) return 9;
+      if (step === 9 && tools.molecule && tools.hydrogenHidden && tools.environment3) return 10;
+      if (step === 10 && tools.molecule && tools.environment3 && tools.selectedMolecule) return 11;
+      if (step === 11 && tools.molecule && tools.environmentOff && tools.selectedMolecule) return 12;
       return step;
     },
     start() {
@@ -125,6 +143,7 @@
         this.body.object3D.quaternion.identity();
         this.taskOrigin = this.target.object3D.position.clone();
         this.target.fkcVariantId = "tutorial-complex";
+        this.target.fkcHideHydrogen = false;
         this.target.modelReady = false;
         const visual = F.create("a-entity", {class: "model-visual",
           "fkc-normalize": {targetSize: 0.7, padding: 0.06}}, this.body);
@@ -158,20 +177,27 @@
       const ctx = this.canvas.getContext("2d");
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 1024, 640);
       ctx.fillStyle = "#203f30"; ctx.font = "bold 64px Arial";
-      ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" : "Tutorial · Aufgaben", 50, 100);
+      const training = this.phase === "training";
+      const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : 0;
+      ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" :
+        `Tutorial · ${this.step + 1} / ${tasks.length}`, 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        this.phase === "done" ? ["Alle sieben Aufgaben abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] : tasks;
-      const training = this.phase === "training";
+        this.phase === "done" ? [`Alle ${tasks.length} Aufgaben abgeschlossen.`, "Du kannst jetzt den VR-Raum erkunden."] :
+          tasks.slice(first, first + tasksPerPage);
+      const menuPalm = training ? palm(F.HandMenu.laserHand()) : "";
+      this.renderedPalm = menuPalm;
       lines.forEach((line, i) => {
-        ctx.fillStyle = training ? (i < this.step ? "#397c40" : i === this.step ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((training ? (i < this.step ? "✓ " : `${i + 1} · `) : "") + line, 50, training ? 153 + i * 41 : 180 + i * 55, 924);
+        const index = first + i;
+        if (training && index === 3) line += ` (${menuPalm} drehen)`;
+        ctx.fillStyle = training ? (index < this.step ? "#397c40" : index === this.step ? "#b34a21" : "#65717b") : "#203f30";
+        ctx.fillText((training ? (index < this.step ? "✓ " : `${index + 1} · `) : "") + line, 50, training ? 153 + i * 41 : 180 + i * 55, 924);
       });
       if (training) {
         ctx.font = "30px Arial";
         ctx.fillStyle = "#203f30";
-        ctx.fillText(hints[this.step], 50, 451, 924);
+        ctx.fillText(this.step === 3 ? `Lass beide Grips los und dreh die ${menuPalm} zum Kopf.` : hints[this.step], 50, 451, 924);
       }
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
@@ -221,6 +247,7 @@
         this.previous = null;
         return;
       }
+      if (this.phase === "training" && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
       const menu = this.el.components["fkc-hand-menu"];
       if (menu && (this.phase !== "training" || this.step < 3)) menu.hide();
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
@@ -244,12 +271,18 @@
           const records = measurements && measurements.saved;
           if (this.step === 3 && this.el.lastSelectedModel !== this.target) F.selectModel(this.target);
           const menuOpen = !!(menu && F.HandMenu.opened && menu.model === this.target);
+          const environment = this.step >= 9 && F.CIF.environmentState(this.target);
           const next = F.Tutorial.progress(this.step,
             Math.hypot(this.head.x - position.x, this.head.z - position.z) < 0.9,
             position.distanceTo(this.taskOrigin), manip ? manip.hands.length : 0, this.body.object3D.scale.x, {
               handMenu: menuOpen, coordination: !!structure && structure.mode === "coordination" && !this.target.fkcPendingVisual,
               distance: F.Tutorial.hasMeasurement(records, this.target, "distance"),
-              angle: F.Tutorial.hasMeasurement(records, this.target, "angle")
+              angle: F.Tutorial.hasMeasurement(records, this.target, "angle"),
+              molecule: structure?.mode === "molecule" && !this.target.fkcPendingVisual,
+              hydrogenHidden: this.target.fkcHideHydrogen,
+              environment3: environment?.enabled && environment.radius === 3,
+              selectedMolecule: hasSelectedMolecule(environment),
+              environmentOff: environment && !environment.enabled
             });
           if (next !== this.step) {
             this.step = next;

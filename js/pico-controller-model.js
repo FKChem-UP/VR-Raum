@@ -6,7 +6,7 @@
   const T = AFRAME.THREE;
   const buttons = hand => ["grip", "trigger", "joystick", ...(hand === "left" ? ["X", "Y"] : ["A", "B"])];
   const helpText = "Steuerhilfe";
-  const hideHelpText = "Steuerhilfe ausblenden";
+  const hideHelpText = "Steuerhilfe aus";
 
   function controlLabels(hand, help, tutorialStep, laserHand, painting) {
     const labels = {};
@@ -119,7 +119,7 @@
       grip: [-mirror * 0.046, 0.031, 0.026],
       joystick: [mirror * 0.043, 0.048, -0.026],
       [names[0]]: [-mirror * 0.058, 0.061, 0.013],
-      [names[1]]: [-mirror * 0.060, 0.070, -0.064],
+      [names[1]]: hand === "right" ? [-0.040, 0.060, -0.049] : [-mirror * 0.060, 0.070, -0.064],
       palm: [0, 0.035, 0.095]
     };
     function showLabels(texts) {
@@ -166,13 +166,15 @@
         ctx.clearRect(0, 0, 512, 96);
         ctx.font = "bold 38px Arial";
         const width = Math.min(512, Math.ceil(ctx.measureText(text).width) + 30);
-        ctx.fillStyle = "#202a29";
+        const hideHelp = name === "B" && text === hideHelpText;
+        ctx.fillStyle = hideHelp ? "#fff0ee" : "#202a29";
         ctx.fillRect(0, 14, width, 68);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = hideHelp ? "#a61919" : "#ffffff";
         ctx.fillText(text, 15, 62, width - 30);
         label.texture.repeat.set(width / 512, 1);
         label.texture.needsUpdate = true;
-        label.sprite.scale.set(width * 0.00019, 96 * 0.00019, 1);
+        const scale = name === "B" && !hideHelp ? 0.00015 : 0.00019;
+        label.sprite.scale.set(width * scale, 96 * scale, 1);
       }
     }
     return {

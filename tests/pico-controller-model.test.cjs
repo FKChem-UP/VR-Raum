@@ -78,6 +78,15 @@ for (const hand of ["left", "right"]) {
   built.showLabels({});
   assert.equal(sprite.visible, false);
   assert.equal(leader.visible, false);
+  if (hand === "right") {
+    built.showLabels({B: "Steuerhilfe"});
+    const help = built.group.children.at(-1);
+    const smallHeight = help.scale.y;
+    const cap = built.controls.get("B").mesh.position;
+    assert.ok(Math.hypot(help.position.x - cap.x, help.position.y - cap.y, help.position.z - cap.z) < 0.04);
+    built.showLabels({B: "Steuerhilfe aus"});
+    assert.ok(help.scale.y > smallHeight);
+  }
   built.dispose();
   assert.equal(sprite.material.disposed, true);
   assert.equal(sprite.material.map.disposed, true);
@@ -96,7 +105,7 @@ assert.equal(F.PicoModels.highlights.right.length, 0);
 const {controlLabels} = F.PicoModels;
 assert.equal(controlLabels("right", false, -1, "right").B, "Steuerhilfe");
 const right = controlLabels("right", true, -1, "right");
-assert.equal(right.B, "Steuerhilfe ausblenden");
+assert.equal(right.B, "Steuerhilfe aus");
 assert.equal(right.A, "Modell zurücksetzen");
 assert.equal(right.palm, undefined);
 const left = controlLabels("left", true, -1, "right");

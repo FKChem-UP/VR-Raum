@@ -65,6 +65,23 @@ assert.equal(next(5, {distance: true}), 5, "Distanz nur in der Koordinationsansi
 assert.equal(next(5, {coordination: true, angle: true}), 5);
 assert.equal(next(5, {coordination: true, distance: true}), 6);
 assert.equal(next(6, {coordination: true, angle: true}), 7);
+assert.equal(next(7, {coordination: true}), 7);
+assert.equal(next(7, {molecule: true}), 8);
+assert.equal(next(8, {molecule: true, hydrogenHidden: true}), 9);
+assert.equal(next(9, {molecule: true, hydrogenHidden: true}), 9);
+assert.equal(next(9, {molecule: true, hydrogenHidden: true, environment3: true}), 10);
+const environment = {selected: new Set(["ion"]), records: new Map([
+  ["ion", {candidate: {atoms: [{}]}}], ["water", {candidate: {atoms: [{}, {}, {}]}}]
+])};
+assert.equal(F.Tutorial.hasSelectedMolecule(environment), false, "Einzelion zählt nicht als Molekül");
+assert.equal(next(10, {molecule: true, environment3: true, selectedMolecule: false}), 10);
+environment.selected.add("water");
+assert.equal(F.Tutorial.hasSelectedMolecule(environment), true);
+assert.equal(next(10, {molecule: true, environment3: true, selectedMolecule: true}), 11);
+assert.equal(next(11, {molecule: true, environmentOff: true}), 11, "Übernommenes Molekül muss bleiben");
+assert.equal(next(11, {molecule: true, environmentOff: true, selectedMolecule: true}), 12);
+assert.equal(F.Tutorial.palm("right"), "linke Handfläche");
+assert.equal(F.Tutorial.palm("left"), "rechte Handfläche");
 const visual = {};
 const target = {querySelector: () => visual};
 const records = [{root: target, visual: {}, measurementMode: "angle"},
