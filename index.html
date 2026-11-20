@@ -43,6 +43,7 @@
 
 
 
+  <script defer src="./js/multiplayer.js?v=1"></script>
   <script defer src="./js/app.js?v=11"></script>
 </head>
 
@@ -162,6 +163,15 @@
         VR-Unterstützung wird geprüft …
       </p>
     </section>
+
+    <details>
+      <summary>Multiplayer-Pilot</summary>
+      <p>Offener Testraum. Im VR-Modus sehen andere Teilnehmende im selben Vorlesungsraum deine Kopf- und Controllerpositionen.</p>
+      <label for="multiplayer-url">HTTPS-Adresse des Multiplayer-Servers</label>
+      <input id="multiplayer-url" type="url" autocomplete="off">
+      <button id="multiplayer-toggle" type="button">Gemeinsam beitreten</button>
+      <p id="multiplayer-status" role="status">Einzelmodus</p>
+    </details>
 
     <details>
       <summary>Bedienhilfe</summary>
@@ -292,6 +302,7 @@
     fkc-hand-menu
     fkc-room-entry
     fkc-tutorial
+    fkc-multiplayer
   >
     <a-entity id="room-root"></a-entity>
 
