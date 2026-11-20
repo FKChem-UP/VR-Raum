@@ -116,7 +116,7 @@
       const handMenu = this.el.components["fkc-hand-menu"];
       if (handMenu) handMenu.hide();
       this.phase = phase;
-      if (F.PicoModels) F.PicoModels.tutorial(phase === "training" ? 0 : -1);
+      if (F.PicoModels) F.PicoModels.tutorial(phase === "training" ? 0 : phase === "question" ? "question" : -1);
       if (phase === "training") {
         this.step = 0;
         this.target.object3D.position.set(...modelPosition);
@@ -159,7 +159,8 @@
       ctx.fillStyle = "#203f30"; ctx.font = "bold 64px Arial";
       ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" : "Tutorial · Aufgaben", 50, 100);
       ctx.font = "36px Arial";
-      const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?", "Nein oder durch das Schild gehen: überspringen."] :
+      const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
+        "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
         this.phase === "done" ? ["Alle sieben Aufgaben abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] : tasks;
       const training = this.phase === "training";
       lines.forEach((line, i) => {

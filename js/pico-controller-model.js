@@ -5,6 +5,38 @@
 (function (F) {
   const T = AFRAME.THREE;
   const buttons = hand => ["grip", "trigger", "joystick", ...(hand === "left" ? ["X", "Y"] : ["A", "B"])];
+  const helpText = "Steuerhilfe";
+  const hideHelpText = "Steuerhilfe ausblenden";
+
+  // xr-standard: Slot 3 ist der Klick des Thumbsticks, nicht dessen Achsen.
+  function helpPress(state, source) {
+    const gp = source && source.gamepad;
+    const available = !!(gp && gp.mapping === "xr-standard" && gp.buttons[3]);
+    const down = available && F.buttonPressed(gp, 3);
+    const toggle = available && state.source === source && down && !state.down;
+    Object.assign(state, {source, available, down});
+    return toggle;
+  }
+
+  function controlLabels(hand, help, helpAvailable, tutorialStep, laserHand, painting) {
+    const labels = {};
+    if (help) {
+      labels.grip = "Greifen / Skalieren";
+      labels.trigger = hand === laserHand ? (painting ? "Zeichnen / Auswählen" : "Auswählen / Messen") : "Trigger ohne Laser";
+      labels.joystick = hand === "left" ? "Bewegen" : "Drehen";
+      labels[hand === "left" ? "X" : "A"] = "Zurücksetzen";
+      labels[hand === "left" ? "Y" : "B"] = "Hauptmenü";
+    }
+    if (tutorialStep === "question") {
+      if (hand === laserHand) labels.trigger = "Trigger: Auswählen";
+    } else if (tutorialStep === 0) {
+      labels.joystick = hand === "left" ? "Bewegen" : "Drehen";
+    } else if (tutorialStep === 1 || tutorialStep === 2) {
+      labels.grip = tutorialStep === 1 ? "Grip: Greifen" : "Grip: Skalieren";
+    }
+    if (hand === "right" && helpAvailable) labels.help = help ? hideHelpText : helpText;
+    return labels;
+  }
   function build(hand) {
     if (!["left", "right"].includes(hand)) throw new Error("Unbekannte Controllerhand.");
     const mirror = hand === "left" ? -1 : 1;
@@ -90,8 +122,54 @@
     });
     control("trigger", new T.SphereGeometry(1, 24, 16), [0, 0.010, -0.044], [0.012, 0.014, 0.009], "#d2d4d7").rotation.x = -0.6;
     control("grip", new T.SphereGeometry(1, 24, 16), [-mirror * 0.019, -0.006, 0.013], [0.005, 0.008, 0.017], "#d2d4d7").rotation.x = 0.45;
+    const labels = new Map();
+    const anchors = {
+      trigger: [mirror * 0.026, 0.025, -0.043],
+      grip: [-mirror * 0.046, 0.031, 0.026],
+      joystick: [mirror * 0.043, 0.048, -0.026],
+      [names[0]]: [-mirror * 0.041, 0.057, 0.007],
+      [names[1]]: [-mirror * 0.047, 0.057, -0.043],
+      help: [0.044, 0.080, -0.050]
+    };
+    function showLabels(texts) {
+      for (const [name, anchor] of Object.entries(anchors)) {
+        const text = texts[name];
+        let label = labels.get(name);
+        if (!text) { if (label) label.sprite.visible = false; continue; }
+        if (!label) {
+          const canvas = document.createElement("canvas");
+          canvas.width = 512;
+          canvas.height = 96;
+          const texture = new T.CanvasTexture(canvas);
+          const mat = new T.SpriteMaterial({map: texture, depthTest: false, depthWrite: false, toneMapped: false});
+          const sprite = new T.Sprite(mat);
+          sprite.position.set(...anchor);
+          sprite.renderOrder = 10020;
+          sprite.raycast = function () {};
+          group.add(sprite);
+          textures.add(texture);
+          materials.add(mat);
+          label = {canvas, texture, sprite, text: null};
+          labels.set(name, label);
+        }
+        label.sprite.visible = true;
+        if (label.text === text) continue;
+        label.text = text;
+        const ctx = label.canvas.getContext("2d");
+        ctx.clearRect(0, 0, 512, 96);
+        ctx.font = "bold 38px Arial";
+        const width = Math.min(512, Math.ceil(ctx.measureText(text).width) + 30);
+        ctx.fillStyle = "#202a29";
+        ctx.fillRect(0, 14, width, 68);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, 15, 62, width - 30);
+        label.texture.repeat.set(width / 512, 1);
+        label.texture.needsUpdate = true;
+        label.sprite.scale.set(width * 0.00019, 96 * 0.00019, 1);
+      }
+    }
     return {
-      group, controls,
+      group, controls, showLabels,
       highlight(names) {
         const active = new Set(names);
         for (const [name, entry] of controls) {
@@ -108,7 +186,9 @@
     };
   }
   F.PicoModels = {
-    build, buttons,
+    build, buttons, helpPress, controlLabels,
+    help: false,
+    tutorialStep: -1,
     highlights: {left: [], right: []},
     setHighlights(hand, names) {
       if (!["left", "right"].includes(hand)) return false;
@@ -117,8 +197,11 @@
       return true;
     },
     tutorial(step) {
+      this.tutorialStep = step;
       const active = step === 0 ? ["joystick"] : step === 1 || step === 2 ? ["grip"] : [];
-      this.setHighlights("left", active); this.setHighlights("right", active);
+      for (const hand of ["left", "right"]) {
+        this.setHighlights(hand, step === "question" && hand === F.HandMenu.laserHand() ? ["trigger"] : active);
+      }
     }
   };
   AFRAME.registerComponent("fkc-pico-model", {
@@ -133,7 +216,12 @@
       this.quaternion = new T.Quaternion();
       this.parentQuaternion = new T.Quaternion();
       this.hidden = new Map();
-      this.exit = () => this.restore();
+      this.helpButton = {};
+      this.exit = () => {
+        this.helpButton = {};
+        F.PicoModels.help = false;
+        this.restore();
+      };
       this.el.sceneEl.addEventListener("exit-vr", this.exit);
     },
     restore: function () {
@@ -144,6 +232,11 @@
     tick: function () {
       const scene = this.el.sceneEl;
       const source = F.getSource(scene, this.data.hand);
+      const models = F.PicoModels;
+      if (this.data.hand === "right") {
+        if (helpPress(this.helpButton, source)) models.help = !models.help;
+        if (!this.helpButton.available) models.help = false;
+      }
       const xr = scene.renderer && scene.renderer.xr;
       const frame = scene.frame && typeof scene.frame.getPose === "function" ? scene.frame : xr && xr.getFrame && xr.getFrame();
       const reference = xr && xr.getReferenceSpace && xr.getReferenceSpace();
@@ -169,7 +262,10 @@
       this.built.group.position.copy(this.position);
       this.built.group.quaternion.copy(this.quaternion);
       this.built.group.visible = true;
-      this.built.highlight(F.PicoModels.highlights[this.data.hand]);
+      const active = models.highlights[this.data.hand];
+      this.built.highlight(this.helpButton.available ? [...active, "joystick"] : active);
+      this.built.showLabels(controlLabels(this.data.hand, models.help, this.helpButton.available,
+        models.tutorialStep, F.HandMenu.laserHand(), F.Draw && F.Draw.mode === "paint"));
     },
     remove: function () {
       this.restore();
