@@ -221,8 +221,15 @@
       }
       // An der Hand verankert, zum Kopf ausgerichtet für lesbare Beschriftung.
       // Abstand von der Hand zum Betrachter statt mitrotierender Handflächenachse.
-      // 10 cm vom Kopf weg vor der Hand, statt zwischen Hand und Gesicht.
-      this.position.addScaledVector(this.toHead, -0.10);
+      // Im Tutorial oberhalb und etwas vor den Controller setzen. Die normale
+      // Einstellung außerhalb des Tutorials bleibt weiter vom Kopf entfernt.
+      const tutorial = !!(F.Tutorial && F.Tutorial.allowsModel(model));
+      this.position.addScaledVector(this.toHead, tutorial ? Math.min(0.05, distance - 0.20) : -0.10);
+      if (tutorial) this.position.y += 0.07;
+      // Trotz deckender Textur in der Overlay-Gruppe nach der Tutorialtafel.
+      this.material.transparent = tutorial;
+      this.mesh.renderOrder = tutorial ? 10010 : 100;
+      this.cursor.renderOrder = tutorial ? 10011 : 120;
       const object = this.root.object3D;
       object.scale.setScalar(F.HandMenu.sizes[F.HandMenu.size]);
       object.position.copy(this.position);

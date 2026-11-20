@@ -3,7 +3,8 @@
 (function (F) {
   const T = AFRAME.THREE;
   const source = "assets/structures/Co-Produkt1.cif";
-  const modelPosition = [0.9, 1.3, 3.5];
+  const modelPosition = [-0.65, 1.3, 3.5];
+  const boardWidth = 1.4, boardHeight = 0.875;
   const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
     "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen"];
   const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
@@ -51,8 +52,6 @@
       this.previous = null;
       this.head = new T.Vector3();
       this.local = new T.Vector3();
-      this.forward = new T.Vector3();
-      this.orientation = new T.Quaternion();
       this.modelWorld = new T.Vector3();
       this.trainingBackground = new T.Color("#edf0f3");
       this.group = F.create("a-entity", {}, this.el);
@@ -60,14 +59,24 @@
       this.canvas = document.createElement("canvas");
       this.canvas.width = 1024; this.canvas.height = 640;
       this.texture = new T.CanvasTexture(this.canvas);
-      this.geometry = new T.PlaneGeometry(1.4, 0.875);
+      this.geometry = new T.PlaneGeometry(boardWidth, boardHeight);
       this.material = new T.MeshBasicMaterial({map: this.texture, side: T.DoubleSide,
         transparent: true, opacity: 1, depthTest: false, depthWrite: false});
       this.board = F.create("a-entity", {class: "vr-action"}, this.group);
       this.board.dataset.fkcTutorial = "true";
       const mesh = new T.Mesh(this.geometry, this.material);
       mesh.renderOrder = 10000; // Deckende Canvasfläche zuletzt über Demo-Labels zeichnen.
+      mesh.frustumCulled = false;
       this.board.setObject3D("mesh", mesh);
+      this.cursorGeometry = new T.CircleGeometry(0.018, 24);
+      this.cursorMaterial = new T.MeshBasicMaterial({color: "#a32b17", side: T.DoubleSide,
+        transparent: true, depthTest: false, depthWrite: false, toneMapped: false});
+      this.cursor = new T.Mesh(this.cursorGeometry, this.cursorMaterial);
+      this.cursor.renderOrder = mesh.renderOrder + 1;
+      this.cursor.frustumCulled = false;
+      this.cursor.raycast = function () {};
+      this.cursor.visible = false;
+      this.board.object3D.add(this.cursor);
       this.shellGeometry = new T.SphereGeometry(60, 24, 16);
       this.shellMaterial = new T.MeshBasicMaterial({color: "#ffffff", side: T.BackSide,
         transparent: true, opacity: 0.82, depthWrite: false});
@@ -124,8 +133,10 @@
       }
       F.Tutorial.active = true;
       this.group.object3D.visible = true;
-      this.board.object3D.position.set(0, this.head.y, 5.1);
+      this.board.object3D.position.set(phase === "question" ? 0 : 0.8, this.head.y,
+        phase === "question" ? 5.1 : 2.75);
       this.board.object3D.rotation.set(0, 0, 0);
+      this.cursor.visible = false;
       this.previous = null;
       this.target.object3D.visible = phase !== "question";
       this.shell.visible = phase === "question";
@@ -175,10 +186,18 @@
       const button = this.buttons.find(button => x >= button.x && x <= button.x + button.w && y >= 480 && y <= 580);
       if (button) { F.Menu.blockDrawing(); button.action(); }
     },
+    updateCursor: function (hit) {
+      const uv = hit && hit.el === this.board && hit.uv;
+      this.cursor.visible = !!uv;
+      if (uv) this.cursor.position.set((uv.x - 0.5) * boardWidth, (uv.y - 0.5) * boardHeight, 0);
+    },
     tick: function () {
       if (!this.el.is("vr-mode")) return;
       if (!F.app || !F.app.activeRoom || F.app.pendingSpawn) return;
-      if (!F.HandMenu.readViewerHead(this.el, F.getRig(), this.head, this.forward, this.orientation)) return;
+      if (!F.HandMenu.readViewerHead(this.el, F.getRig(), this.head)) {
+        this.cursor.visible = false;
+        return;
+      }
       if (this.pending) {
         if (F.app.currentId !== "welcome") F.app.changeRoom("welcome");
         F.app.positionAtSpawn({x: 0, z: 6.5});
@@ -196,6 +215,9 @@
       if (F.Menu.opened) F.Menu.close();
       const menu = this.el.components["fkc-hand-menu"];
       if (menu && (this.phase !== "training" || this.step < 3)) menu.hide();
+      const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
+      const tools = laser && laser.components["fkc-controller"];
+      this.updateCursor(tools && tools.source && tools.line.visible ? tools.hit : null);
       if (this.phase === "question") {
         this.board.object3D.updateWorldMatrix(true, false);
         this.local.copy(this.head);
@@ -203,18 +225,8 @@
         if (crossed(this.previous, this.local)) this.close();
         this.previous = this.local.clone();
       } else {
-        // Seitliches Aufgabenfeld folgt der horizontalen Blickrichtung, nicht
-        // einem alten Weltpunkt, der nach dem Hinlaufen hinter dem Nutzer liegt.
-        const forward = this.forward;
-        forward.y = 0;
-        if (forward.lengthSq() > 1e-6) {
-          forward.normalize();
-          const right = new T.Vector3(-forward.z, 0, forward.x);
-          // Beim Üben mit dem Handmenü bleibt dessen Seite frei.
-          const side = this.step >= 3 && F.HandMenu.laserHand() === "right" ? 1 : -1;
-          this.board.object3D.position.copy(this.head).addScaledVector(forward, 2.1).addScaledVector(right, side * 0.95);
-          this.board.object3D.lookAt(this.head);
-        }
+        // Der Weltpunkt bleibt rechts vom Modell, auch beim Blick zur Tafel.
+        this.board.object3D.lookAt(this.head);
         if (this.phase === "training" && this.target.modelReady) {
           const manip = this.target.components["fkc-manipulable"];
           const position = this.target.object3D.getWorldPosition(this.modelWorld);
@@ -263,6 +275,7 @@
       this.roomVisible = undefined;
       if (returnToSpawn) this.el.object3D.background = this.previousBackground;
       F.Tutorial.active = false;
+      if (this.cursor) this.cursor.visible = false;
       if (F.PicoModels) F.PicoModels.tutorial(-1);
       this.group.object3D.visible = false;
       this.phase = null; this.previous = null;
@@ -276,7 +289,7 @@
       this.el.removeEventListener("exit-vr", this.exit);
       this.group.remove();
       [this.geometry, this.material, this.texture, this.shellGeometry, this.shellMaterial,
-        this.grid.geometry, this.grid.material].forEach(resource => resource.dispose());
+        this.grid.geometry, this.grid.material, this.cursorGeometry, this.cursorMaterial].forEach(resource => resource.dispose());
     }
   });
 })(window.FKCVR);

@@ -426,6 +426,12 @@
 
       if (!pointer || !pointer.object3D || !hit) return;
 
+      // Tutorialtafeln zeigen ihren Trefferpunkt selbst an der getroffenen UV.
+      if (hit.type === "action" && hit.el.dataset.fkcTutorial === "true") {
+        pointer.object3D.visible = false;
+        return;
+      }
+
       pointerPosition.copy(hit.point);
 
       if (hit.normal) {
@@ -446,8 +452,7 @@
       const mesh = pointer.getObject3D("mesh");
 
       if (mesh) {
-        const tutorialHit = hit.type === "action" && hit.el && hit.el.dataset.fkcTutorial === "true";
-        const menuHit = tutorialHit || !!(
+        const menuHit = !!(
           hit.type === "action" &&
           hit.el &&
           ((F.Menu && F.Menu.opened && hit.el.dataset.fkcMenu === "true") ||
@@ -455,7 +460,7 @@
         );
 
         mesh.frustumCulled = false;
-        mesh.renderOrder = tutorialHit ? 10001 : menuHit ? 110 : 1;
+        mesh.renderOrder = menuHit ? 110 : 1;
 
         const materials = Array.isArray(mesh.material)
           ? mesh.material
@@ -467,14 +472,6 @@
           material.depthTest = !menuHit;
           material.depthWrite = false;
           material.toneMapped = false;
-          // Das deckende Tutorialschild wird in der transparenten Rendergruppe
-          // gezeichnet. Der Punkt muss in derselben Gruppe danach erscheinen.
-          const transparent = !!tutorialHit;
-          if (material.transparent !== transparent) {
-            material.transparent = transparent;
-            material.needsUpdate = true;
-          }
-          if (tutorialHit) material.color.set("#a32b17");
         });
       }
 
