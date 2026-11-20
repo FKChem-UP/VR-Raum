@@ -10,23 +10,24 @@
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-   <script defer src="./js/vr-controls.js?v=3"></script>
+    <script defer src="./js/vr-controls.js?v=4"></script>
   <script defer src="./js/room-builder.js?v=4"></script>
 
 
   <script defer src="./js/welcome-floor.js?v=2"></script>
   <script defer src="./js/cif-structure.js?v=4"></script>
   <script defer src="./js/cif-model.js?v=10"></script>
-  <script defer src="./js/rooms.js?v=5"></script>
+  <script defer src="./js/rooms.js?v=6"></script>
 
 
    <script src="./js/drawing.js?v=2" defer></script>
 
-  <script defer src="./js/vr-tools.js?v=12"></script>
+  <script defer src="./js/vr-tools.js?v=13"></script>
   <script defer src="./js/atom-labels.js?v=8"></script>
   <script defer src="./js/measurements.js?v=5"></script>
   <script defer src="./js/room-entry.js?v=2"></script>
-  <script defer src="./js/hand-menu.js?v=16"></script>
+  <script defer src="./js/hand-menu.js?v=17"></script>
+  <script defer src="./js/tutorial.js?v=1"></script>
 
 
 
@@ -40,7 +41,7 @@
 
 
 
-  <script defer src="./js/app.js?v=7"></script>
+  <script defer src="./js/app.js?v=8"></script>
 </head>
 
 <body>
@@ -289,12 +290,13 @@
     fkc-measurements
     fkc-hand-menu
     fkc-room-entry
+    fkc-tutorial
   >
     <a-entity id="room-root"></a-entity>
 
     <a-entity
       id="rig"
-      position="0 0 5"
+      position="0 0 6.5"
       fkc-navigation="speed: 3; desktopSpeed: 4; turnSpeed: 60; deadzone: 0.18"
     >
       <a-entity

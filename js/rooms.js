@@ -101,7 +101,7 @@
     depth: 16,
     height: 5.2,
 
-    spawn: {x: 0, z: 5},
+    spawn: {x: 0, z: 6.5},
 
     posterWidth: 3,
     posterHeight: 1.6875,

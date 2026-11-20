@@ -36,6 +36,10 @@ assert.equal(F.HandMenu.laserHand(), "left");
 F.HandMenu.setLaserHand("right");
 assert.equal(F.HandMenu.laserHand(), "right");
 assert.ok(components["fkc-hand-menu"]);
+assert.equal(F.HandMenu.legendInk("#000000"), "#ffffff");
+assert.equal(F.HandMenu.legendInk("#515151"), "#ffffff");
+assert.equal(F.HandMenu.legendInk("#ffffff"), "#000000");
+assert.equal(F.HandMenu.legendInk("#eeeeee"), "#000000");
 // Viewerpose muss Vorrang vor einer möglicherweise versetzten XR-Kamera haben.
 const position = {
   copy(value) { this.value = value; return this; },

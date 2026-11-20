@@ -50,6 +50,11 @@
     laserHand,
     gate,
     readViewerHead,
+    legendInk(color) {
+      const rgb = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255);
+      const linear = rgb.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722 > 0.179 ? "#000000" : "#ffffff";
+    },
     size: "standard",
     sizes: {small: 0.85, standard: 1, large: 1.15},
     setSize(size) {
@@ -528,16 +533,20 @@
           // Kompakte Legende; für viele Elemente wird eine eigene Seite nötig.
           let x = 28;
           for (const [element, color] of colors) {
-            if (x > 670) { x = 28; y += 30; }
+            if (x > 680) { x = 28; y += 48; }
             ctx.fillStyle = color;
-            ctx.fillRect(x, y, 25, 25);
-            ctx.fillStyle = "#203f30";
-            ctx.font = "27px Arial";
-            ctx.fillText(element, x + 34, y + 24);
-            x += 112;
+            ctx.beginPath();
+            ctx.arc(x + 22, y + 22, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = F.HandMenu.legendInk(color);
+            ctx.font = "bold 24px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(element, x + 22, y + 30, 38);
+            ctx.textAlign = "left";
+            x += 58;
           }
         } else text("GLB: keine verlässliche Elementzuordnung.");
-        y += 36;
+        y += 48;
         // Nur Kurzinfo auf derselben Fläche; ausführlicher bestehender Modelltext
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
         if (structure) text(structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");

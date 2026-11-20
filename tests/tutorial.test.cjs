@@ -1,0 +1,40 @@
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const F = {};
+const components = {};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/tutorial.js"), "utf8"), {
+  window: {FKCVR: F}, AFRAME: {THREE: {}, registerComponent(name, component) { components[name] = component; }}
+});
+assert.equal(F.Tutorial.crossed(null, {x: 0, y: 0, z: -1}), false);
+assert.equal(F.Tutorial.crossed({x: 0, y: 0, z: 1}, {x: 0, y: 0, z: -1}), true);
+assert.equal(F.Tutorial.crossed({x: 2, y: 0, z: 1}, {x: 2, y: 0, z: -1}), false);
+assert.equal(F.Tutorial.crossed({x: 0, y: 2, z: 1}, {x: 0, y: 2, z: -1}), false);
+assert.equal(F.Tutorial.crossed({x: 0, y: 0, z: -1}, {x: 0, y: 0, z: 1}), false);
+let blocks = 0;
+F.Menu = {blockDrawing() { blocks++; }};
+F.invalidateHits = () => {};
+const component = Object.assign({group: {object3D: {visible: true}},
+  room: {object3D: {visible: false}}, roomVisible: true}, components["fkc-tutorial"]);
+F.Tutorial.active = true;
+component.close();
+assert.equal(F.Tutorial.active, false);
+assert.equal(component.room.object3D.visible, true);
+assert.equal(component.group.object3D.visible, false);
+let action = 0;
+component.buttons = [{x: 80, w: 380, action() { action++; }}];
+F.Tutorial.active = true;
+component.click({uv: {x: 200/1024, y: 1-520/640}});
+assert.equal(action, 1);
+component.click({uv: {x: 0, y: 1}});
+assert.equal(action, 1);
+let rooms = 0;
+F.app = {changeRoom() { rooms++; }};
+component.pending = null;
+F.getScene = () => ({is: () => true, components: {"fkc-tutorial": component}});
+F.Tutorial.start();
+assert.equal(component.pending, "training");
+assert.equal(rooms, 1);
+console.log("Tutorialtest bestanden: Schildüberquerung, Trefferbuttons, Wiederherstellung und manueller Start.");

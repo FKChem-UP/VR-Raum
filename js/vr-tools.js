@@ -167,6 +167,9 @@
         !effectivelyVisible(target.mesh)
       ) return false;
 
+      if (F.Tutorial && F.Tutorial.active) {
+        return target.type === "action" && target.el.dataset.fkcTutorial === "true";
+      }
       if (menuOpen) {
         return (
           target.type === "action" &&
@@ -1352,6 +1355,10 @@
           false,
           "room-help"
         );
+        button("Tutorial starten", () => {
+          this.close();
+          if (F.Tutorial) F.Tutorial.start();
+        });
 
         y += 20;
 

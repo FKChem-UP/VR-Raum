@@ -617,7 +617,7 @@ window.FKCVR = window.FKCVR || {};
     },
 
     start: function () {
-      if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened)) return;
+      if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened) || (F.Tutorial && F.Tutorial.active)) return;
 
       this.el.object3D.getWorldPosition(this.position);
 

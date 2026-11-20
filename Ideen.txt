@@ -418,6 +418,16 @@ IDE-61: Laser grün/Malstift gelb, Malmodus gelbes Handmenü. Zahnrad im Malmodu
   verwenden Einstellungen; bestehende Striche bleiben unverändert. Undo letzter
   Strich und Zeichnungen des ausgewählten Modells entfernen angeboten.
 
+IDE-62: Elementsymbole direkt in Elementfarbkugeln, dunkle Farben weiße,
+  helle schwarze Schrift. Lokal implementiert mit Luminanz-Kontrastregel.
+IDE-63: Tutorialfrage einmal pro VR-Sitzung, zusätzlich Hauptmenüstart.
+  Start weiter hinten, weiße Überblendung, festes Ja/Nein-Schild;
+  Durchgehen oder Nein überspringt. Ja weiße Trainingsumgebung, Bewegung zu
+  entferntem Modell, linkes/rechtes Joystick-Bewegen/Drehen erklären.
+  Erste Etappe lokal umgesetzt mit Zielkugel und Text, Abschluss bei 80 cm.
+  Gewünschte Pico4-Ultra-Controllergrafik/rote Joysticks noch offen (Assets).
+  Weitere Tutorialschritte folgen später, Pico-Nachtest erforderlich.
+
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
 Werkzeugmodi, Undo, Zellrahmen-Umschalter, Nachbarhervorhebung,

@@ -502,7 +502,9 @@
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
-          if (this.hit.el.dataset.fkcHandMenu === "true") {
+          if (this.hit.el.dataset.fkcTutorial === "true") {
+            if (F.Tutorial) F.Tutorial.click(this.hit);
+          } else if (this.hit.el.dataset.fkcHandMenu === "true") {
             if (F.HandMenu) F.HandMenu.click(this.hit);
           } else if (this.hit.el.dataset.fkcMenu === "true") {
             if (F.Menu) F.Menu.click(this.hit);
@@ -794,6 +796,7 @@
 
     changeRoom: function (id) {
       if (this.changing || id === this.currentId) return;
+      if (F.Tutorial && F.Tutorial.active) F.Tutorial.close();
 
       const config = this.getConfig(id);
 
