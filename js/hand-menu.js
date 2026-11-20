@@ -253,8 +253,9 @@
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size].join("|");
-      if (signature !== this.signature) {
-        this.signature = signature;
+      const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
+      if (modeSignature !== this.signature) {
+        this.signature = modeSignature;
         this.render(structure);
       }
     },
@@ -284,12 +285,14 @@
     render: function (structure) {
       const ctx = this.ctx;
       const model = this.model;
+      const painting = F.Draw && F.Draw.mode === "paint";
       this.buttons = [];
-      ctx.fillStyle = "#edf4ee";
+      ctx.fillStyle = painting ? "#fff5cd" : "#edf4ee";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
-      ctx.fillText(this.page === "settings" ? "Modelleinstellungen" : "Modellwerkzeuge", 28, 48, 610);
+      ctx.fillText(this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
+        painting ? "Malstift" : "Modellwerkzeuge", 28, 48, 510);
       ctx.font = "28px Arial";
       ctx.fillText(model.dataset.title || "3D-Modell", 28, 88, 710);
       let y = 115;
@@ -299,7 +302,7 @@
         ctx.fillText(value, 28, y + 30, 710);
         // Platz unter der Schriftgrundlinie für Unterlängen und Abstand zur
         // nächsten Button-/Legendenfläche, damit diese den Text nicht übermalt.
-        y += 44;
+        y += 40;
       };
       const button = (label, action, selected = false) => {
         const compact = this.page === "settings" || !!structure;
@@ -310,7 +313,7 @@
         const shift = pressed ? 4 : 0;
         ctx.fillStyle = "#8c9b92";
         ctx.fillRect(b.x, b.y + 4, b.w, b.h);
-        ctx.fillStyle = pressed ? "#f3bcbc" : hovered ? "#fff0b8" : selected ? "#b9dcc4" : "#d5e2d9";
+        ctx.fillStyle = pressed ? "#f3bcbc" : hovered ? "#fff0b8" : selected ? (painting ? "#ffd665" : "#b9dcc4") : (painting ? "#ffedac" : "#d5e2d9");
         ctx.fillRect(b.x, b.y + shift, b.w, b.h);
         ctx.strokeStyle = hovered ? "#b57c00" : "#82988a";
         ctx.lineWidth = hovered ? 4 : 2;
@@ -324,7 +327,7 @@
       // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
       const row = entries => {
         const compactRow = !!structure;
-        const height = compactRow ? 67 : 87;
+        const height = compactRow ? 72 : 87;
         const w = (712 - (entries.length - 1) * 12) / entries.length;
         entries.forEach((entry, index) => {
           const x = 28 + index * (w + 12);
@@ -335,31 +338,50 @@
           const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
           ctx.fillRect(x, y + 5, w, height + 5);
-          ctx.fillStyle = pressed ? "#e99d9d" : selected ? "#f3bcbc" : hovered ? "#fff0b8" : "#d5e2d9";
+          ctx.fillStyle = pressed ? "#e99d9d" : selected ? "#f3bcbc" : hovered ? "#fff0b8" : painting ? "#ffedac" : "#d5e2d9";
           ctx.fillRect(x, y + shift, w, height);
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
           ctx.strokeRect(x, y + shift, w, height);
-          const atomCount = entry.count || 2;
+          const plain = ["plain", "variant", "color", "opacity"].includes(entry.kind);
+          const atomCount = entry.kind === "atom-size" ? 1 : entry.count || 2;
           const points = [];
           for (let i = 0; i < atomCount; i++) {
             points.push([entry.kind === "space-filling" ? x + w / 2 + (i === 0 ? -10 : 10) :
-              x + w * (0.22 + i * 0.56 / (atomCount - 1)),
-              y + shift + 27 + (atomCount > 2 && i % 2 ? 12 : 0)]);
+              atomCount === 1 ? x + w / 2 : x + w * (0.22 + i * 0.56 / (atomCount - 1)),
+              y + shift + 22 + (atomCount > 2 && i % 2 ? 7 : 0)]);
           }
-          if (entry.kind !== "space-filling") {
+          if (!plain && entry.kind !== "space-filling" && entry.kind !== "environment") {
             ctx.strokeStyle = "#284635";
-            ctx.lineWidth = entry.kind === "capped-sticks" ? 12 : entry.kind === "wires" ? 2 : 4;
+            ctx.lineWidth = entry.kind === "bond-size" ? 10 * entry.factor : entry.kind === "capped-sticks" ? 12 : entry.kind === "wires" ? 2 : 4;
             ctx.beginPath();
             points.forEach(([px, py], i) => { if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
             ctx.stroke();
           }
-          points.forEach(([px, py], i) => {
+          if (!plain && entry.kind !== "environment") points.forEach(([px, py], i) => {
             ctx.fillStyle = entry.kind === "space-filling" && i === 1 ? "#78a486" : "#486e56";
             ctx.beginPath();
-            ctx.arc(px, py, entry.kind === "space-filling" ? 17 : entry.kind === "wires" ? 3 : 8, 0, Math.PI * 2);
+            ctx.arc(px, py, entry.kind === "atom-size" ? 14 * entry.factor : entry.kind === "space-filling" ? 15 : entry.kind === "wires" ? 3 : 7, 0, Math.PI * 2);
             ctx.fill();
           });
+          if (entry.kind === "environment") {
+            const cx = x + w / 2;
+            ctx.fillStyle = "#486e56";
+            ctx.beginPath(); ctx.arc(cx, y + shift + 22, 6, 0, Math.PI * 2); ctx.fill();
+            const count = entry.radius ? Math.round(entry.radius * 2) : 0;
+            for (let i = 0; i < count; i++) {
+              const angle = i * Math.PI * 2 / count;
+              ctx.globalAlpha = 0.35;
+              ctx.beginPath();
+              ctx.arc(cx + Math.cos(angle) * 19, y + shift + 22 + Math.sin(angle) * 14, 4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+          if (entry.kind === "color") {
+            ctx.fillStyle = entry.color;
+            ctx.fillRect(x + w / 2 - 14, y + shift + 10, 28, 20);
+          }
           if (entry.kind === "angle") {
             ctx.beginPath();
             ctx.lineWidth = 2;
@@ -372,20 +394,20 @@
             ctx.beginPath();
             ctx.moveTo(x + w / 2, y + shift + 8);
             ctx.lineTo(x + w / 2 + 22, y + shift + 27);
-            ctx.lineTo(x + w / 2, y + shift + 46);
+            ctx.lineTo(x + w / 2, y + shift + 38);
             ctx.lineTo(x + w / 2 - 22, y + shift + 27);
             ctx.lineTo(x + w / 2, y + shift + 8);
-            ctx.lineTo(x + w / 2, y + shift + 46);
+            ctx.lineTo(x + w / 2, y + shift + 38);
             ctx.stroke();
           }
           ctx.fillStyle = "#173527";
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
-          ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 58 : 73), w - 12);
+          ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 63 : 73), w - 12);
           ctx.textAlign = "left";
-          this.buttons.push({x, y, w, h: height + 10, action: entry.action});
+          this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
         });
-        y += compactRow ? 80 : 100;
+        y += compactRow ? 85 : 100;
       };
       if (this.page === "settings") {
         // Kompaktere Einstellungszeilen lassen Platz für Palette und Reichweite.
@@ -394,39 +416,61 @@
         for (const [size, title] of [["small", "Kleiner (85 %)"], ["standard", "Standard (100 %)"], ["large", "Größer (115 %)"]]) {
           button(title, () => F.HandMenu.setSize(size), F.HandMenu.size === size);
         }
-        if (structure) {
+        if (painting) {
+          text("Malfarbe · unabhängig von der Laserfarbe");
+          row([["#ffcc33", "Gelb"], ["#ee5151", "Rot"], ["#507dff", "Blau"], ["#45d77e", "Grün"]].map(([color, label]) => ({
+            label, kind: "color", color, selected: F.Draw.color === color, action: () => { F.Draw.color = color; }
+          })));
+          text("Strichdicke");
+          row([0.002, 0.004, 0.008, 0.016].map(radius => ({label: radius * 2000 + " mm", kind: "bond-size", factor: radius / 0.008,
+            selected: F.Settings.strokeRadius === radius, action: () => { F.Settings.strokeRadius = radius; }})));
+          text("Deckkraft · gilt für neue Striche");
+          row([0.2, 0.35, 0.6, 1].map(opacity => ({label: Math.round(opacity * 100) + " %", kind: "opacity",
+            selected: F.Draw.opacity === opacity, action: () => { F.Draw.opacity = opacity; }})));
+        } else if (structure) {
           text("Bindungsfarben · nur Ball-and-Stick");
           for (const [mode, title] of [["auto", "Style-Standard"], ["element", "Endatomfarben"], ["uniform", "Einheitliche Farbe"]]) {
             button(title, () => F.CIF.setBondAppearance(model, mode), (model.fkcBondColorMode || "auto") === mode);
           }
           text("Farbwahl aktiviert einheitliche Bindungsfarbe");
           row([["#949494", "Grau"], ["#eeeeee", "Weiß"], ["#ff9d38", "Orange"], ["#000000", "Schwarz"]].map(([color, title]) => ({
-            label: title, selected: model.fkcBondColorMode === "uniform" && (model.fkcBondColor || "#949494") === color,
+            label: title, kind: "color", color, selected: model.fkcBondColorMode === "uniform" && (model.fkcBondColor || "#949494") === color,
             action: () => F.CIF.setBondAppearance(model, "uniform", color)
           })));
           text("Bindungsdicke · nur Ball-and-Stick");
-          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %",
+          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %", kind: "bond-size", factor,
             selected: (model.fkcBondThickness || 1) === factor,
             action: () => F.CIF.setBondThickness(model, factor)})));
           text("Atomgröße · nur Ball-and-Stick");
-          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %",
+          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %", kind: "atom-size", factor,
             selected: (model.fkcAtomScale || 1) === factor,
             action: () => F.CIF.setAtomOptions(model, undefined, factor)})));
         } else text("Bindungsfarben nur bei CIF-Modellen verfügbar.");
         this.texture.needsUpdate = true;
         return;
       }
-      {
+      if (painting) {
+        text("Trigger halten: Oberfläche markieren");
+        text("Laser/Malstift oben wechselt zurück zur Atomauswahl.");
+        text("Farbe, Dicke und Deckkraft im Zahnrad einstellen.");
+        button("Letzten eigenen Strich zurücknehmen", () => {
+          const stroke = F.Draw.strokes.at(-1);
+          if (stroke) F.Draw.remove(stroke);
+        });
+        button("Zeichnungen am ausgewählten Modell entfernen", () => F.Draw.clear(model));
+      } else {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = model.fkcVariants || [];
-        variants.slice(this.offset, this.offset + 3).forEach(variant => {
-          button(variant.title, () => {
+        row(variants.slice(this.offset, this.offset + 4).map(variant => ({
+          label: variant.cifMode === "coordination" ? "Koordination" : variant.cifMode === "cell" ? "Zelle" :
+            /\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül",
+          kind: "variant", selected: variant.id === model.fkcVariantId, action: () => {
             if (!model.fkcPendingVisual) F.switchVariant(model, variant.id);
-          }, variant.id === model.fkcVariantId);
-        });
+          }
+        })));
         if (!variants.length) text("Für dieses Modell nur eine Ansicht.");
-        if (variants.length > 3) button("Weitere Ansichten", () => {
-          this.offset = this.offset + 3 < variants.length ? this.offset + 3 : 0;
+        if (variants.length > 4) button("Weitere Ansichten", () => {
+          this.offset = this.offset + 4 < variants.length ? this.offset + 4 : 0;
         });
         if (structure) {
           text("Styles");
@@ -463,7 +507,7 @@
         if (structure && structure.environmentCell) {
           const state = F.CIF.environmentState(model);
           text("Umgebung (Å) · " + state.selected.size + " übernommen");
-          row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","),
+          row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","), kind: "environment", radius,
             selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
             action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
@@ -484,13 +528,13 @@
           // Kompakte Legende; für viele Elemente wird eine eigene Seite nötig.
           let x = 28;
           for (const [element, color] of colors) {
-            if (x > 650) { x = 28; y += 30; }
+            if (x > 670) { x = 28; y += 30; }
             ctx.fillStyle = color;
             ctx.fillRect(x, y, 25, 25);
             ctx.fillStyle = "#203f30";
             ctx.font = "27px Arial";
             ctx.fillText(element, x + 34, y + 24);
-            x += 125;
+            x += 112;
           }
         } else text("GLB: keine verlässliche Elementzuordnung.");
         y += 36;
@@ -498,6 +542,18 @@
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
         if (structure) text(structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
       }
+      const modeIndex = this.buttons.length;
+      const modePressed = this.pressedIndex === modeIndex;
+      ctx.fillStyle = painting ? "#ffe083" : "#b9dcc4";
+      if (this.hoverIndex === modeIndex) ctx.fillStyle = "#fff0b8";
+      ctx.fillRect(546, 14 + (modePressed ? 4 : 0), 106, 54);
+      ctx.fillStyle = "#173527";
+      ctx.font = "24px Arial";
+      ctx.fillText(painting ? "✎ Malen" : "↗ Laser", 551, 49 + (modePressed ? 4 : 0), 96);
+      this.buttons.push({x: 546, y: 14, w: 106, h: 58, label: "tool-mode", action: () => {
+        F.Draw.setMode(painting ? "laser" : "paint");
+        this.page = "model";
+      }});
       // Eigenständiger Headerbutton, kein zusätzlicher Platz in Werkzeugzeilen.
       const gearIndex = this.buttons.length;
       const gearPressed = this.pressedIndex === gearIndex;

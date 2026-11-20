@@ -401,10 +401,22 @@ IDE-56: Grip zieht entferntes anvisiertes Modell langsam, zunehmend schneller
   Geschwindigkeit begrenzt. Keine Kollisionen berücksichtigt; Pico-Test offen.
 IDE-57: Malen entfernen oder Laser/Malmodus-Schalter, Standard Laser,
   Malfarbe transparent als Textmarker statt Text übermalen. Noch nicht umgesetzt;
-  Agent empfiehlt Schalter und Rücksprache statt Entfernung.
+  Später ausdrücklich freigegeben/jetzt umgesetzt: Laserstandard und gelber
+  Malmodus, separater Farb-/Dicken-/Deckkraftbereich im Zahnrad, transparente
+  Striche standardmäßig 35 % deckend. Atomauswahl und Malen getrennt.
 IDE-58: Co-Zellmoleküle vervollständigen auch außerhalb Zelle. Lokaler Button,
   200 Atome/220 Bindungen aus vollständigen die Zelle berührenden Komponenten,
   Rahmen und Maßstab erhalten, An/Aus reversibel. Pico-Nachtest offen.
+IDE-59: Symbole für Atomgröße/Bindungsdicke proportional variieren,
+  Umgebung zentrale Kugel mit transparenten Nachbarn je Radius verschieden;
+  Stylesymbole und Texte nicht überlagern. Lokal umgesetzt, Pico-Nachtest offen.
+IDE-60: Ansichten platzsparend nebeneinander, vollständige Legende einschließlich
+  H zeigen. Layout überarbeitet/testgeprüft. Bis vier Ansichten je Reihe,
+  weitere per Wechselbutton; keine allgemeine Ansichtsauswahl aus CIF behaupten.
+IDE-61: Laser grün/Malstift gelb, Malmodus gelbes Handmenü. Zahnrad im Malmodus
+  statt Atomoptionen Malfarbe/Dicke/Deckkraft. Lokal umgesetzt, neue Striche
+  verwenden Einstellungen; bestehende Striche bleiben unverändert. Undo letzter
+  Strich und Zeichnungen des ausgewählten Modells entfernen angeboten.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------

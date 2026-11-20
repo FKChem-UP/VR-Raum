@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const F = {Settings: {laserHand: "right"}};
+F.Draw = {mode: "laser", color: "#ffcc33", opacity: 0.35, strokes: [],
+  setMode(mode) { this.mode = mode; }, clear() {}, remove() {}};
 const components = {};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/hand-menu.js"), "utf8"), {
   window: {FKCVR: F},
@@ -98,7 +100,7 @@ const menu = Object.assign({ctx, model, offset: 0, texture: {},
 const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "Pa-3"}};
 menu.render(structure);
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
-assert.equal(menu.buttons.length, 15, "Werkzeuge einschließlich H-Sichtbarkeit und Zahnrad");
+assert.equal(menu.buttons.length, 16, "Werkzeuge einschließlich H-Sichtbarkeit, Modus und Zahnrad");
 const distanceButton = menu.buttons[9];
 const angleButton = menu.buttons[10];
 distanceButton.action();
@@ -116,9 +118,9 @@ assert.equal(menu.buttonIndex({x: 0, y: 0}), -1);
 menu.hoverIndex = 8;
 menu.pressedIndex = 8;
 menu.render(structure);
-assert.equal(menu.buttons.length, 15, "Hover/Druck verändert Trefferbereiche nicht");
+assert.equal(menu.buttons.length, 16, "Hover/Druck verändert Trefferbereiche nicht");
 menu.render({mode: "coordination", atoms: new Array(7), polyhedra: [{}], spaceGroup: {name: "P -1"}});
-assert.equal(menu.buttons.length, 16, "Koordinationsansicht bietet fünf Styles, Messungen, H-Aus und Zahnrad");
+assert.equal(menu.buttons.length, 17, "Koordinationsansicht bietet fünf Styles, Messungen, H-Aus, Modus und Zahnrad");
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
 menu.buttons[7].action(); // Polyhedral-Style direkt erreichbar.
 for (const entry of drawnTexts.filter(entry => /^(Styles|Messen|Legende)/.test(entry.text))) {
@@ -167,13 +169,39 @@ assert.equal(menu.page, "model");
 menu.render({...structure, environmentCell: {}});
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Umgebungsbuttons passen auf Werkzeugseite");
 assert.ok(drawnTexts.at(-1).y <= 890, "Kurzinfo bleibt innerhalb der Fläche");
-const environmentButtons = menu.buttons.filter(button => button.h === 77).slice(-7);
+const environmentButtons = menu.buttons.filter(button => button.kind === "environment");
 environmentButtons[0].action();
 assert.equal(environmentActions.at(-1)[1], false);
 environmentButtons[6].action();
 assert.equal(environmentActions.at(-1)[2], 5);
 environmentButtons[3].action();
 assert.equal(environmentActions.at(-1)[2], 2.5);
+const originalQuery = model.querySelector;
+model.querySelector = () => ({object3D: {traverse(callback) {
+  ["Co", "N", "O", "Cl", "C", "H"].forEach(element => callback({userData: {fkcAtom: {element}},
+    material: {color: {getHexString: () => "ffffff"}}}));
+}}});
+menu.render({...structure, environmentCell: {}});
+const hLegend = drawnTexts.findLast(entry => entry.text === "H");
+assert.ok(hLegend && hLegend.y < 890, "Sechste Atomsorte H vollständig im Co-Menü sichtbar");
+model.querySelector = originalQuery;
+const atomOptions = [];
+F.CIF.setAtomOptions = (...args) => atomOptions.push(args);
+menu.buttons.find(button => button.label === "tool-mode").action();
+assert.equal(F.Draw.mode, "paint");
+menu.render(structure);
+assert.equal(menu.buttons.some(button => button.kind === "variant"), false, "Malen hat keine Atom-/Messwerkzeuge");
+menu.buttons.at(-1).action();
+menu.render(structure);
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
+menu.buttons.find(button => button.label === "Rot").action();
+assert.equal(F.Draw.color, "#ee5151");
+menu.buttons.find(button => button.label === "20 %").action();
+assert.equal(F.Draw.opacity, 0.2);
+menu.buttons[0].action();
+menu.render(structure);
+menu.buttons.find(button => button.label === "tool-mode").action();
+assert.equal(F.Draw.mode, "laser");
 menu.render(null);
 menu.buttons.at(-1).action();
 menu.render(null);

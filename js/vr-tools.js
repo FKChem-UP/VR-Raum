@@ -13,7 +13,7 @@
    * Raumgestaltung, Zeichentechnik, Laser und Navigation
    * bleiben erhalten.
    *
-   * Eine Farbe pro Hand: Laserfarbe = Malfarbe.
+    * Laserfarben pro Hand; Malfarbe und Deckkraft separat in drawing.js.
    * Einstellungen bleiben beim Raumwechsel erhalten.
    * Nach Neuladen gelten wieder die Standardwerte.
    */
@@ -1464,7 +1464,7 @@
        */
       if (this.page === "laser-drawing") {
         text(
-          "Eine gemeinsame Laser- und Malfarbe pro Hand.\n" +
+          "Laserfarbe pro Hand; Malfarbe separat im Handmenü-Zahnrad.\n" +
           "Laserbreite und Malstrichstärke sind unabhängig."
         );
 
@@ -1478,7 +1478,7 @@
         );
 
         button(
-          "Laser- und Malfarben",
+          "Laserfarben",
           () => this.navigate("colors")
         );
 
@@ -2095,8 +2095,8 @@
             "Bedienung",
             "Links: laufen · Rechts: drehen",
             "Grip: greifen · 2 Hände: skalieren",
-            "Trigger: Oberflächen bemalen",
-            "Laserfarbe = Malfarbe",
+            "Handmenü: Laser / Malstift wechseln",
+            "Malfarbe/Deckkraft: Handmenü-Zahnrad",
             "B/Y: Einstellungen & 3D-Modell"
           ])
         );

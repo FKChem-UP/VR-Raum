@@ -22,6 +22,15 @@
   const MAX_STROKES = 300;
 
   F.Draw = {
+    mode: "laser",
+    color: "#ffcc33",
+    opacity: 0.35,
+    setMode(mode) {
+      if (!["laser", "paint"].includes(mode)) return;
+      this.mode = mode;
+      if (mode === "paint" && F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
+      if (F.Menu) F.Menu.blockDrawing();
+    },
     strokes: [],
 
     remove: function (stroke) {
@@ -66,6 +75,9 @@
 
       const material = new T.MeshBasicMaterial({
         color,
+        transparent: this.opacity < 1,
+        opacity: this.opacity,
+        depthWrite: false,
         side: T.DoubleSide
       });
 
@@ -136,6 +148,7 @@
         radius,
         worldRadius,
         color,
+        opacity: this.opacity,
         count: 0,
         lastLocal: point.clone(),
         lastNormal: hit.normal.clone(),
@@ -186,14 +199,14 @@
     },
 
     sample: function (stroke, hit, hand) {
+      if (this.mode !== "paint" || !hit.normal) return null;
       const body = hit.type === "model"
         ? hit.el.querySelector(".manip-body")
         : hit.el;
 
       if (!body) return null;
 
-      const color =
-        F.Settings.lasers[hand] || F.Settings.lasers.right;
+      const color = this.color;
 
       const worldRadius = F.Settings.strokeRadius;
       const parent = body.object3D;
@@ -218,6 +231,7 @@
         stroke.surfaceMesh === hit.mesh &&
         stroke.parent === parent &&
         stroke.color === color &&
+        stroke.opacity === this.opacity &&
         stroke.worldRadius === worldRadius &&
         stroke.count < CAPACITY
       );

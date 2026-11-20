@@ -521,9 +521,11 @@
           const grabber = this.el.components["fkc-grabber"];
           if (!(grabber && grabber.grabbed)) {
             F.selectModel(this.hit.el);
-            if (F.CIF && F.CIF.clickEnvironment(this.hit)) return;
-            if (F.Measure && F.Measure.click(this.hit)) return;
-            if (F.AtomLabels && F.AtomLabels.toggle(this.hit)) return;
+            if (!F.Draw || F.Draw.mode !== "paint") {
+              if (F.CIF && F.CIF.clickEnvironment(this.hit)) return;
+              if (F.Measure && F.Measure.click(this.hit)) return;
+              if (F.AtomLabels && F.AtomLabels.toggle(this.hit)) return;
+            }
           }
         }
         if ((F.Menu && F.Menu.opened) || (F.HandMenu && F.HandMenu.opened)) return;
@@ -532,7 +534,7 @@
 
         if (grabber && grabber.grabbed) return;
 
-        this.drawingAllowed = true;
+        this.drawingAllowed = !!(F.Draw && F.Draw.mode === "paint");
         this.el.sceneEl.lastSelectedTarget = this.hit.el;
 
         if (this.hit.type === "model") {
