@@ -288,6 +288,23 @@
 
   const room = id => F.rooms.find(item => item.id === id);
   const v1 = room("vorlesung-1");
+  const nacl = "assets/structures/NaCl.cif";
+  Object.assign(room("vorlesung-6").stations[0], {
+    title: "Natriumchlorid – Steinsalzstruktur",
+    model: nacl,
+    cifMode: "cell",
+    variantAlignment: "individual",
+    info: "Die kubische Elementarzelle enthält vier Na⁺- und vier Cl⁻-Positionen (a = 5,6917 Å).\n" +
+      "Die CIF führt die acht Positionen explizit in P 1 auf; der ideale Steinsalztyp hat die Symmetrie Fm-3m.\n\n" +
+      "Na⁺ ist von sechs Cl⁻-Ionen oktaedrisch umgeben; auch Cl⁻ hat sechs Gegenionen als nächste Nachbarn. " +
+      "Die Na⁺-Ansicht zeigt den ersten Nachbarschaftsausschnitt über Zellgrenzen hinweg (Na–Cl: ca. 2,846 Å). " +
+      "Der Style Polyeder zeigt das Koordinationsoktaeder, keine kovalenten Bindungen. " +
+      "Ionenkugeln sind schematisch; insbesondere sind die Raumfüllungsradien keine Ionenradien.",
+    variants: [
+      {id: "nacl-cell", title: "NaCl – Elementarzelle", model: nacl, cifMode: "cell"},
+      {id: "nacl-na", title: "Na⁺ – Koordinationsumgebung", model: nacl, cifMode: "coordination"}
+    ]
+  });
   Object.assign(room("team-b").stations[0], {
     title: "Co-Produkt1 – CIF-Testmodell",
     model: "assets/structures/Co-Produkt1.cif",

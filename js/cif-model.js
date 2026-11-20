@@ -611,6 +611,9 @@
     if (!["molecule", "cell", "coordination"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
+    if (/^[ \t]*data_NaCl[ \t\r]*$/im.test(source)) {
+      return F.NaClStructure.createStructure(source, mode);
+    }
     if (/^[ \t]*_atom_site_aniso_label(?:[ \t\r\n]|$)/im.test(source)) {
       if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
       const parsed = F.CIFStructure.parse(source);
@@ -650,7 +653,7 @@
     H: {color: "#eeeeee", vdw: 1.20}, C: {color: "#515151", vdw: 1.70},
     N: {color: "#3055ee", vdw: 1.55}, O: {color: "#ee3333", vdw: 1.52},
     Cl: {color: "#35c935", vdw: 1.75},
-    Co: {color: "#ed709b", vdw: 2.00}
+    Co: {color: "#ed709b", vdw: 2.00}, Na: {color: "#8359dc", vdw: 2.27}
   };
 
   // Konvexe Hülle aus echten Nachbarpositionen; koplanare Flächen nur einmal
@@ -1188,15 +1191,15 @@
             bondsInModel: structure.bonds.length,
             chosenCenterFractional: structure.chosenCenterFractional,
             moleculeCentersFractional: structure.moleculeCentersFractional,
-            bondRangeAngstrom: [
+            bondRangeAngstrom: structure.bonds.length ? [
               Math.min(...structure.bonds.map(b => b.distanceAngstrom)),
               Math.max(...structure.bonds.map(b => b.distanceAngstrom))
-            ]
+            ] : null
           }
         );
 
-        F.setStatus("CIF-Modell aufgebaut: " + structure.atoms.length +
-          " Atome und " + structure.bonds.length + " Bindungen.");
+        F.setStatus(structure.kind === "nacl" ? "NaCl-Modell aufgebaut: " + structure.atoms.length + " Ionen." :
+          "CIF-Modell aufgebaut: " + structure.atoms.length + " Atome und " + structure.bonds.length + " Bindungen.");
       } catch (error) {
         if (
           requestId !== this.requestId ||
