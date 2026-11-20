@@ -17,7 +17,7 @@
       materials.add(result);
       return result;
     }
-    const white = material("#eeeef0"), seam = material("#bfc2c6");
+    const white = material("#eeeef0");
     function mesh(name, geometry, mat, position, scale) {
       geometries.add(geometry);
       const object = new T.Mesh(geometry, mat);
@@ -28,18 +28,39 @@
       group.add(object);
       return object;
     }
-    // Glatter, länglicher Griff mit rundem Abschluss; ringlose ovale Oberseite.
-    const grip = mesh("housing-handle", new T.SphereGeometry(1, 24, 20), white,
-      [mirror * 0.004, -0.041, 0.012], [0.024, 0.077, 0.023]);
-    grip.rotation.z = mirror * -0.08;
-    const head = mesh("housing-head", new T.SphereGeometry(1, 32, 20), white,
-      [0, 0.025, -0.006], [0.041, 0.025, 0.047]);
-    head.rotation.x = -0.18;
-    const face = mesh("housing-top-seam", new T.SphereGeometry(1, 32, 16), seam,
-      [0, 0.041, -0.009], [0.0375, 0.003, 0.041]);
-    face.rotation.x = -0.18;
-    mesh("housing-top", new T.SphereGeometry(1, 32, 16), white,
-      [0, 0.043, -0.009], [0.037, 0.003, 0.040]).rotation.x = -0.18;
+    // Ein durchgehendes Gehäuse statt überlappender Ellipsoide. In Grip-Space
+    // zeigt -Z nach vorn: vom Tastenfeld läuft der Griff überwiegend nach +Z.
+    // Querschnitte in mm: Höhe, Z-Mitte, Halbachsen X/Z, seitlicher Versatz.
+    const rings = [
+      [-44, 79, 5, 7, 4], [-42, 77, 12, 13, 4], [-36, 69, 16, 20, 4],
+      [-25, 48, 18, 27, 3], [-12, 23, 19, 29, 2], [0, 3, 21, 29, 0],
+      [9, -12, 25, 30, -2], [15, -21, 32, 36, -3], [22, -25, 39, 42, -3],
+      [28, -26, 40, 43, -3], [33, -26, 38, 41, -3], [35, -26, 34, 37, -3]
+    ];
+    const vertices = [], indices = [], sides = 40;
+    rings.forEach(([y, z, rx, rz, x], ring) => {
+      for (let i = 0; i < sides; i++) {
+        const angle = 2 * Math.PI * i / sides;
+        vertices.push((mirror * x + rx * Math.cos(angle)) / 1000, y / 1000, (z + rz * Math.sin(angle)) / 1000);
+        if (ring) {
+          const a = (ring - 1) * sides + i, b = (ring - 1) * sides + (i + 1) % sides;
+          indices.push(a, a + sides, b, b, a + sides, b + sides);
+        }
+      }
+    });
+    for (const ring of [0, rings.length - 1]) {
+      const [y, z, , , x] = rings[ring], center = vertices.length / 3;
+      vertices.push(mirror * x / 1000, y / 1000, z / 1000);
+      for (let i = 0; i < sides; i++) {
+        const a = ring * sides + i, b = ring * sides + (i + 1) % sides;
+        indices.push(center, ring ? b : a, ring ? a : b);
+      }
+    }
+    const shell = new T.BufferGeometry();
+    shell.setAttribute("position", new T.Float32BufferAttribute(vertices, 3));
+    shell.setIndex(indices);
+    shell.computeVertexNormals();
+    mesh("housing", shell, white, [0, 0, 0]);
     function control(name, geometry, position, scale, color = "#242629") {
       const mat = material(color);
       const object = mesh(name, geometry, mat, position, scale);
@@ -47,15 +68,14 @@
       controls.set(name, {mesh: object, material: mat, color});
       return object;
     }
-    const stick = control("joystick", new T.CylinderGeometry(0.009, 0.009, 0.005, 24),
-      [-mirror * 0.017, 0.053, -0.022]);
-    stick.rotation.x = -0.18;
-    mesh("joystick-stem", new T.CylinderGeometry(0.004, 0.005, 0.009, 16), material("#17191b"),
-      [-mirror * 0.017, 0.047, -0.022]);
+    const stickX = mirror * 0.013;
+    mesh("joystick-socket", new T.CylinderGeometry(0.010, 0.011, 0.002, 28), material("#494b4f"), [stickX, 0.0356, -0.042]);
+    mesh("joystick-stem", new T.CylinderGeometry(0.004, 0.005, 0.008, 20), material("#17191b"), [stickX, 0.040, -0.042]);
+    control("joystick", new T.CylinderGeometry(0.009, 0.008, 0.004, 32), [stickX, 0.045, -0.042]);
     const names = hand === "left" ? ["X", "Y"] : ["A", "B"];
     names.forEach((name, i) => {
-      const x = mirror * (i ? 0.009 : 0.010), z = i ? -0.019 : 0.003;
-      control(name, new T.CylinderGeometry(0.0062, 0.0067, 0.0035, 20), [x, 0.048, z]).rotation.x = -0.18;
+      const x = -mirror * (i ? 0.018 : 0.006), z = i ? -0.034 : -0.010;
+      control(name, new T.CylinderGeometry(0.0065, 0.007, 0.004, 28), [x, 0.037, z]);
       const canvas = document.createElement("canvas");
       canvas.width = canvas.height = 64;
       const ctx = canvas.getContext("2d");
@@ -65,15 +85,11 @@
       const texture = new T.CanvasTexture(canvas); textures.add(texture);
       const textMaterial = new T.MeshBasicMaterial({map: texture, transparent: true, depthWrite: false, side: T.DoubleSide});
       materials.add(textMaterial);
-      const text = mesh("label-" + name, new T.PlaneGeometry(0.009, 0.009), textMaterial, [x, 0.0502, z]);
-      text.rotation.x = -Math.PI / 2 - 0.18;
+      const text = mesh("label-" + name, new T.PlaneGeometry(0.009, 0.009), textMaterial, [x, 0.0393, z]);
+      text.rotation.x = -Math.PI / 2;
     });
-    control("trigger", new T.SphereGeometry(1, 20, 16), [0, 0.022, -0.049], [0.013, 0.012, 0.008], "#d2d4d7");
-    control("grip", new T.SphereGeometry(1, 20, 16), [-mirror * 0.024, -0.013, 0.003], [0.006, 0.017, 0.010], "#d2d4d7");
-    mesh("system-button", new T.CylinderGeometry(0.0045, 0.0045, 0.002, 16), white,
-      [mirror * 0.025, 0.046, 0.008]).rotation.x = -0.18;
-    mesh("menu-button", new T.CylinderGeometry(0.0045, 0.0045, 0.002, 16), white,
-      [mirror * 0.027, 0.046, -0.008]).rotation.x = -0.18;
+    control("trigger", new T.SphereGeometry(1, 24, 16), [0, 0.010, -0.044], [0.012, 0.014, 0.009], "#d2d4d7").rotation.x = -0.6;
+    control("grip", new T.SphereGeometry(1, 24, 16), [-mirror * 0.019, -0.006, 0.013], [0.005, 0.008, 0.017], "#d2d4d7").rotation.x = 0.45;
     return {
       group, controls,
       highlight(names) {
