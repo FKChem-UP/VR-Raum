@@ -160,6 +160,8 @@
 
     const menuOpen = F.Menu && F.Menu.opened;
     const handMenuOpen = F.HandMenu && F.HandMenu.opened;
+    const tutorialActive = F.Tutorial && F.Tutorial.active;
+    const measurement = tutorialActive && F.Measure?.enabled && F.Draw?.mode !== "paint" ? F.Measure.mode : null;
 
     const targets = hitTargets.filter(target => {
       if (
@@ -173,10 +175,11 @@
           target.el.dataset.fkcMenu === "true"
         );
       }
-      if (F.Tutorial && F.Tutorial.active) {
+      if (tutorialActive) {
         return (target.type === "action" && (target.el.dataset.fkcTutorial === "true" ||
           (F.HandMenu && F.HandMenu.opened && target.el.dataset.fkcHandMenu === "true"))) ||
-          (target.type === "model" && target.el.modelReady && F.Tutorial.allowsModel(target.el));
+          (target.type === "model" && target.el.modelReady && F.Tutorial.allowsModel(target.el) &&
+            (!measurement || F.Tutorial.measurementTarget(target.mesh, measurement)));
       }
 
       if (handMenuOpen) {
@@ -208,7 +211,17 @@
 
     if (!hits.length) return null;
 
-    const hit = hits[0];
+    let hit = hits[0];
+    // Wenn ein Stab direkt am Atom beginnt, bevorzuge den nahen Atomtreffer.
+    // In der Stabmitte bleibt die direkte Distanzmessung per Bindung erhalten.
+    if (measurement === "distance" && hit.object.userData.fkcBond) {
+      const {el} = lookup.get(hit.object);
+      for (const candidate of hits.slice(1)) {
+        const target = lookup.get(candidate.object);
+        if (candidate.distance - hit.distance > 0.025 || target.type !== "model" || target.el !== el) break;
+        if (candidate.object.userData.fkcAtom) { hit = candidate; break; }
+      }
+    }
     const target = lookup.get(hit.object);
 
     const normal = hit.face

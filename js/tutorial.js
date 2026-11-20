@@ -38,6 +38,11 @@
   F.Tutorial = {
     active: false, crossed, hasSelectedMolecule, palm,
     allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active && root.object3D.visible; },
+    measurementTarget(mesh, mode) {
+      const data = mesh.userData;
+      return !data.fkcEnvironmentId && (!!data.fkcAtom || (mode === "distance" &&
+        Number.isInteger(data.fkcBond?.a) && Number.isInteger(data.fkcBond?.b)));
+    },
     menuTarget(scene, root) {
       if (!this.allowsModel(root) || F.Menu?.opened || root.fkcPendingVisual) return null;
       const tutorial = scene.components["fkc-tutorial"];
@@ -163,6 +168,14 @@
       }
       F.Tutorial.active = true;
       this.group.object3D.visible = true;
+      // Nur die Zutrittsfrage liegt über der weißen Überblendung. Im Training
+      // verdecken nähere Modelle sowohl die Tafel als auch deren Laserpunkt.
+      const question = phase === "question";
+      this.material.transparent = question;
+      this.material.depthTest = this.material.depthWrite = !question;
+      this.material.needsUpdate = true;
+      this.board.getObject3D("mesh").renderOrder = question ? 10000 : 0;
+      this.cursorMaterial.depthTest = !question;
       this.board.object3D.position.set(phase === "question" ? 0 : 0.8, this.head.y,
         phase === "question" ? 5.1 : 2.75);
       this.board.object3D.rotation.set(0, 0, 0);
@@ -228,7 +241,8 @@
     updateCursor: function (hit) {
       const uv = hit && hit.el === this.board && hit.uv;
       this.cursor.visible = !!uv;
-      if (uv) this.cursor.position.set((uv.x - 0.5) * boardWidth, (uv.y - 0.5) * boardHeight, 0);
+      if (uv) this.cursor.position.set((uv.x - 0.5) * boardWidth, (uv.y - 0.5) * boardHeight,
+        this.phase === "question" ? 0 : 0.002);
     },
     tick: function () {
       if (!this.el.is("vr-mode")) return;

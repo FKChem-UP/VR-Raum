@@ -32,10 +32,13 @@ component.click({uv: {x: 0, y: 1}});
 assert.equal(action, 1);
 const board = {};
 const cursor = {visible: false, position: {set(...coordinates) { this.coordinates = coordinates; }}};
-const overlay = {board, cursor, updateCursor: component.updateCursor};
+const overlay = {board, cursor, phase: "question", updateCursor: component.updateCursor};
 overlay.updateCursor({el: board, uv: {x: 0.75, y: 0.25}});
 assert.equal(cursor.visible, true);
 assert.deepEqual(cursor.position.coordinates, [0.35, -0.21875, 0], "Punkt liegt auf der getroffenen Schildfläche");
+overlay.phase = "training";
+overlay.updateCursor({el: board, uv: {x: 0.5, y: 0.5}});
+assert.deepEqual(cursor.position.coordinates, [0, 0, 0.002], "Punkt liegt knapp vor der tiefengeprüften Tafel");
 overlay.updateCursor({el: {}, uv: {x: 0.5, y: 0.5}});
 assert.equal(cursor.visible, false, "Fremde Treffer zeigen keinen Punkt auf dem Schild");
 overlay.updateCursor({el: board, uv: {x: 0.5, y: 0.5}});
@@ -57,6 +60,43 @@ F.Tutorial.active = true;
 assert.equal(F.Tutorial.allowsModel({id: "tutorial-co-model", object3D: {visible: true}}), true);
 assert.equal(F.Tutorial.allowsModel({id: "tutorial-co-model", object3D: {visible: false}}), false);
 assert.equal(F.Tutorial.allowsModel({id: "welcome-model"}), false);
+const atomMesh = {userData: {fkcAtom: {}}};
+const bondMesh = {userData: {fkcBond: {a: 0, b: 1}}};
+assert.equal(F.Tutorial.measurementTarget(atomMesh, "angle"), true);
+assert.equal(F.Tutorial.measurementTarget(bondMesh, "angle"), false);
+assert.equal(F.Tutorial.measurementTarget(bondMesh, "distance"), true);
+assert.equal(F.Tutorial.measurementTarget({userData: {}}, "distance"), false);
+assert.equal(F.Tutorial.measurementTarget({userData: {fkcAtom: {}, fkcEnvironmentId: "other"}}, "distance"), false);
+// Gemeinsamen Trefferpfad testen: sichtbares Atom vor der Tafel, Stab davor.
+const rayRoot = {id: "tutorial-co-model", object3D: {visible: true}, isConnected: true, modelReady: true};
+const rayBoard = {isConnected: true, dataset: {fkcTutorial: "true"}};
+const vector = {clone() { return this; }, negate() { return this; }, dot() { return 0; }};
+const surface = {userData: {}};
+const rayTargets = [bondMesh, atomMesh, surface];
+for (const mesh of rayTargets) Object.assign(mesh, {isMesh: true, visible: true, updateWorldMatrix() {}});
+rayBoard.object3D = {traverse: visit => visit(surface)};
+const visualEntity = {object3D: {traverse: visit => [bondMesh, atomMesh].forEach(visit)}, closest: () => rayRoot};
+F.RoomBuilder = {build() {}};
+F.getScene = () => ({addEventListener() {}, querySelectorAll(selector) {
+  return selector === ".vr-action" ? [rayBoard] : selector === ".model-visual" ? [visualEntity] : [];
+}});
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/vr-tools.js"), "utf8"), {
+  window: {FKCVR: F}, THREE: {}, console: {info() {}}
+});
+let distances = [0.80, 0.81, 1];
+const ray = {ray: {direction: vector}, intersectObjects(objects) {
+  return rayTargets.map((object, i) => ({object, distance: distances[i], point: vector}))
+    .filter(hit => objects.includes(hit.object)).sort((a, b) => a.distance - b.distance);
+}};
+F.Measure = {enabled: true, mode: "angle"};
+assert.equal(F.findHit(ray, true).mesh, atomMesh, "Bindungsstab blockiert die Winkelauswahl nicht");
+F.Measure.mode = "distance";
+assert.equal(F.findHit(ray, true).mesh, atomMesh, "Atom am Bindungsende hat Vorrang");
+distances = [0.8, 0.9, 1];
+assert.equal(F.findHit(ray, true).mesh, bondMesh, "Direkte Distanzmessung am Stab bleibt möglich");
+distances = [0.8, 0.81, 0.7];
+assert.equal(F.findHit(ray, true).el, rayBoard, "Nur eine tatsächlich nähere Tafel fängt den Strahl ab");
+F.Measure.enabled = false;
 const trainingRoot = {id: "tutorial-co-model", object3D: {visible: true}};
 const training = {phase: "training", target: trainingRoot, step: 4};
 const scene = {components: {"fkc-tutorial": training}};
