@@ -250,7 +250,7 @@
         model.fkcAtomLabels, this.page, this.offset, this.infoOffset,
         structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
-        F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor,
+        F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size].join("|");
       if (signature !== this.signature) {
@@ -323,6 +323,8 @@
       };
       // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
       const row = entries => {
+        const compactRow = !!(structure && structure.environmentCell);
+        const height = compactRow ? 67 : 87;
         const w = (712 - (entries.length - 1) * 12) / entries.length;
         entries.forEach((entry, index) => {
           const x = 28 + index * (w + 12);
@@ -332,12 +334,12 @@
           const hovered = this.hoverIndex === buttonIndex;
           const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
-          ctx.fillRect(x, y + 5, w, 92);
+          ctx.fillRect(x, y + 5, w, height + 5);
           ctx.fillStyle = pressed ? "#e99d9d" : selected ? "#f3bcbc" : hovered ? "#fff0b8" : "#d5e2d9";
-          ctx.fillRect(x, y + shift, w, 87);
+          ctx.fillRect(x, y + shift, w, height);
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
-          ctx.strokeRect(x, y + shift, w, 87);
+          ctx.strokeRect(x, y + shift, w, height);
           const atomCount = entry.count || 2;
           const points = [];
           for (let i = 0; i < atomCount; i++) {
@@ -379,11 +381,11 @@
           ctx.fillStyle = "#173527";
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
-          ctx.fillText(entry.label, x + w / 2, y + shift + 73, w - 12);
+          ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 58 : 73), w - 12);
           ctx.textAlign = "left";
-          this.buttons.push({x, y, w, h: 97, action: entry.action});
+          this.buttons.push({x, y, w, h: height + 10, action: entry.action});
         });
-        y += 100;
+        y += compactRow ? 80 : 100;
       };
       if (this.page === "settings") {
         // Kompaktere Einstellungszeilen lassen Platz für Palette und Reichweite.
@@ -393,22 +395,19 @@
           button(title, () => F.HandMenu.setSize(size), F.HandMenu.size === size);
         }
         if (structure) {
-          text("Bindungsfarben · ausgewähltes CIF-Modell");
+          text("Bindungsfarben · nur Ball-and-Stick");
           for (const [mode, title] of [["auto", "Style-Standard"], ["element", "Endatomfarben"], ["uniform", "Einheitliche Farbe"]]) {
             button(title, () => F.CIF.setBondAppearance(model, mode), (model.fkcBondColorMode || "auto") === mode);
           }
           text("Farbwahl aktiviert einheitliche Bindungsfarbe");
-          row([["#949494", "Grau"], ["#eeeeee", "Weiß"], ["#333333", "Dunkelgrau"], ["#ff9d38", "Orange"], ["#000000", "Schwarz"]].map(([color, title]) => ({
+          row([["#949494", "Grau"], ["#eeeeee", "Weiß"], ["#ff9d38", "Orange"], ["#000000", "Schwarz"]].map(([color, title]) => ({
             label: title, selected: model.fkcBondColorMode === "uniform" && (model.fkcBondColor || "#949494") === color,
             action: () => F.CIF.setBondAppearance(model, "uniform", color)
           })));
-          if (!structure.environmentCell) text("Atomfarben und Messfarben bleiben unverändert.");
-          if (structure.environmentCell) {
-            const state = F.CIF.environmentState(model);
-            text("Umgebung · minimaler Atomabstand (Å)");
-            row([1.5, 2, 3, 4, 5].map(radius => ({label: String(radius), selected: state.radius === radius,
-              action: () => F.CIF.setEnvironment(model, state.enabled, radius)})));
-          }
+          text("Bindungsdicke · nur Ball-and-Stick");
+          row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %",
+            selected: (model.fkcBondThickness || 1) === factor,
+            action: () => F.CIF.setBondThickness(model, factor)})));
         } else text("Bindungsfarben nur bei CIF-Modellen verfügbar.");
         this.texture.needsUpdate = true;
         return;
@@ -453,8 +452,10 @@
         button("Modell zurücksetzen", () => F.resetTarget(model));
         if (structure && structure.environmentCell) {
           const state = F.CIF.environmentState(model);
-          button("Umgebung: " + (state.enabled ? "An" : "Aus") + " · " + state.radius + " Å · " + state.selected.size + " übernommen",
-            () => F.CIF.setEnvironment(model, !state.enabled), state.enabled);
+          text("Umgebung (Å) · " + state.selected.size + " übernommen");
+          row([null, 1.5, 2, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","),
+            selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
+            action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
         }
         text("Legende: Atomsorten");

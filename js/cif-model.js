@@ -678,14 +678,14 @@
         const element = elements[mesh.userData.fkcAtom.element];
         if (!element) throw new Error("Unbekanntes Darstellungselement.");
         mesh.scale.setScalar(styleId === "space-filling" ? element.vdw :
-          styleId === "ball-stick" && mesh.userData.fkcAtom.element === "H" ? 0.20 : style.atomRadius);
+          styleId === "ball-stick" && mesh.userData.fkcAtom.element === "H" ? style.atomRadius / 2 : style.atomRadius);
       } else if (mesh.userData.fkcPolyhedron) {
         mesh.visible = styleId === "polyhedral";
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
-        mesh.scale.x = mesh.scale.z = style.bondRadius;
+        mesh.scale.x = mesh.scale.z = style.bondRadius * (styleId === "ball-stick" ? group.userData.fkcBondThickness || 1 : 1);
         if (mesh.userData.fkcElementMaterial) {
-          const mode = group.userData.fkcBondColorMode || "auto";
+          const mode = styleId === "ball-stick" ? group.userData.fkcBondColorMode || "auto" : "auto";
           mesh.material = (mode === "element" || mode === "auto" && ["wires", "capped-sticks"].includes(styleId))
             ? mesh.userData.fkcElementMaterial : mesh.userData.fkcNeutralMaterial;
           if (mesh.userData.fkcNeutralMaterial.color) {
@@ -699,6 +699,18 @@
 
   F.CIF = {
     createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements,
+    setBondThickness(root, factor) {
+      if (![0.5, 0.75, 1].includes(factor)) return false;
+      const visual = root && root.querySelector(".model-visual");
+      const group = visual && visual.getObject3D("mesh");
+      if (!group || !visual.fkcStructure || root.fkcPendingVisual) return false;
+      root.fkcBondThickness = factor;
+      group.userData.fkcBondThickness = factor;
+      applyStyle(group, group.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(group);
+      F.invalidateHits();
+      return true;
+    },
     environmentState(root) {
       const visual = root && root.querySelector(".model-visual");
       const group = visual && visual.getObject3D("mesh");
@@ -746,6 +758,7 @@
         record.built.group.visible = selected || state.enabled && state.available.has(id);
         record.built.group.userData.fkcBondColorMode = group.userData.fkcBondColorMode;
         record.built.group.userData.fkcBondColor = group.userData.fkcBondColor;
+        record.built.group.userData.fkcBondThickness = group.userData.fkcBondThickness;
         applyStyle(record.built.group, group.userData.fkcStyle || "ball-stick");
         for (const material of record.materials.values()) {
           material.transparent = !selected;
@@ -1036,6 +1049,7 @@
         const root = this.el.closest(".interactable");
         built.group.userData.fkcBondColorMode = root && root.fkcBondColorMode || "auto";
         built.group.userData.fkcBondColor = root && root.fkcBondColor || "#949494";
+        built.group.userData.fkcBondThickness = root && root.fkcBondThickness || 1;
         applyStyle(built.group, (root && root.fkcStyle) || "ball-stick");
 
         this.built = built;

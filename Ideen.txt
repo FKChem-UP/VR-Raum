@@ -382,6 +382,18 @@ IDE-49: Umgebung einblenden, Kandidaten auswählen und beim Ausschalten nur
   Numerische/Logiktests bestanden, Pico-Performance/Bedienung offen.
 IDE-50: Schwarz als zusätzliche einheitliche Bindungsfarbe anbieten.
   #000000 ergänzt; Farbpalette jetzt als kompakte direkte Buttonreihe.
+IDE-51: Dunkelgrau aus Palette entfernen; Farben und einstellbare Bindungsdicke
+  nur für Ball-and-Stick, Wires/Sticks immer Endatomfarben. Lokal umgesetzt,
+  Dicke 50/75/100 %, Variantenwechsel erhält Präferenz. Polyhedral nicht betroffen.
+IDE-52: H-Atome in Ball-and-Stick halb so groß wie übrige Atome.
+  Radius 0,16 statt 0,32 Å, Darstellungsradien, keine physikalische Behauptung.
+IDE-53: Umgebung Aus/1,5/2/3/4/5 Å direkt im Handmenü statt Einstellungsseite.
+  Lokal umgesetzt. Ganze Bestandteile reichen laut Nutzer, atomweise Auswahl
+  wird nicht benötigt. Messungen zwischen benachbarten Komplexen/Co-Zentren
+  weiterhin langfristig gewünscht, noch gesperrt.
+IDE-54: H-Brücken gestrichelt rot darstellen. Nutzer möchte zunächst eigene
+  H-Brückenregeln/Referenzdaten liefern (Rückfrage beantwortet). Daher keine
+  automatische O/N/Cl-Kandidatenregel implementieren, H-Brücken warten.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
