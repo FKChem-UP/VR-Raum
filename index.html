@@ -27,7 +27,8 @@
   <script defer src="./js/measurements.js?v=5"></script>
   <script defer src="./js/room-entry.js?v=2"></script>
   <script defer src="./js/hand-menu.js?v=17"></script>
-  <script defer src="./js/tutorial.js?v=2"></script>
+  <script defer src="./js/pico-controller-model.js?v=1"></script>
+  <script defer src="./js/tutorial.js?v=3"></script>
 
 
 
@@ -309,6 +310,7 @@
       <a-entity
         id="leftHand"
         hand-controls="hand: left; handModelStyle: lowPoly; color: #d6e5df"
+        fkc-pico-model="hand: left"
         fkc-grabber
         fkc-controller="hand: left"
       ></a-entity>
@@ -316,6 +318,7 @@
       <a-entity
         id="rightHand"
         hand-controls="hand: right; handModelStyle: lowPoly; color: #d6e5df"
+        fkc-pico-model="hand: right"
         fkc-grabber
         fkc-controller="hand: right"
       ></a-entity>

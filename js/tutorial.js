@@ -76,6 +76,7 @@
       const handMenu = this.el.components["fkc-hand-menu"];
       if (handMenu) handMenu.hide();
       this.phase = phase;
+      if (F.PicoModels) F.PicoModels.tutorial(phase === "training" ? 0 : -1);
       if (phase === "training") {
         this.step = 0;
         this.target.object3D.position.set(3, 1.3, 4);
@@ -181,6 +182,7 @@
             position.distanceTo(this.taskOrigin), manip ? manip.hands.length : 0, this.body.object3D.scale.x);
           if (next !== this.step) {
             this.step = next;
+            if (F.PicoModels) F.PicoModels.tutorial(next);
             if (next === 3) this.phase = "done";
             this.render();
           }
@@ -197,6 +199,7 @@
       if (this.room && this.roomVisible !== undefined) this.room.object3D.visible = this.roomVisible;
       this.roomVisible = undefined;
       F.Tutorial.active = false;
+      if (F.PicoModels) F.PicoModels.tutorial(-1);
       this.group.object3D.visible = false;
       this.phase = null; this.previous = null;
       if (returnToSpawn && F.app && F.app.currentId === "welcome") F.app.positionAtSpawn({x: 0, z: 6.5});

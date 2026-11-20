@@ -437,6 +437,13 @@ IDE-65: Tutorial drei Aufgaben: bewegen/drehen und hingehen, Grip anfassen
 IDE-66: Weiße Pico4-Ultra-Controller statt Hände, Raum für Kontrast dimmen.
   Kein lokales Controllerasset gefunden. Nutzer wählte ausdrücklich Hände
   vorerst behalten und liefert später Asset. Keine Ersatzcontroller eingefügt.
+  Neuer ausdrücklicher Auftrag mit zwei Fotos: selbst zwei 3D-Modelle erzeugen,
+  erst nach Sichtbarkeit der Bilder. Fotos gesehen, angenäherte weiße ringlose
+  Modelle lokal prozedural erzeugt (keine Hersteller-/Maßgenauigkeit behaupten).
+  Grip/Trigger/Joystick und X/Y bzw. A/B getrennte Materialien, unabhängig
+  rot/emissiv hervorhebbar. Hände visuell ersetzt bei gültiger Grip-Pose,
+  Tracking/Greifen weiterhin hand-controls. Tutorial Joystick/Grip-Hinweise.
+  Rendering-/Passform-Nachtest offen, keine externen Assets heruntergeladen.
 
 NICHT ALS NUTZERWUNSCH ZU VERSTEHEN
 ---------------------------------
