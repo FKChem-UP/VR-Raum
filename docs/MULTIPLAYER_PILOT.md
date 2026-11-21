@@ -1,6 +1,18 @@
 # Multiplayer-Pilot
 
-GitHub Pages liefert weiterhin den öffentlichen Einzelspielermodus. Der getrennte Pilot-Dienst überträgt nur Kopf- und Controllerposen, wenn im Browserpanel bewusst „Gemeinsam beitreten“ gewählt wurde und VR läuft. Gleiche Raum-ID und derselbe Server sind nötig, nicht dasselbe WLAN. Kein Konto, Audio oder gespeicherter Lernfortschritt. Das Tutorial wird nicht übertragen. Es gibt keinen Raumcode und keine Adminrolle: Jeder mit Zugang zum Dienst kann beitreten. Für einen beaufsichtigten Test betreiben und danach stoppen; nicht als dauerhaften offenen Dienst für die Lehre betrachten. Der Origin-Filter ist kein Passwortschutz. Anbieter können IP-Adressen protokollieren.
+Die [VR-Seite auf GitHub Pages](https://fkchem-up.github.io/VR-Raum/) bleibt öffentlich und funktioniert im Einzelmodus ohne Server. Im Browserpanel „Multiplayer-Pilot“ ist `https://fkc-vr-multiplayer.onrender.com` vorausgefüllt. Übertragen wird erst nach bewusstem Klick auf „Gemeinsam beitreten“ und im VR-Modus. Alle brauchen denselben Server und dieselbe Raum-ID, nicht dasselbe WLAN.
+
+Der Pilot hat keine Konten, keinen Raumcode, keine Adminrolle, kein Audio und keinen dauerhaft gespeicherten Lernfortschritt. Anzeigenamen sind freiwillig; Spitznamen genügen. Avatare und Sitzungszustände werden nur im Arbeitsspeicher gehalten. Der Dienst ist offen; der Origin-Filter ist kein Zugriffsschutz. Der Hosting-Anbieter kann technische Logs einschließlich IP-Adressen führen. Für beaufsichtigte Tests nutzen; die Eignung für den regulären Lehrbetrieb separat klären.
+
+## Was geteilt wird
+
+| Gemeinsam sichtbar | Bleibt lokal oder ist ausgeschlossen |
+| --- | --- |
+| Avatar mit Vorschau, optionalem Spitznamen, frei wählbarer Form, Farbe und Stil; belegte Optionen sind pro Raum nicht wählbar. Der Würfel nutzt freie Optionen. | Keine Geschlechtsabfrage. Auswahl im Beitrittsmenü; der Server prüft sie beim VR-Beitritt erneut. |
+| Kopf und Controller bzw. Zeigehände; virtuelle Augenhöhe 1,60 m. Laser und Treffpunkt, wenn auf ein Modell gezeigt wird. | Haupt- und Handmenü, Steuerhilfe, Laser im Malmodus und Malstriche. |
+| Position, Drehung und Größe gemeinsamer Modelle. Eine Person hat die Greiffreigabe; beim Loslassen, Verlassen oder Timeout kann eine andere übernehmen. | Modellreset und Darstellungsstile wie Polyeder oder Kugel–Stab. |
+| Ansichten wie Molekül, Koordination oder Zelle, auch für später Beitretende. Fremder Griff sperrt den Wechsel. | Tutorial und offener Strukturraum sind Einzelspielerbereiche. |
+| Angeheftete Atomlabels und fertige Distanz-, Winkel- und Torsionsmessungen an derselben Modellvariante. Messwerte werden aus CIF-Koordinaten berechnet. | Flüchtige Laserlabels und noch laufende Messauswahl. Kein dauerhaftes Archiv. |
 
 ## Dienst auf einem HTTPS-Host starten
 
@@ -10,14 +22,14 @@ Auf einem Node-Webdienst mit öffentlicher HTTPS-Adresse dieses Repository als Q
 - `FKC_HOST=0.0.0.0` (damit der HTTPS-Proxy des Hosts den Dienst erreicht).
 - `PORT` vom Host übernehmen; Standard ist `8787`.
 
-Der Dienst selbst spricht HTTP; der Hosting-Proxy muss öffentlich **HTTPS** anbieten. `https://<serveradresse>/health` soll `{"ok":true}` liefern. Eine einzelne Instanz nutzen: Teilnehmer werden nur flüchtig im Speicher gehalten. Der Pilot nutzt kurze HTTPS-Anfragen statt WebSockets.
+Der Dienst selbst spricht HTTP; der Hosting-Proxy muss öffentlich **HTTPS** anbieten. [Gesundheitsprüfung](https://fkc-vr-multiplayer.onrender.com/health) soll `{"ok":true}` liefern. Eine einzelne Instanz nutzen. Der Pilot nutzt kurze HTTPS-Anfragen statt WebSockets. Render Free kann schlafen; vor dem Test die Gesundheitsprüfung aufrufen. Bei Änderungen an Server oder gemeinsamem Protokoll sowohl GitHub Pages als auch Render aktualisieren; bei ausbleibendem Auto-Deploy in Render **Manual Deploy → Deploy latest commit** wählen. Anschließend beide Pico-Seiten neu laden.
 
 ## Zwei Pico-Headsets testen
 
-1. In beiden Pico-Browsern dieselbe veröffentlichte VR-Seite öffnen. Im Abschnitt „Multiplayer-Pilot“ auf beiden Geräten dieselbe HTTPS-Serveradresse eingeben und „Gemeinsam beitreten“ drücken. `?multiplayer=<URL-kodierte Serveradresse>` kann das Feld vorausfüllen, startet aber keine Übertragung.
-2. Auf beiden Geräten VR starten und das Tutorial überspringen. Im selben Raum stehen und nacheinander zur Seite gehen bzw. Controller bewegen. Blaue Köpfe und Controller der anderen Person sollten folgen. Das ist noch keine gemeinsame Modellbearbeitung.
-3. Mit einem Gerät den Raum wechseln: Das andere sollte verschwinden. Im neuen Raum zusammenkommen, danach auf einem Gerät VR verlassen. Bei einem Verbindungsabbruch verschwinden alte Serverpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
+1. Auf beiden Picos dieselbe VR-Seite öffnen, „Multiplayer-Pilot“ ausklappen und dieselbe Serveradresse verwenden. „Gemeinsam beitreten“ wählen, VR starten und das Tutorial überspringen. Ein `?multiplayer=`-Parameter kann die Adresse vorgeben, startet aber keinen Beitritt.
+2. Im Begrüßungsraum am Team-B-Podest testen: auf Co zeigen; Modell greifen, drehen, skalieren und übergeben; Ansicht **Molekül → Koordination → Molekül** umschalten; Label anheften und eine Messung abschließen sowie wieder entfernen. Die zweite Person schaut zunächst nur zu.
+3. Raum wechseln bzw. VR verlassen; fremde Anzeigen müssen aus dem bisherigen Raum verschwinden. Bei Verbindungsabbruch verfallen alte Teilnehmendenpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
 
 ## Nächste Etappen
 
-Synchronisierte Modellbewegung mit serverseitiger Greif-Freigabe, anschließend geteilte Labels sowie Distanz-, Winkel- und später weitere Messungen. Für Messungen stabile Modell-, Varianten- und Atom-IDs verwenden; die Werte stammen weiterhin aus Strukturkoordinaten in Å, nicht aus VR-Anzeigekoordinaten. Private Sitzungen und ein Raumcode lassen sich bei Bedarf separat ergänzen. WebXR-, Pico-Browser- und eduroam-Verhalten erst nach echtem Gerätetest als bestätigt behandeln.
+Nutzerbestätigt auf Pico: Beitritt, gemeinsames Zeigen, gedrehte Modelle sowie geteilte Labels und Messungen. Den gemeinsamen Ansichtswechsel und den Betrieb mit größeren Gruppen bzw. über eduroam separat praktisch prüfen. Sinnvolle spätere Pakete: gemeinsames Markieren nach Nachtest des lokalen Malmodus, gemeinsamer Modellreset und bei Bedarf Raumcode. Keine dieser Erweiterungen gilt bereits als umgesetzt.

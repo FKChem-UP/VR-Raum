@@ -615,6 +615,11 @@
     if (/^[ \t]*data_NaCl[ \t\r]*$/im.test(source)) {
       return F.NaClStructure.createStructure(source, mode);
     }
+    if (/^[ \t]*data_ZnS[ \t\r]*$/im.test(source)) {
+      const structure = F.ZnSStructure.createStructure(source, mode);
+      if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
+      return structure;
+    }
     if (/^[ \t]*_atom_site_aniso_label(?:[ \t\r\n]|$)/im.test(source)) {
       if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
       const parsed = F.CIFStructure.parse(source);
@@ -1214,7 +1219,8 @@
           }
         );
 
-        F.setStatus(structure.kind === "nacl" ? "NaCl-Modell aufgebaut: " + structure.atoms.length + " Ionen." :
+        F.setStatus(structure.kind === "zns" ? "ZnS-Modell aufgebaut: " + structure.bonds.length + " Zn–S-Kontakte." :
+          structure.kind === "nacl" ? "NaCl-Modell aufgebaut: " + structure.atoms.length + " Ionen." :
           "CIF-Modell aufgebaut: " + structure.atoms.length + " Atome und " + structure.bonds.length + " Bindungen.");
       } catch (error) {
         if (

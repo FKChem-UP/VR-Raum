@@ -9,7 +9,8 @@
     ["Co-Produkt1.cif", "Co-Komplex", [["molecule", "Molekül"], ["cell", "Zelle"], ["coordination", "Koordination"]]],
     ["Cu.cif", "Kupfer"], ["H2O.cif", "Eis"],
     ["NaCl.cif", "Natriumchlorid", [["cell", "Zelle"], ["coordination", "Na⁺-Umgebung"]]],
-    ["S8.cif", "S₈ · Schwefel"], ["YBa2Cu3O7-x_tetragonal.cif", "YBa₂Cu₃O₇₋ₓ · CIF"], ["ZnS.cif", "ZnS · Zinkblende"]
+    ["S8.cif", "S₈ · Schwefel"], ["YBa2Cu3O7-x_tetragonal.cif", "YBa₂Cu₃O₇₋ₓ · CIF"],
+    ["ZnS.cif", "ZnS · Zinkblende", [["cell", "Zelle"], ["coordination", "Zn-Umgebung"]]]
   ];
   const config = {id: "structure-room", kind: "structure-room", title: "Strukturraum · CIF-Bibliothek",
     spawn: {x: 0, z: 3.8}, modelSize: 0.85};

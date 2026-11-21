@@ -193,11 +193,21 @@
         roomId: "vorlesung-7",
         title: "Zinkblende",
         plaqueText: "Zink\u00ADblende",
-        model: "assets/models/ZnS.glb",
+        model: "assets/structures/ZnS.cif",
+        cifMode: "cell",
+        variantAlignment: "individual",
+        variants: [
+          {id: "zns-cell", title: "ZnS – Elementarzelle", model: "assets/structures/ZnS.cif", cifMode: "cell"},
+          {id: "zns-coordination", title: "ZnS – Zn-Koordinationsumgebung", model: "assets/structures/ZnS.cif", cifMode: "coordination"}
+        ],
         info:
           "Vorschau für Vorlesung 7.\n\n" +
-          "Zinkblende: ZnS mit tetraedrischer " +
-          "Koordination beider Ionensorten."
+          "Zinkblende: Zn und S haben je vier nächste Gegenionen. " +
+          "Die Stäbe zeigen diese Zn–S-Kontakte, kein einzelnes Molekül.\n\n" +
+          "Zelle: acht Positionen (vier Zn, vier S); Kontakte sind an den Zellgrenzen geteilt. " +
+          "Die CIF führt alle Positionen explizit in P 1 auf.\n\n" +
+          "Koordination: ein Zn mit vier S-Nachbarn auch aus Nachbarzellen. " +
+          "Im Style Polyhedral bilden die vier S-Positionen ein Tetraeder."
       },
       {
         roomId: "vorlesung-8",
