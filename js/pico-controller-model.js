@@ -217,9 +217,12 @@
     schema: {hand: {default: "right"}},
     init: function () {
       this.built = build(this.data.hand);
+      this.pointingHand = F.AvatarModels.hand(this.data.hand);
       // Eigener Object3D-Schlüssel: hand-controls darf seinen Tracking-/Meshslot
       // weiterhin verwalten. Die Grip-Pose setzt nur diese Visual-Untergruppe.
       this.el.setObject3D("pico-controller", this.built.group);
+      this.el.setObject3D("fkc-pointing-hand", this.pointingHand.group);
+      this.pointingHand.group.visible = false;
       this.built.group.visible = false;
       this.position = new T.Vector3();
       this.quaternion = new T.Quaternion();
@@ -235,6 +238,7 @@
       this.built.group.visible = false;
       for (const [object, visible] of this.hidden) object.visible = visible;
       this.hidden.clear();
+      this.pointingHand.group.visible = false;
     },
     tick: function () {
       const scene = this.el.sceneEl;
@@ -246,7 +250,7 @@
       const rig = F.getRig();
       if (!source || !source.gripSpace || !frame || !reference || !rig) { this.restore(); return; }
       const pose = frame.getPose(source.gripSpace, reference);
-      if (!pose) { this.built.group.visible = false; return; }
+      if (!pose) { this.built.group.visible = this.pointingHand.group.visible = false; return; }
       // Das frühere Handmesh verstecken, ohne Laser/Grabber/Tracking zu ändern.
       const handMesh = this.el.getObject3D("mesh");
       if (handMesh) {
@@ -264,7 +268,14 @@
       this.quaternion.premultiply(this.parentQuaternion.invert());
       this.built.group.position.copy(this.position);
       this.built.group.quaternion.copy(this.quaternion);
-      this.built.group.visible = true;
+      const showHands = F.AvatarModels.showsHands();
+      this.built.group.visible = !showHands;
+      this.pointingHand.group.visible = showHands;
+      if (showHands) {
+        this.pointingHand.group.position.copy(this.position);
+        this.pointingHand.group.quaternion.copy(this.quaternion);
+        return;
+      }
       const texts = controlLabels(this.data.hand, models.help, models.tutorialStep,
         F.HandMenu.laserHand(), F.Draw && F.Draw.mode === "paint");
       this.built.highlight([...models.highlights[this.data.hand], ...Object.keys(texts)]);
@@ -274,6 +285,8 @@
       this.restore();
       this.el.sceneEl.removeEventListener("exit-vr", this.exit);
       this.el.removeObject3D("pico-controller");
+      this.el.removeObject3D("fkc-pointing-hand");
+      this.pointingHand.dispose();
       this.built.dispose();
     }
   });

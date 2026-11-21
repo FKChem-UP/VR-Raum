@@ -1396,6 +1396,11 @@
        * ALLGEMEINE EINSTELLUNGEN
        */
       if (this.page === "settings") {
+        button(F.Settings.showPointingHands ? "Anzeige: Zeigehände (mit Controllern)" : "Anzeige: Pico-Controller",
+          () => {
+            F.Settings.showPointingHands = !F.Settings.showPointingHands;
+            this.render();
+          }, "#d2e9ec");
                 button(
           "Laser und Zeichnen",
           () => this.navigate("laser-drawing"),

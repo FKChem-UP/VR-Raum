@@ -40,7 +40,8 @@ function createServer(origin) {
         return reply(res, 200, {ok: true});
       }
       if (typeof data.room !== "string" || !/^(welcome|vorlesung-[1-8]|team-[ab])$/.test(data.room) ||
-          !pose(data.head) || ![data.left, data.right].every(p => p === null || pose(p))) {
+          !pose(data.head) || ![data.left, data.right].every(p => p === null || pose(p)) ||
+          (data.hands !== undefined && typeof data.hands !== "boolean")) {
         return reply(res, 400, {error: "Ungültige Raum- oder Positionsdaten"});
       }
       if (!prior) {
@@ -48,9 +49,9 @@ function createServer(origin) {
         token = randomUUID();
       } else if (now - prior.time < 60) return reply(res, 429, {error: "Zu viele Aktualisierungen"});
       peers.set(token, {id: prior?.id || randomUUID(), room: data.room, time: now,
-        head: data.head, left: data.left, right: data.right});
+        head: data.head, left: data.left, right: data.right, hands: data.hands === true});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
-        .map(([, {id, head, left, right}]) => ({id, head, left, right}));
+        .map(([, {id, head, left, right, hands}]) => ({id, head, left, right, hands}));
       reply(res, 200, {token, peers: nearby});
     } catch {
       if (!res.destroyed) reply(res, 400, {error: "Ungültige Nachricht"});
