@@ -1,6 +1,18 @@
 "use strict";
 
 (function (F) {
+  function withContactDepth(base, depth) {
+    const {cell, bonds: periodic, origin} = base.contactExpansion;
+    const {atoms, bonds} = F.StructureCell.expandContacts(cell, periodic, base.atoms, depth, origin);
+    const bondSegments = base.mode === "cell" ? bonds.flatMap(bond => {
+      const start = atoms[bond.a].positionAngstrom, end = atoms[bond.b].positionAngstrom;
+      const middle = start.map((value, axis) => (value + end[axis]) / 2);
+      return [[start, middle], [middle, end]].map(([startAngstrom, endAngstrom], half) => ({
+        ...bond, id: `${bond.id}-${half}`, bondId: bond.id, half, startAngstrom, endAngstrom
+      }));
+    }) : [];
+    return {...base, atoms, bonds, bondSegments, contactDepth: depth};
+  }
   // Spezialansichten für die vollständig ausgeschriebene kubische Zinkblende-CIF.
   function createStructure(source, mode) {
     const fail = message => { throw new Error("ZnS-CIF: " + message); };
@@ -41,25 +53,12 @@
 
     const base = {...cell, kind: "zns", name: "ZnS – Zinkblende", coordinateUnit: "angstrom", mode};
     if (mode === "cell") return {...base, bonds};
-    if (mode === "zns-sites") return base;
+    const expansion = (atoms, origin) => ({...base, atoms, contactExpansion: {cell, bonds, origin}, contactDepth: 0});
+    if (mode === "zns-sites") return expansion(atoms.map((atom, siteIndex) => ({...atom, siteIndex, cellShift: [0, 0, 0]})));
 
     const {imageId, closedImages} = F.StructureCell;
     if (mode === "zns-closed-cell") {
-      const images = closedImages(cell);
-      const indices = new Map(images.map((atom, index) => [atom.id, index]));
-      const visibleBonds = images.flatMap((atom, a) => bonds.filter(bond => bond.a === atom.siteIndex).flatMap(bond => {
-        const shift = atom.cellShift.map((value, axis) => value + bond.cellShift[axis]);
-        const b = indices.get(imageId(atoms[bond.b], shift));
-        return b === undefined ? [] : [{...bond, id: `${images[a].id}/${images[b].id}`, a, b}];
-      }));
-      const bondSegments = visibleBonds.flatMap(bond => {
-        const start = images[bond.a].positionAngstrom, end = images[bond.b].positionAngstrom;
-        const middle = start.map((value, axis) => (value + end[axis]) / 2);
-        return [[start, middle], [middle, end]].map(([startAngstrom, endAngstrom], half) => ({
-          ...bond, id: `${bond.id}-${half}`, bondId: bond.id, half, startAngstrom, endAngstrom
-        }));
-      });
-      return {...base, mode: "cell", atoms: images, bonds: visibleBonds, bondSegments};
+      return withContactDepth({...expansion(closedImages(cell)), mode: "cell"}, 0);
     }
 
     const anion = mode === "zns-s";
@@ -70,14 +69,17 @@
     const cartesian = F.CIFStructure.cartesian;
     const neighbors = shell.map(bond => {
       const atom = atoms[bond.b];
-      return {...atom, id: imageId(atom, bond.cellShift), cellShift: bond.cellShift,
+      return {...atom, id: imageId(atom, bond.cellShift), siteIndex: bond.b, cellShift: bond.cellShift,
         fractional: atom.fractional.map((value, axis) => value + bond.cellShift[axis]),
         positionAngstrom: cartesian(bond.deltaFractional, cell.cellMatrix)};
     });
-    return {...base, mode: "coordination", atoms: [{...atoms[center], positionAngstrom: [0, 0, 0]}, ...neighbors],
+    const seeds = [{...atoms[center], siteIndex: center, cellShift: [0, 0, 0], positionAngstrom: [0, 0, 0]}, ...neighbors];
+    const view = mode === "coordination" ? {...base, atoms: seeds} :
+      expansion(seeds.map((atom, index) => ({...atom, modelNumber: index + 1})), atoms[center].fractional);
+    return {...view, mode: "coordination",
       bonds: shell.map((bond, index) => ({...bond, a: 0, b: index + 1})),
       polyhedra: [{center: 0, neighbors: [1, 2, 3, 4]}]};
   }
 
-  F.ZnSStructure = {createStructure};
+  F.ZnSStructure = {createStructure, withContactDepth};
 })(window.FKCVR);

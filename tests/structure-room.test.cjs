@@ -49,6 +49,35 @@ for (const variant of [...zns.variants, ...znsChoices]) {
   const distance = 5.45027 * Math.sqrt(3) / 4;
   assert.equal(model.kind, "zns");
   const centerElement = variant.cifMode === "zns-s" ? "S" : "Zn";
+  if (zns.variants.includes(variant)) {
+    assert.equal(model.contactDepth, 0);
+    let previous = model;
+    for (let depth = 1; depth <= F.CIF.maxContactDepth; depth++) {
+      const expanded = F.ZnSStructure.withContactDepth(model, depth);
+      assert.equal(expanded.contactDepth, depth);
+      assert.ok(expanded.atoms.length > previous.atoms.length);
+      assert.ok(expanded.atoms.length <= 256);
+      assert.equal(new Set(expanded.atoms.map(atom => atom.id)).size, expanded.atoms.length);
+      assert.equal(new Set(expanded.bonds.map(bond => bond.id)).size, expanded.bonds.length);
+      previous.atoms.forEach((atom, index) => assert.deepEqual(expanded.atoms[index], atom));
+      for (const bond of expanded.bonds) {
+        const a = expanded.atoms[bond.a], b = expanded.atoms[bond.b];
+        assert.notEqual(a.element, b.element);
+        close(Math.hypot(...b.positionAngstrom.map((value, i) => value - a.positionAngstrom[i])), distance);
+      }
+      expanded.atoms.slice(previous.atoms.length).forEach((_, index) => {
+        const next = index + previous.atoms.length;
+        assert.ok(expanded.bonds.some(bond => bond.b === next && bond.a < previous.atoms.length));
+      });
+      if (depth === 1 && model.mode === "coordination") {
+        assert.equal(expanded.atoms.length, 17);
+        assert.equal(expanded.bonds.length, 16);
+        assert.ok(expanded.atoms.slice(5).every(atom => atom.element === centerElement));
+      }
+      if (model.mode === "cell") assert.equal(expanded.bondSegments.length, expanded.bonds.length * 2);
+      previous = expanded;
+    }
+  } else assert.equal(model.contactExpansion, undefined, "Tablet bleibt unverändert");
   for (const bond of model.bonds) {
     assert.equal(model.atoms[bond.a].element, centerElement);
     assert.equal(model.atoms[bond.b].element, centerElement === "Zn" ? "S" : "Zn");
@@ -105,4 +134,4 @@ const tablet = components["fkc-structure-tablet"];
 let clicks = 0;
 tablet.click.call({buttons: [{x: 36, y: 105, w: 402, action() { clicks++; }}]}, {x: 100 / 896, y: 1 - 130 / 730});
 assert.equal(clicks, 1);
-console.log("Strukturraum und ZnS: Tablet-Regression, CIF-Plätze, geschlossene Zelle und beide Tetraeder geprüft.");
+console.log("Strukturraum und ZnS: Tablet-Regression, CIF-Plätze, geschlossene Zelle, beide Tetraeder und je drei Kontaktschalen geprüft.");

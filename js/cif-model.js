@@ -752,6 +752,40 @@
 
   F.CIF = {
     createStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements, hydrogenContactDashes,
+    maxContactDepth: 3,
+    setContactDepth(root, depth) {
+      const visual = root?.querySelector(".model-visual");
+      const component = visual?.components["fkc-cif-model"];
+      const current = visual?.fkcStructure;
+      if (!component?.built || !current?.contactExpansion || root.fkcPendingVisual ||
+          !Number.isInteger(depth) || depth < 0 || depth > this.maxContactDepth || current.contactDepth === depth) return false;
+      const base = component.contactBase || current;
+      let structure, built;
+      try {
+        structure = depth === 0 ? base : F.ZnSStructure.withContactDepth(base, depth);
+        built = buildMesh(structure);
+      } catch (error) {
+        F.setStatus(error.message);
+        return false;
+      }
+      const previous = component.built;
+      for (const key of ["fkcBondColorMode", "fkcBondColor", "fkcBondThickness", "fkcHideHydrogen", "fkcAtomScale"]) {
+        built.group.userData[key] = previous.group.userData[key];
+      }
+      applyStyle(built.group, previous.group.userData.fkcStyle || "ball-stick");
+      const scene = F.getScene();
+      scene?.components["fkc-atom-labels"]?.clear();
+      scene?.components["fkc-measurements"]?.reset(root);
+      component.contactBase = base;
+      component.built = built;
+      visual.fkcStructure = structure;
+      // Kein model-loaded: Der Koordinatenrahmen und Griffbereich der Basis bleiben stehen.
+      visual.setObject3D("mesh", built.group);
+      previous.dispose();
+      F.invalidateHits();
+      F.setStatus(`Kontaktschalen: ${depth} · ${structure.atoms.length} sichtbare Positionen`);
+      return true;
+    },
     setHydrogenContacts(root, enabled) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
@@ -919,7 +953,7 @@
       root.fkcStyle = styleId;
       // Anzeigegröße/Griffbereich an geänderte Atomradien anpassen.
       const normalize = visual.components["fkc-normalize"];
-      if (normalize) {
+      if (normalize && !visual.fkcStructure.contactDepth) {
         // Umgebung darf die Basis beim Stylewechsel nicht unerwartet verkleinern.
         const environment = mesh.userData.fkcEnvironment;
         const records = environment ? [...environment.records.values()] : [];
@@ -1161,6 +1195,7 @@
       }
 
       this.el.fkcStructure = null;
+      this.contactBase = null;
 
       if (!this.data.src) return;
 

@@ -56,5 +56,41 @@
     }).map((atom, index) => ({...atom, modelNumber: index + 1}));
   }
 
-  F.StructureCell = {read, imageId, closedImages};
+  // Strukturregeln liefern die Kanten; die Suche kennt keine Elementsymbole.
+  function expandContacts(cell, contacts, seeds, depth, origin = [0, 0, 0]) {
+    const adjacency = cell.atoms.map(() => []);
+    for (const bond of contacts) {
+      adjacency[bond.a].push({site: bond.b, shift: bond.cellShift, bond});
+      adjacency[bond.b].push({site: bond.a, shift: bond.cellShift.map(value => -value), bond});
+    }
+    const atoms = seeds.slice();
+    const indices = new Map(atoms.map((atom, index) => [imageId(cell.atoms[atom.siteIndex], atom.cellShift), index]));
+    let first = 0;
+    for (let step = 0; step < depth; step++) {
+      const end = atoms.length;
+      for (; first < end; first++) {
+        const current = atoms[first];
+        for (const edge of adjacency[current.siteIndex]) {
+          const base = cell.atoms[edge.site];
+          const cellShift = current.cellShift.map((value, axis) => value + edge.shift[axis]);
+          const id = imageId(base, cellShift);
+          if (indices.has(id)) continue;
+          if (atoms.length >= 256) throw new Error("Zu viele Positionen für die Kontakterweiterung.");
+          const fractional = base.fractional.map((value, axis) => value + cellShift[axis]);
+          const positionAngstrom = F.CIFStructure.cartesian(fractional.map((value, axis) => value - origin[axis]), cell.cellMatrix);
+          indices.set(id, atoms.length);
+          atoms.push({...base, id, siteIndex: edge.site, cellShift, fractional, positionAngstrom, modelNumber: atoms.length + 1});
+        }
+      }
+    }
+    const bonds = atoms.flatMap((atom, a) => adjacency[atom.siteIndex].flatMap(edge => {
+      const shift = atom.cellShift.map((value, axis) => value + edge.shift[axis]);
+      const b = indices.get(imageId(cell.atoms[edge.site], shift));
+      return b === undefined || b <= a ? [] : [{id: `${atom.id}/${atoms[b].id}`, a, b,
+        distanceAngstrom: edge.bond.distanceAngstrom}];
+    }));
+    return {atoms, bonds};
+  }
+
+  F.StructureCell = {read, imageId, closedImages, expandContacts};
 })(window.FKCVR);

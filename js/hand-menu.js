@@ -267,7 +267,7 @@
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
         cue, pulse,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
-        structure && structure.mode, model.fkcStyle, F.Measure && F.Measure.enabled,
+        structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
@@ -521,7 +521,7 @@
         button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
-        if (structure) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
+        if (structure && !structure.contactExpansion) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
           () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen), false, "hide-hydrogen");
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
@@ -542,6 +542,13 @@
           button("Alle Messungen zurücksetzen", () => this.el.components["fkc-measurements"].reset());
         }
         button("Modell zurücksetzen", () => F.resetTarget(model));
+        if (structure?.contactExpansion) {
+          const depth = structure.contactDepth;
+          text(`Kontaktschalen · ${depth} von ${F.CIF.maxContactDepth} zusätzlich`);
+          row([{label: "− Weniger", change: -1}, {label: "+ Mehr", change: 1}].map(({label, change}) => ({
+            label, kind: "plain", action: () => F.CIF.setContactDepth(model, depth + change)
+          })));
+        }
         if (structure && structure.environmentCell) {
           const state = F.CIF.environmentState(model);
           text("Umgebung (Å) · " + state.selected.size + " übernommen");

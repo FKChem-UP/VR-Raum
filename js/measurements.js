@@ -143,15 +143,18 @@
           {root: record.root, atom: record.points[i]}));
       });
     },
-    reset: function () {
+    reset: function (root) {
       const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
+      const retained = [];
       for (const record of this.saved || []) {
+        if (root && record.root !== root) { retained.push(record); continue; }
         Object.assign(this, record);
         this.disposeDisplay();
       }
       Object.assign(this, active);
-      this.saved = [];
-      this.clearSelection();
+      this.saved = retained;
+      if (!root || this.root === root) this.clearSelection();
+      else this.syncLabels();
     },
     archive: function () {
       if (this.points.length !== counts[this.measurementMode]) return;
