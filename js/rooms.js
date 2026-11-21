@@ -194,20 +194,23 @@
         title: "Zinkblende",
         plaqueText: "Zink\u00ADblende",
         model: "assets/structures/ZnS.cif",
-        cifMode: "cell",
+        cifMode: "zns-closed-cell",
         variantAlignment: "individual",
         variants: [
-          {id: "zns-cell", title: "ZnS – Elementarzelle", model: "assets/structures/ZnS.cif", cifMode: "cell"},
-          {id: "zns-coordination", title: "ZnS – Zn-Koordinationsumgebung", model: "assets/structures/ZnS.cif", cifMode: "coordination"}
+          {id: "zns-cell", title: "ZnS – Elementarzelle", model: "assets/structures/ZnS.cif", cifMode: "zns-closed-cell"},
+          {id: "zns-sites", title: "ZnS – CIF-Ausgangspositionen", model: "assets/structures/ZnS.cif", cifMode: "zns-sites"},
+          {id: "zns-coordination", title: "ZnS – Zn-Koordination", model: "assets/structures/ZnS.cif", cifMode: "zns-zn"},
+          {id: "zns-anion", title: "ZnS – S-Koordination", model: "assets/structures/ZnS.cif", cifMode: "zns-s"}
         ],
         info:
           "Vorschau für Vorlesung 7.\n\n" +
           "Zinkblende: Zn und S haben je vier nächste Gegenionen. " +
           "Die Stäbe zeigen diese Zn–S-Kontakte, kein einzelnes Molekül.\n\n" +
-          "Zelle: acht Positionen (vier Zn, vier S); Kontakte sind an den Zellgrenzen geteilt. " +
-          "Die CIF führt alle Positionen explizit in P 1 auf.\n\n" +
-          "Koordination: ein Zn mit vier S-Nachbarn auch aus Nachbarzellen. " +
-          "Im Style Polyhedral bilden die vier S-Positionen ein Tetraeder."
+          "Elementarzelle: 18 sichtbare Kugeln, davon Zn an Ecken und auf Flächen. " +
+          "Gewichtet gehören vier Zn und vier S zur Zelle.\n\n" +
+          "CIF-Ausgangspositionen: acht explizite Plätze aus P 1, ohne Randabbilder.\n\n" +
+          "Zn- und S-Koordination: je vier Gegenionen, auch aus Nachbarzellen. " +
+          "Der Style Polyhedral zeigt das jeweilige Tetraeder."
       },
       {
         roomId: "vorlesung-8",

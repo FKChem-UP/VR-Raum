@@ -494,8 +494,9 @@
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
-          label: variant.cifMode === "coordination" ? "Koordination" : variant.cifMode === "cell" ? "Zelle" :
-            /\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül",
+          label: ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
+            "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle"})[variant.cifMode] ||
+            (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
           kind: "variant", cueId: "variant:" + variant.id, selected: variant.id === model.fkcVariantId, action: () => {
             if (!model.fkcPendingVisual) F.switchVariant(model, variant.id);
           }
@@ -582,7 +583,9 @@
         y += 48;
         // Nur Kurzinfo auf derselben Fläche; ausführlicher bestehender Modelltext
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
-        if (structure) text(structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
+        if (structure) text(structure.atoms[0]?.cellWeight !== undefined
+          ? `${structure.atoms.length} sichtbar · ${structure.cellAtomCount} pro Zelle`
+          : structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
       }
       const modeIndex = this.buttons.length;
       const modePressed = this.pressedIndex === modeIndex;

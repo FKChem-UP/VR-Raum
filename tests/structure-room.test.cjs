@@ -39,20 +39,42 @@ for (const entry of F.StructureRoom.catalog) {
 const zns = F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "vorlesung-7");
 const znsChoices = F.StructureRoom.variants(F.StructureRoom.catalog.find(entry => entry[0] === "ZnS.cif"));
 assert.equal(zns.model, znsChoices[0].model);
-assert.equal(zns.cifMode, "cell");
-assert.deepEqual(zns.variants.map(variant => variant.cifMode), znsChoices.map(variant => variant.cifMode));
-for (const variant of zns.variants) {
+assert.equal(zns.cifMode, "zns-closed-cell");
+assert.deepEqual(Array.from(znsChoices, variant => variant.cifMode), ["cell", "coordination"]);
+assert.deepEqual(Array.from(zns.variants, variant => variant.cifMode), ["zns-closed-cell", "zns-sites", "zns-zn", "zns-s"]);
+for (const variant of [...zns.variants, ...znsChoices]) {
   const source = fs.readFileSync(path.join(root, variant.model), "utf8");
   const model = F.CIF.createStructure(source, variant.cifMode);
   const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
   const distance = 5.45027 * Math.sqrt(3) / 4;
   assert.equal(model.kind, "zns");
+  const centerElement = variant.cifMode === "zns-s" ? "S" : "Zn";
   for (const bond of model.bonds) {
-    assert.equal(model.atoms[bond.a].element, "Zn");
-    assert.equal(model.atoms[bond.b].element, "S");
+    assert.equal(model.atoms[bond.a].element, centerElement);
+    assert.equal(model.atoms[bond.b].element, centerElement === "Zn" ? "S" : "Zn");
     close(bond.distanceAngstrom, distance);
   }
-  if (variant.cifMode === "cell") {
+  if (variant.cifMode === "zns-sites") {
+    assert.equal(model.atoms.length, 8);
+    assert.equal(model.bonds.length, 0);
+    assert.deepEqual(Array.from(model.atoms, atom => atom.cifLabel), ["Zn0", "Zn1", "Zn2", "Zn3", "S4", "S5", "S6", "S7"]);
+  } else if (variant.cifMode === "zns-closed-cell") {
+    assert.equal(model.atoms.length, 18);
+    assert.equal(new Set(model.atoms.map(atom => atom.id)).size, 18);
+    assert.equal(model.cellAtomCount, 8);
+    for (const element of ["Zn", "S"]) {
+      close(model.atoms.filter(atom => atom.element === element).reduce((sum, atom) => sum + atom.cellWeight, 0), 4);
+    }
+    for (const [weight, count] of [[1 / 8, 8], [1 / 2, 6], [1, 4]]) {
+      assert.equal(model.atoms.filter(atom => atom.cellWeight === weight).length, count);
+    }
+    assert.ok(model.atoms.every(atom => atom.fractional.every(value => value >= 0 && value <= 1)));
+    assert.equal(model.bonds.length, 16);
+    assert.equal(model.bondSegments.length, 32);
+    for (const bond of model.bonds) {
+      close(Math.hypot(...model.atoms[bond.b].positionAngstrom.map((value, i) => value - model.atoms[bond.a].positionAngstrom[i])), distance);
+    }
+  } else if (variant.cifMode === "cell") {
     assert.equal(model.atoms.length, 8);
     assert.equal(model.bonds.length, 16);
     assert.equal(new Set(model.bonds.map(bond => bond.id)).size, 16);
@@ -68,7 +90,8 @@ for (const variant of zns.variants) {
   } else {
     assert.equal(model.atoms.length, 5);
     assert.equal(model.bonds.length, 4);
-    assert.ok(model.atoms.slice(1).some(atom => atom.cellShift.some(Boolean)));
+    assert.equal(model.atoms[0].element, centerElement);
+    if (centerElement === "Zn") assert.ok(model.atoms.slice(1).some(atom => atom.cellShift.some(Boolean)));
     const points = model.polyhedra[0].neighbors.map(index => model.atoms[index].positionAngstrom);
     assert.equal(F.CIF.polyhedronTriangles(points).length, 4);
     assert.ok(F.CIF.availableStyles(model).some(style => style.id === "polyhedral"));
@@ -82,4 +105,4 @@ const tablet = components["fkc-structure-tablet"];
 let clicks = 0;
 tablet.click.call({buttons: [{x: 36, y: 105, w: 402, action() { clicks++; }}]}, {x: 100 / 896, y: 1 - 130 / 730});
 assert.equal(clicks, 1);
-console.log("Strukturraum: acht CIFs, Tablet-Treffer und periodische ZnS-Zelle samt ZnS₄-Tetraeder geprüft.");
+console.log("Strukturraum und ZnS: Tablet-Regression, CIF-Plätze, geschlossene Zelle und beide Tetraeder geprüft.");

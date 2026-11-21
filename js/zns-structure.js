@@ -4,14 +4,16 @@
   // Spezialansichten für die vollständig ausgeschriebene kubische Zinkblende-CIF.
   function createStructure(source, mode) {
     const fail = message => { throw new Error("ZnS-CIF: " + message); };
-    if (!["cell", "coordination"].includes(mode)) fail("Zelle oder Koordination erwartet.");
+    if (!["cell", "coordination", "zns-sites", "zns-closed-cell", "zns-zn", "zns-s"].includes(mode)) {
+      fail("Unbekannte Ansicht.");
+    }
     const cell = F.StructureCell.read(source);
     const {atoms, cellLengthsAngstrom: lengths, cellAnglesDegrees: angles} = cell;
     const edge = lengths[0];
     const eps = 1e-6;
     if (!(edge > 0) || lengths.some(value => Math.abs(value - edge) > eps) ||
         angles.some(value => Math.abs(value - 90) > eps)) fail("Kubische Zelle erwartet.");
-    if (atoms.length !== 8 || new Set(atoms.map(atom => atom.cifLabel)).size !== 8 ||
+    if (cell.spaceGroup.number !== "1" || atoms.length !== 8 || new Set(atoms.map(atom => atom.cifLabel)).size !== 8 ||
         atoms.filter(atom => atom.element === "Zn").length !== 4 ||
         atoms.filter(atom => atom.element === "S").length !== 4 ||
         atoms.some(atom => atom.occupancy !== 1)) fail("Vier vollbesetzte Zn- und vier S-Positionen erwartet.");
@@ -39,17 +41,40 @@
 
     const base = {...cell, kind: "zns", name: "ZnS – Zinkblende", coordinateUnit: "angstrom", mode};
     if (mode === "cell") return {...base, bonds};
+    if (mode === "zns-sites") return base;
 
-    const center = atoms.findIndex(atom => atom.element === "Zn");
-    const shell = bonds.filter(bond => bond.a === center);
+    const {imageId, closedImages} = F.StructureCell;
+    if (mode === "zns-closed-cell") {
+      const images = closedImages(cell);
+      const indices = new Map(images.map((atom, index) => [atom.id, index]));
+      const visibleBonds = images.flatMap((atom, a) => bonds.filter(bond => bond.a === atom.siteIndex).flatMap(bond => {
+        const shift = atom.cellShift.map((value, axis) => value + bond.cellShift[axis]);
+        const b = indices.get(imageId(atoms[bond.b], shift));
+        return b === undefined ? [] : [{...bond, id: `${images[a].id}/${images[b].id}`, a, b}];
+      }));
+      const bondSegments = visibleBonds.flatMap(bond => {
+        const start = images[bond.a].positionAngstrom, end = images[bond.b].positionAngstrom;
+        const middle = start.map((value, axis) => (value + end[axis]) / 2);
+        return [[start, middle], [middle, end]].map(([startAngstrom, endAngstrom], half) => ({
+          ...bond, id: `${bond.id}-${half}`, bondId: bond.id, half, startAngstrom, endAngstrom
+        }));
+      });
+      return {...base, mode: "cell", atoms: images, bonds: visibleBonds, bondSegments};
+    }
+
+    const anion = mode === "zns-s";
+    const center = atoms.findIndex(atom => atom.element === (anion ? "S" : "Zn"));
+    const shell = anion ? bonds.filter(bond => bond.b === center).map(bond => ({...bond, a: bond.b, b: bond.a,
+      cellShift: bond.cellShift.map(value => -value), deltaFractional: bond.deltaFractional.map(value => -value)})) :
+      bonds.filter(bond => bond.a === center);
     const cartesian = F.CIFStructure.cartesian;
     const neighbors = shell.map(bond => {
       const atom = atoms[bond.b];
-      return {...atom, id: `${atom.id}:${bond.cellShift.join(",")}`, cellShift: bond.cellShift,
+      return {...atom, id: imageId(atom, bond.cellShift), cellShift: bond.cellShift,
         fractional: atom.fractional.map((value, axis) => value + bond.cellShift[axis]),
         positionAngstrom: cartesian(bond.deltaFractional, cell.cellMatrix)};
     });
-    return {...base, atoms: [{...atoms[center], positionAngstrom: [0, 0, 0]}, ...neighbors],
+    return {...base, mode: "coordination", atoms: [{...atoms[center], positionAngstrom: [0, 0, 0]}, ...neighbors],
       bonds: shell.map((bond, index) => ({...bond, a: 0, b: index + 1})),
       polyhedra: [{center: 0, neighbors: [1, 2, 3, 4]}]};
   }

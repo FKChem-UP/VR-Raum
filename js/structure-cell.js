@@ -41,5 +41,20 @@
       spaceGroup: {name: values["_space_group_name_h-m_alt"] || values["_symmetry_space_group_name_h-m"] || "Nicht angegeben",
         number: values._space_group_it_number || values._symmetry_int_tables_number || ""}};
   }
-  F.StructureCell = {read};
+  // Ein periodisches Abbild ist durch Basisplatz und ganzzahligen Versatz eindeutig.
+  const imageId = (atom, shift) => `${atom.id}:${shift.join(",")}`;
+  function closedImages(cell) {
+    return cell.atoms.flatMap((atom, siteIndex) => {
+      const [xs, ys, zs] = atom.fractional.map(value => value === 0 ? [0, 1] : [0]);
+      return xs.flatMap(x => ys.flatMap(y => zs.map(z => {
+        const cellShift = [x, y, z];
+        const fractional = atom.fractional.map((value, axis) => value + cellShift[axis]);
+        return {...atom, id: imageId(atom, cellShift), siteIndex, cellShift, fractional,
+          cellWeight: 1 / (xs.length * ys.length * zs.length),
+          positionAngstrom: F.CIFStructure.cartesian(fractional, cell.cellMatrix)};
+      })));
+    }).map((atom, index) => ({...atom, modelNumber: index + 1}));
+  }
+
+  F.StructureCell = {read, imageId, closedImages};
 })(window.FKCVR);

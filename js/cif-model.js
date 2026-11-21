@@ -609,16 +609,16 @@
 
   function createStructure(source, mode = "molecule") {
     if (mode === "library-cell") return F.StructureCell.read(source);
+    if (/^[ \t]*data_ZnS[ \t\r]*$/im.test(source)) {
+      const structure = F.ZnSStructure.createStructure(source, mode);
+      if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
+      return structure;
+    }
     if (!["molecule", "cell", "coordination"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
     if (/^[ \t]*data_NaCl[ \t\r]*$/im.test(source)) {
       return F.NaClStructure.createStructure(source, mode);
-    }
-    if (/^[ \t]*data_ZnS[ \t\r]*$/im.test(source)) {
-      const structure = F.ZnSStructure.createStructure(source, mode);
-      if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
-      return structure;
     }
     if (/^[ \t]*_atom_site_aniso_label(?:[ \t\r\n]|$)/im.test(source)) {
       if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
