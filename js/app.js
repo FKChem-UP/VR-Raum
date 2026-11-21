@@ -510,6 +510,18 @@
         this.updateRay();
         this.updateHit();
 
+        const grabber = this.el.components["fkc-grabber"];
+        if (F.Draw?.mode === "paint" && !F.Menu?.opened && !F.HandMenu?.opened && !grabber?.grabbed && !grabber?.pulling &&
+            (!this.hit || F.Draw.surfaceHit(this.hit))) {
+          this.drawingAllowed = true;
+          if (this.hit) {
+            this.el.sceneEl.lastSelectedTarget = this.hit.el;
+            if (this.hit.type === "model") F.selectModel(this.hit.el);
+          }
+          this.sampleDrawing();
+          return;
+        }
+
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
@@ -531,7 +543,6 @@
         }
 
         if (!(F.Menu && F.Menu.opened) && this.hit.type === "model") {
-          const grabber = this.el.components["fkc-grabber"];
           if (!(grabber && grabber.grabbed)) {
             F.selectModel(this.hit.el);
             if (!F.Draw || F.Draw.mode !== "paint") {
@@ -543,18 +554,14 @@
         }
         if ((F.Menu && F.Menu.opened) || (F.HandMenu && F.HandMenu.opened)) return;
 
-        const grabber = this.el.components["fkc-grabber"];
-
         if (grabber && grabber.grabbed) return;
 
-        this.drawingAllowed = !!(F.Draw && F.Draw.mode === "paint");
         this.el.sceneEl.lastSelectedTarget = this.hit.el;
 
         if (this.hit.type === "model") {
           F.selectModel(this.hit.el);
         }
 
-        this.sampleDrawing();
       };
 
       tools.tick = function () {
@@ -593,7 +600,7 @@
 
         const grabber = this.el.components["fkc-grabber"];
 
-        if (grabber && grabber.grabbed) {
+        if (grabber && (grabber.grabbed || grabber.pulling)) {
           this.stroke = null;
           this.drawingAllowed = false;
           this.hide();

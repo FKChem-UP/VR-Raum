@@ -25,6 +25,16 @@
     mode: "laser",
     color: "#ffcc33",
     opacity: 0.35,
+    // Raumplakate sind nur im Lasermodus Eintrittsziele. Menüflächen bleiben Aktionen.
+    surfaceHit(hit) {
+      if (this.mode !== "paint" || !hit || !hit.normal) return null;
+      if (hit.type === "model" || hit.type === "surface") return hit;
+      if (hit.type === "action" && hit.el?.dataset.roomId &&
+          !hit.el.dataset.fkcMenu && !hit.el.dataset.fkcHandMenu && !hit.el.dataset.fkcTutorial) {
+        return {...hit, type: "surface"};
+      }
+      return null;
+    },
     setMode(mode) {
       if (!["laser", "paint"].includes(mode)) return;
       this.mode = mode;
@@ -199,7 +209,8 @@
     },
 
     sample: function (stroke, hit, hand) {
-      if (this.mode !== "paint" || !hit.normal) return null;
+      hit = this.surfaceHit(hit);
+      if (!hit) return null;
       const body = hit.type === "model"
         ? hit.el.querySelector(".manip-body")
         : hit.el;

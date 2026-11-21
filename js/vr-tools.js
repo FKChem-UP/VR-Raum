@@ -378,11 +378,6 @@
     tools.sampleDrawing = function () {
       if (!this.drawingAllowed || !F.Draw) return;
 
-      if (!this.hit || this.hit.type === "action") {
-        this.stroke = null;
-        return;
-      }
-
       this.stroke = F.Draw.sample(
         this.stroke,
         this.hit,
