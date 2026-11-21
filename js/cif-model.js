@@ -608,6 +608,7 @@
   }
 
   function createStructure(source, mode = "molecule") {
+    if (mode === "library-cell") return F.StructureCell.read(source);
     if (!["molecule", "cell", "coordination"].includes(mode)) {
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
@@ -653,7 +654,9 @@
     H: {color: "#eeeeee", vdw: 1.20}, C: {color: "#515151", vdw: 1.70},
     N: {color: "#3055ee", vdw: 1.55}, O: {color: "#ee3333", vdw: 1.52},
     Cl: {color: "#35c935", vdw: 1.75},
-    Co: {color: "#ed709b", vdw: 2.00}, Na: {color: "#8359dc", vdw: 2.27}
+    Co: {color: "#ed709b", vdw: 2.00}, Na: {color: "#8359dc", vdw: 2.27},
+    Cu: {color: "#bd6539", vdw: 1.4}, S: {color: "#e4bc24", vdw: 1.8},
+    Y: {color: "#5a9bae", vdw: 2.32}, Ba: {color: "#79a446", vdw: 2.68}, Zn: {color: "#6976b1", vdw: 1.39}
   };
 
   // Konvexe Hülle aus echten Nachbarpositionen; koplanare Flächen nur einmal
@@ -938,6 +941,18 @@
     const cylinder = new T.CylinderGeometry(1, 1, 1, 12);
 
     const atomMaterials = new Map();
+    const partialMaterials = new Map();
+    function partialMaterial(atom, source) {
+      const key = `${atom.element}:${atom.occupancy}`;
+      if (!partialMaterials.has(key)) {
+        const material = source.clone();
+        material.transparent = true;
+        material.opacity = Math.min(0.8, Math.max(0.18, atom.occupancy));
+        material.depthWrite = false;
+        partialMaterials.set(key, material);
+      }
+      return partialMaterials.get(key);
+    }
 
     const bondMaterial = new T.MeshStandardMaterial({
       name: "CIF-Bond",
@@ -959,7 +974,7 @@
           color: elements[atom.element].color, roughness: 0.45, metalness: 0}));
       }
       const atomMaterial = atomMaterials.get(atom.element);
-      const mesh = new T.Mesh(sphere, atomMaterial);
+      const mesh = new T.Mesh(sphere, atom.occupancy < 1 ? partialMaterial(atom, atomMaterial) : atomMaterial);
 
       mesh.name = atom.id;
       mesh.position.fromArray(atom.positionAngstrom);
@@ -1094,6 +1109,7 @@
         sphere.dispose();
         cylinder.dispose();
         atomMaterials.forEach(material => material.dispose());
+        partialMaterials.forEach(material => material.dispose());
         bondMaterial.dispose();
         frameMaterial.dispose();
       }

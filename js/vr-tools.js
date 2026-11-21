@@ -1372,6 +1372,13 @@
           this.close();
           if (F.Tutorial) F.Tutorial.start();
         });
+        if (F.StructureRoom && !F.Tutorial?.active) {
+          const inLibrary = F.app?.currentId === F.StructureRoom.config.id;
+          button(inLibrary ? "Zum Begrüßungsraum" : "Strukturraum öffnen", () => {
+            this.close();
+            F.app.changeRoom(inLibrary ? "welcome" : F.StructureRoom.config.id);
+          });
+        }
 
         y += 20;
 

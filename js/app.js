@@ -525,7 +525,9 @@
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
-          if (this.hit.el.dataset.fkcTutorial === "true") {
+          if (this.hit.el.dataset.fkcStructureTablet === "true") {
+            F.StructureRoom.click(this.hit);
+          } else if (this.hit.el.dataset.fkcTutorial === "true") {
             if (F.Tutorial) F.Tutorial.click(this.hit);
           } else if (this.hit.el.dataset.fkcHandMenu === "true") {
             if (F.HandMenu) F.HandMenu.click(this.hit);
@@ -706,13 +708,14 @@
 
     getConfig: function (id) {
       if (id === "welcome") return F.welcomeRoom;
+      if (id === F.StructureRoom?.config.id) return F.StructureRoom.config;
       return F.rooms.find(room => room.id === id);
     },
 
     bindInterface: function () {
       const select = document.getElementById("room-select");
 
-      F.rooms.forEach(room => {
+      [...F.rooms, F.StructureRoom.config].forEach(room => {
         const option = document.createElement("option");
         option.value = room.id;
         option.textContent = room.title;
@@ -785,7 +788,9 @@
         if (!hit) return;
 
         if (hit.type === "action") {
-          if (hit.el.dataset.fkcMenu === "true") {
+          if (hit.el.dataset.fkcStructureTablet === "true") {
+            F.StructureRoom.click(hit);
+          } else if (hit.el.dataset.fkcMenu === "true") {
             F.Menu.click(hit);
           } else if (
             hit.el.dataset.roomId &&

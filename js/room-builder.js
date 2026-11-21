@@ -2695,6 +2695,7 @@
 
   F.RoomBuilder = {
     build: function (parent, config, rooms) {
+      if (config.kind === "structure-room") return F.StructureRoom.build(parent, makeModel);
       const result = config.kind === "welcome"
         ? buildWelcome(parent, config, rooms)
         : buildMuseum(parent, config);

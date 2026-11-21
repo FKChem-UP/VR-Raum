@@ -190,11 +190,13 @@
 
     sharesModel(root) {
       return !!(this.endpoint && this.self && this.el.is("vr-mode") && !F.Tutorial?.active &&
+        F.app?.currentId !== F.StructureRoom?.config.id &&
         root.id.startsWith(F.app?.currentId + "-model-"));
     },
 
     requestVariant(root, variant) {
       if (!this.endpoint || !this.el.is("vr-mode") || F.Tutorial?.active ||
+          F.app?.currentId === F.StructureRoom?.config.id ||
           !root.id.startsWith(F.app?.currentId + "-model-")) return false;
       if (this.room && this.room !== F.app.currentId) {
         F.Menu.notify("Bitte warten, bis der gemeinsame Raum verbunden ist.");
@@ -239,6 +241,7 @@
     grab(root, grabber, pulling) {
       if (!this.sharesModel(root)) {
         if (!this.endpoint || !this.el.is("vr-mode") || F.Tutorial?.active ||
+            F.app?.currentId === F.StructureRoom?.config.id ||
             !root.id.startsWith(F.app?.currentId + "-model-")) return false;
         F.setStatus("Gemeinsame Modelle noch nicht verbunden. Bitte erneut versuchen.");
         return true;
@@ -430,7 +433,7 @@
       this.displayAnnotations();
       if (!this.endpoint || !this.el.is("vr-mode")) return;
       const room = F.app?.currentId;
-      if (F.Tutorial?.active || !room || F.app.pendingSpawn) {
+      if (F.Tutorial?.active || !room || room === F.StructureRoom?.config.id || F.app.pendingSpawn) {
         if (this.room) this.clearPresence();
         return;
       }
