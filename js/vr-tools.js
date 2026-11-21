@@ -2076,35 +2076,36 @@
     connectAllHands();
     connectNavigation();
 
-    if (config.stations) {
-      config.stations.forEach((station, index) => {
-        const root = document.getElementById(
-          config.id + "-model-" + (index + 1)
-        );
+    const modelConfigs = config.stations || (config.kind === "welcome"
+      ? rooms.map(room => (config.exhibits || []).find(exhibit => exhibit.roomId === room.id)) : []);
+    modelConfigs.forEach((station, index) => {
+      if (!station || (!config.stations && !station.variants)) return;
+      const root = document.getElementById(
+        config.id + "-model-" + (index + 1)
+      );
 
-        if (!root) return;
+      if (!root) return;
 
-        root.fkcInfo = station.info || "";
-        root.fkcModelSize = config.modelSize || 0.5;
-        root.fkcVariantAlignment =
-          station.variantAlignment || "shared";
+      root.fkcInfo = station.info || "";
+      root.fkcModelSize = config.modelSize || 0.5;
+      root.fkcVariantAlignment =
+        station.variantAlignment || "shared";
 
-        const variants = Array.isArray(station.variants)
-          ? station.variants.filter(item => item && item.model)
-          : [];
+      const variants = Array.isArray(station.variants)
+        ? station.variants.filter(item => item && item.model)
+        : [];
 
-        if (variants.length) {
-          root.fkcVariants = variants.map((variant, number) => ({
-            id: variant.id || "variant-" + (number + 1),
-            title: variant.title || "Darstellung " + (number + 1),
-            model: variant.model,
-            cifMode: variant.cifMode || "molecule"
-          }));
+      if (variants.length) {
+        root.fkcVariants = variants.map((variant, number) => ({
+          id: variant.id || "variant-" + (number + 1),
+          title: variant.title || "Darstellung " + (number + 1),
+          model: variant.model,
+          cifMode: variant.cifMode || "molecule"
+        }));
 
-          root.fkcVariantId = root.fkcVariants[0].id;
-        }
-      });
-    }
+        root.fkcVariantId = root.fkcVariants[0].id;
+      }
+    });
 
     /*
      * Bestehende Zuordnung der Bedienungstafel beibehalten.

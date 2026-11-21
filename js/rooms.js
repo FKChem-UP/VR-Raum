@@ -225,10 +225,7 @@
         plaqueText:
           "Cobalt-Komplex aus einer " +
           "Ein\u00ADkristall-Umwandlung",
-        model: "assets/models/Co-Komplex.glb",
-        info:
-          "Vorschau für Team B.\n\n" +
-          "Cobalt-Komplex aus einer Einkristall-Umwandlung."
+        model: "" // Die CIF-Konfiguration wird unten mit Team B geteilt.
       }
     ]
   };
@@ -305,16 +302,15 @@
       {id: "nacl-na", title: "Na⁺ – Koordinationsumgebung", model: nacl, cifMode: "coordination"}
     ]
   });
-  Object.assign(room("team-b").stations[0], {
-    title: "Co-Produkt1 – CIF-Testmodell",
+  const coModel = {
     model: "assets/structures/Co-Produkt1.cif",
     cifMode: "molecule",
     variantAlignment: "individual",
     info: "CIF-Test: zusammenhängende zweikernige Co-Einheit und vollständige trikline Zelle.\n" +
       "Verbindungsansicht: koordinierte Einheit ohne freies Chlorid und Kristallwasser.\n" +
       "Zellansicht enthält alle CIF-Positionen einschließlich dieser Bestandteile.\n" +
-      "Nicht-H-Bindungen aus CIF; H-Bindungen geometrisch über eindeutigen C/N/O-Nachbarn " +
-      "zwischen 0,6 und 1,25 Å ergänzt, keine Wasserstoffbrücken dargestellt.\n" +
+      "Nicht-H-Bindungen aus CIF; Bindungen zu H werden über eindeutige C/N/O-Nachbarn " +
+      "zwischen 0,6 und 1,25 Å ergänzt. Wasserstoffbrücken aus der CIF lassen sich in den Zellansichten einblenden.\n" +
       "Space-Filling-Radien (Å): H 1,20; C 1,70; N 1,55; O 1,52; Cl 1,75; Co 2,00 " +
       "(gewählte Radiuskonvention, für Co keine Ableitung aus der CIF).\n" +
       "Koordinationsumgebung: ein Co mit zwei N-, zwei O- und zwei Cl-Nachbarn.\n" +
@@ -327,7 +323,10 @@
       {id: "co-cell", title: "Co – Elementarzelle", model: "assets/structures/Co-Produkt1.cif", cifMode: "cell"},
       {id: "co-coordination", title: "Co – Koordinationsumgebung", model: "assets/structures/Co-Produkt1.cif", cifMode: "coordination"}
     ]
-  });
+  };
+  Object.assign(room("team-b").stations[0], coModel, {title: "Co-Produkt1 – CIF-Testmodell"});
+  Object.assign(F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "team-b"), coModel,
+    {info: "Vorschau für Team B.\n\n" + coModel.info});
 
   /*
    * ============================================================
