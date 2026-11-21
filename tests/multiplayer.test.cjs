@@ -102,7 +102,10 @@ async function test() {
     for (const key of Object.keys(firstProfile)) assert.equal((await post({...state, profile: {[key]: firstProfile[key]}})).status, 409);
     const profile = {name: "Laborfuchs", form: "slim", color: "#31749b", style: "monocle"};
     const pointing = [1, 1.2, 6, 0, 1.4, 4];
-    const b = await ok({...state, head: [1, 1.6, 6, 0, 0, 0, 1], hands: true, pointing, profile: {...profile, gender: "w", name: "  Laborfuchs\u202e "}});
+    const annotations = [{model: "welcome-model-10", variant: "co-complex", mode: "pin", atoms: ["co-heavy-1"]},
+      {model: "welcome-model-10", variant: "co-complex", mode: "angle", atoms: ["co-heavy-2", "co-heavy-1", "co-heavy-3"]}];
+    const b = await ok({...state, head: [1, 1.6, 6, 0, 0, 0, 1], hands: true, pointing,
+      annotations: [...annotations, {...annotations[0], model: "team-a-model-1"}], profile: {...profile, gender: "w", name: "  Laborfuchs\u202e "}});
     assert.deepEqual(a.peers, []);
     assert.equal(b.peers.length, 1);
     assert.equal(b.peers[0].token, undefined);
@@ -117,9 +120,12 @@ async function test() {
     assert.equal(update.peers[0].head[0], 1);
     assert.equal(update.peers[0].hands, true);
     assert.deepEqual(update.peers[0].pointing, pointing);
-    await ok({...state, token: b.token, pointing: null});
+    assert.deepEqual(update.peers[0].annotations, annotations);
+    await ok({...state, token: b.token, pointing: null, annotations: []});
     await wait(80);
-    assert.equal((await ok({...state, token: a.token})).peers[0].pointing, null);
+    const cleared = (await ok({...state, token: a.token})).peers[0];
+    assert.equal(cleared.pointing, null);
+    assert.deepEqual(cleared.annotations, []);
     assert.deepEqual(update.peers[0].profile, profile);
     assert.deepEqual(FallbackProfile(), {name: "x".repeat(24), color: "", form: "", style: ""});
     await wait(80);

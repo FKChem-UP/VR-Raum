@@ -190,11 +190,29 @@
     },
 
     clearModels() {
+      this.remoteAnnotations = [];
+      this.displayAnnotations();
       if (this.ownedRoot) F.releaseModel(this.ownedRoot);
       this.ownedRoot = null;
       this.self = null;
       this.models.clear();
       this.grips.clear();
+    },
+
+    displayAnnotations() {
+      if (!this.remoteAnnotations?.length && !this.annotationsShown) return;
+      const entries = this.endpoint && !F.Tutorial?.active && this.room === F.app?.currentId
+        ? F.SharedAnnotations.resolve(this.remoteAnnotations || [], this.room, id => document.getElementById(id)) : new Map();
+      const labels = this.el.components?.["fkc-atom-labels"];
+      const measurements = this.el.components?.["fkc-measurements"];
+      const pins = new Map();
+      for (const [key, entry] of entries) if (entry.measurementMode === "pin") {
+        pins.set(entry.meshes[0], entry.root);
+        entries.delete(key);
+      }
+      if (labels) labels.sharedPins = pins;
+      measurements?.updateShared(entries);
+      this.annotationsShown = pins.size > 0 || entries.size > 0;
     },
 
     grab(root, grabber, pulling) {
@@ -356,6 +374,7 @@
         this.token = result.token;
         if (result.profile) this.profile = F.AvatarProfile.normalize(result.profile);
         this.showPeers(result.peers);
+        this.remoteAnnotations = result.peers.flatMap(peer => F.SharedAnnotations.normalize(peer.annotations, data.room));
         this.receiveModels(result);
         this.status.textContent = `Multiplayer verbunden · ${result.peers.length} weitere Personen im Raum.`;
       } catch {
@@ -370,6 +389,7 @@
     },
 
     tick(time) {
+      this.displayAnnotations();
       if (!this.endpoint || !this.el.is("vr-mode")) return;
       const room = F.app?.currentId;
       if (F.Tutorial?.active || !room || F.app.pendingSpawn) {
@@ -402,7 +422,8 @@
       const world = pose => pack(this.position.copy(pose.position).applyMatrix4(rig.matrixWorld),
         this.quaternion.copy(pose.orientation).premultiply(this.rigRotation));
       const data = {room, head: world(viewer.transform), left: null, right: null,
-        hands: F.AvatarModels.showsHands(), pointing: pointing(this.el), modelCommand: this.modelCommand()};
+        hands: F.AvatarModels.showsHands(), pointing: pointing(this.el), modelCommand: this.modelCommand(),
+        annotations: F.SharedAnnotations.collect(this.el, room)};
       for (const hand of ["left", "right"]) {
         const space = F.getSource(this.el, hand)?.gripSpace;
         const pose = space && frame.getPose(space, reference);

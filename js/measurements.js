@@ -29,7 +29,7 @@
   const displayFields = ["geometry", "material", "line", "canvas", "texture", "labelMaterial",
     "label", "haloGeometry", "haloMaterial", "halos", "rodGeometry", "rodMaterial", "rods",
     "guideGeometry", "guideMaterial", "guide", "planeGeometry", "planeMaterial", "planes",
-    "points", "meshes", "root", "visual", "labelWidth", "measurementMode"];
+    "points", "meshes", "root", "visual", "labelWidth", "measurementMode", "resultText"];
   F.Measure = {
     distance, angle, torsion, counts, titles, colors,
     enabled: false,
@@ -62,11 +62,11 @@
       this.saved = [];
       this.createDisplay();
     },
-    createDisplay: function () {
+    createDisplay: function (mode = F.Measure.mode) {
       this.points = [];
       this.meshes = [];
       this.root = null;
-      this.measurementMode = F.Measure.mode;
+      this.measurementMode = mode;
       const color = colors[this.measurementMode];
       this.geometry = new T.BufferGeometry();
       this.geometry.setAttribute("position", new T.Float32BufferAttribute(new Array(12).fill(0), 3));
@@ -138,7 +138,7 @@
       if (!labels) return;
       if (!labels.measureLabels) labels.measureLabels = new Map();
       labels.measureLabels.clear();
-      [...(this.saved || []), this].forEach(record => {
+      [...(this.saved || []), ...(this.sharedDisplays?.values() || []), this].forEach(record => {
         (record.meshes || []).forEach((mesh, i) => labels.measureLabels.set(mesh,
           {root: record.root, atom: record.points[i]}));
       });
@@ -202,12 +202,18 @@
         F.setStatus(titles[F.Measure.mode] + ": " + this.points.length + "/" + required + " Atome gewählt.");
         return;
       }
+      this.renderResult();
+      F.setStatus(titles[F.Measure.mode] + ": " + this.resultText);
+      // Sofort archivieren: Modus-Aus und nächste Messung erhalten dieses Ergebnis.
+      if (this.saved && this.geometry) this.archive();
+    },
+    renderResult: function () {
       let text;
       try {
         const coordinates = this.points.map(point => point.positionAngstrom);
-        const result = F.Measure[F.Measure.mode](...coordinates);
-        text = result.toFixed(F.Measure.mode === "distance" ? 3 : 1) +
-          (F.Measure.mode === "distance" ? " Å" : "°");
+        const result = F.Measure[this.measurementMode](...coordinates);
+        text = result.toFixed(this.measurementMode === "distance" ? 3 : 1) +
+          (this.measurementMode === "distance" ? " Å" : "°");
       } catch (error) { text = "Nicht definiert"; }
       const ctx = this.canvas.getContext("2d");
       ctx.font = "bold 52px Arial";
@@ -223,9 +229,34 @@
       ctx.strokeText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       ctx.fillText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       this.texture.needsUpdate = true;
-      F.setStatus(titles[F.Measure.mode] + ": " + text);
-      // Sofort archivieren: Modus-Aus und nächste Messung erhalten dieses Ergebnis.
-      if (this.saved && this.geometry) this.archive();
+      this.resultText = text;
+    },
+    updateShared: function (entries) {
+      if (!this.sharedDisplays) this.sharedDisplays = new Map();
+      const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
+      const local = this.saved || [];
+      for (const [key, record] of this.sharedDisplays) {
+        const next = entries.get(key);
+        if (next?.visual === record.visual && next.meshes.every((mesh, i) => mesh === record.meshes[i])) continue;
+        Object.assign(this, record);
+        this.disposeDisplay();
+        this.sharedDisplays.delete(key);
+      }
+      for (const [key, entry] of entries) {
+        if (this.sharedDisplays.has(key)) continue;
+        this.createDisplay(entry.measurementMode);
+        Object.assign(this, entry);
+        this.renderResult();
+        this.sharedDisplays.set(key, Object.fromEntries(displayFields.map(field => [field, this[field]])));
+      }
+      for (const record of this.sharedDisplays.values()) {
+        Object.assign(this, record);
+        if (record.meshes.some(mesh => !mesh.visible) || local.some(entry => entry.visual === record.visual && entry.measurementMode === record.measurementMode &&
+            entry.meshes.every((mesh, i) => mesh === record.meshes[i]))) this.hideDisplay();
+        else this.updateDisplay();
+      }
+      Object.assign(this, active);
+      this.syncLabels();
     },
     tick: function () {
       const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
@@ -342,6 +373,7 @@
       this.planeMaterial.dispose();
     },
     remove: function () {
+      this.updateShared(new Map());
       this.reset();
       this.disposeDisplay();
     }

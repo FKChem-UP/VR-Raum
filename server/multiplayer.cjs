@@ -4,6 +4,7 @@ const http = require("node:http");
 const {randomUUID} = require("node:crypto");
 const {normalize, available, choices} = require("../js/avatar-profile.js");
 const {sharedModels} = require("./shared-models.cjs");
+const {normalize: annotations} = require("../js/shared-annotations.js");
 const validRoom = room => typeof room === "string" && /^(welcome|vorlesung-[1-8]|team-[ab])$/.test(room);
 
 function createServer(origin) {
@@ -33,7 +34,7 @@ function createServer(origin) {
     try {
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 2048) { req.destroy(); return; }
+        if (size > 12288) { req.destroy(); return; }
         body += chunk;
       }
       const data = JSON.parse(body);
@@ -75,9 +76,11 @@ function createServer(origin) {
       }
       const self = prior?.id || randomUUID();
       peers.set(token, {id: self, room: data.room, time: now,
-        head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null});
+        head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null,
+        annotations: annotations(data.annotations, data.room)});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
-        .map(([, {id, head, left, right, hands, profile, pointing}]) => ({id, head, left, right, hands, profile, pointing}));
+        .map(([, {id, head, left, right, hands, profile, pointing, annotations}]) =>
+          ({id, head, left, right, hands, profile, pointing, annotations}));
       const models = updateModels(data.room, self, data.modelCommand, peers);
       reply(res, 200, {token, self, profile, peers: nearby, models});
     } catch {

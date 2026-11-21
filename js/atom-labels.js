@@ -132,6 +132,10 @@
 
     updateExtraLabels: function (camera) {
       const wanted = new Map();
+      for (const [mesh, root] of this.sharedPins || []) {
+        const target = atomFromHit({type: "model", el: root, mesh});
+        if (target) wanted.set(mesh, target.atom);
+      }
       // Messlabels sind eigene temporäre Auswahl, unabhängig von normalen Pins
       // und dem Labelmodus; keine Originalmaterialien verändern.
       for (const [mesh, entry] of this.measureLabels) {
