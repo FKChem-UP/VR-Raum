@@ -65,7 +65,8 @@
     })[profile.form] || [0.094, 0.126, 0.091, 0.205, 0.255, 0.035];
     // Position der Gesichtsfront bleibt annähernd am Augenanker.
     p.oval(head, skin, [0, -0.023, depth - 0.056], [faceWidth, faceHeight, depth]);
-    if (profile.form === "broad" || profile.form === "compact") {
+    const jaw = profile.form === "broad" || profile.form === "compact";
+    if (jaw) {
       p.oval(head, skin, [0, -0.079, 0.009], [faceWidth * 0.83, 0.055, 0.070]);
     }
     for (const sign of [-1, 1]) {
@@ -73,7 +74,7 @@
       p.oval(head, dark, [sign * eyes, 0, -0.049], [0.011, 0.012, 0.008]);
     }
     p.oval(head, skin, [0, -0.029, -0.059], [0.018, 0.023, 0.021]);
-    p.oval(head, dark, [0, -0.067, -0.047], [0.023, 0.006, 0.008]);
+    p.oval(head, dark, [0, jaw ? -0.073 : -0.067, jaw ? -0.063 : -0.053], [0.023, 0.006, 0.008]);
     p.oval(body, shirt, [0, -0.155 - torsoHeight, 0.065], [shoulders, torsoHeight, shoulders * 0.53]);
     for (const sign of [-1, 1]) {
       const sleeve = p.oval(body, shirt, [sign * shoulders * 0.81, -0.245, 0.065], [0.075, 0.108, 0.087]);

@@ -618,6 +618,7 @@ window.FKCVR = window.FKCVR || {};
 
     start: function () {
       if (this.grabbed || this.pulling || (F.Menu && F.Menu.opened)) return;
+      const multiplayer = this.el.sceneEl.components["fkc-multiplayer"];
 
       this.el.object3D.getWorldPosition(this.position);
 
@@ -652,12 +653,14 @@ window.FKCVR = window.FKCVR || {};
           if (hit && hit.type === "model" && hit.el.modelReady &&
               !(F.Tutorial && F.Tutorial.active) &&
               hit.el.components["fkc-manipulable"].hands.length === 0) {
+            if (multiplayer?.grab(hit.el, this, true)) return;
             this.pulling = hit.el;
             this.pullTime = 0;
             F.selectModel(hit.el);
           }
         }
       }
+      if (best && multiplayer?.grab(best, this, false)) return;
       if (best && best.components["fkc-manipulable"].start(this.el)) {
         this.grabbed = best;
       }
@@ -694,6 +697,7 @@ window.FKCVR = window.FKCVR || {};
     },
 
     end: function () {
+      this.el?.sceneEl?.components["fkc-multiplayer"]?.grips?.delete(this);
       this.pulling = null;
       if (!this.grabbed) return;
 

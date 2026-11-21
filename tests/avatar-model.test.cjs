@@ -65,6 +65,13 @@ const broad = models.build("two", {form: "broad", style: "cape"});
 assert.ok(broad.head.children[0].scale.values[0] > narrow.head.children[0].scale.values[0] * 1.5);
 assert.ok(broad.body.children[0].scale.values[0] > narrow.body.children[0].scale.values[0] * 1.5);
 assert.notEqual(broad.body.children[0].scale.values[1], narrow.body.children[0].scale.values[1]);
+for (const form of ["broad", "compact"]) {
+  const model = models.build("jaw", {form, style: "none"});
+  const jaw = model.head.children[1];
+  const mouth = model.head.children.at(-1);
+  assert.ok(mouth.position.values[2] < jaw.position.values[2] - jaw.scale.values[2], "Mund liegt vor dem Kiefer");
+  model.dispose();
+}
 narrow.dispose();
 broad.dispose();
 console.log("Avatar: stabiles Aussehen, Körperteile, Zeigehände und Freigabe geprüft.");

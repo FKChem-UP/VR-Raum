@@ -17,6 +17,8 @@
   AFRAME.registerComponent("fkc-multiplayer", {
     init() {
       this.avatars = new Map();
+      this.models = new Map();
+      this.grips = new Map();
       this.position = new T.Vector3();
       this.quaternion = new T.Quaternion();
       this.rigRotation = new T.Quaternion();
@@ -170,6 +172,7 @@
     },
 
     clearPresence() {
+      this.clearModels();
       this.request?.abort();
       this.request = null;
       if (this.endpoint && this.token) {
@@ -179,6 +182,93 @@
       this.token = null;
       this.room = null;
       this.showPeers([]);
+    },
+
+    sharesModel(root) {
+      return !!(this.endpoint && this.self && this.el.is("vr-mode") && !F.Tutorial?.active &&
+        root.id.startsWith(F.app?.currentId + "-model-"));
+    },
+
+    clearModels() {
+      if (this.ownedRoot) F.releaseModel(this.ownedRoot);
+      this.ownedRoot = null;
+      this.self = null;
+      this.models.clear();
+      this.grips.clear();
+    },
+
+    grab(root, grabber, pulling) {
+      if (!this.sharesModel(root)) {
+        if (!this.endpoint || !this.el.is("vr-mode") || F.Tutorial?.active ||
+            !root.id.startsWith(F.app?.currentId + "-model-")) return false;
+        F.setStatus("Gemeinsame Modelle noch nicht verbunden. Bitte erneut versuchen.");
+        return true;
+      }
+      const owner = this.models.get(root.id)?.owner;
+      if ((owner && owner !== this.self) || (this.ownedRoot && this.ownedRoot !== root) ||
+          [...this.grips.values()].some(intent => intent.root !== root)) {
+        F.setStatus("Modell wird bereits gehalten. Loslassen und erneut greifen.");
+        return true;
+      }
+      this.grips.set(grabber, {root, pulling});
+      this.startGrantedGrips();
+      return true;
+    },
+
+    startGrantedGrips() {
+      for (const [grabber, {root, pulling}] of this.grips) {
+        if (!root.isConnected) { this.grips.delete(grabber); continue; }
+        const owner = this.models.get(root.id)?.owner;
+        if (!owner) continue;
+        this.grips.delete(grabber);
+        if (owner !== this.self) {
+          F.setStatus("Modell wird bereits von jemand anderem gehalten.");
+          continue;
+        }
+        this.ownedRoot = root;
+        if (F.Menu?.opened) continue;
+        if (pulling) { grabber.pulling = root; grabber.pullTime = 0; F.selectModel(root); }
+        else if (root.components["fkc-manipulable"].start(grabber.el)) grabber.grabbed = root;
+      }
+    },
+
+    modelCommand() {
+      const pending = this.grips.values().next().value?.root;
+      const root = this.ownedRoot || pending;
+      if (!root?.isConnected) return undefined;
+      const body = root.querySelector(".manip-body").object3D;
+      const moving = this.ownedRoot && (pending || Array.from(this.el.querySelectorAll("[fkc-grabber]"))
+        .some(hand => {
+          const g = hand.components["fkc-grabber"];
+          return g && (g.grabbed === root || g.pulling === root);
+        }));
+      return {model: root.id, action: this.ownedRoot ? (moving ? "move" : "release") : "grab",
+        transform: [...root.object3D.position.toArray(), ...root.object3D.quaternion.toArray(),
+          ...body.quaternion.toArray(), Math.min(10, body.scale.x)]};
+    },
+
+    receiveModels(result) {
+      if (!Array.isArray(result.models) || !result.self) {
+        this.clearModels();
+        return;
+      }
+      this.self = result.self;
+      this.models = new Map(result.models.map(model => [model.model, model]));
+      if (this.ownedRoot && this.models.get(this.ownedRoot.id)?.owner !== this.self) {
+        F.releaseModel(this.ownedRoot);
+        this.ownedRoot = null;
+      }
+      for (const model of result.models) {
+        const root = document.getElementById(model.model);
+        if (!root?.modelReady || !this.sharesModel(root) || (model.owner === this.self && root === this.ownedRoot)) continue;
+        const body = root.querySelector(".manip-body").object3D;
+        root.object3D.position.fromArray(model.transform);
+        root.object3D.quaternion.fromArray(model.transform, 3);
+        body.quaternion.fromArray(model.transform, 7);
+        body.scale.setScalar(model.transform[11]);
+        root.object3D.updateWorldMatrix(true, true);
+      }
+      this.startGrantedGrips();
     },
 
     leave() {
@@ -266,9 +356,11 @@
         this.token = result.token;
         if (result.profile) this.profile = F.AvatarProfile.normalize(result.profile);
         this.showPeers(result.peers);
+        this.receiveModels(result);
         this.status.textContent = `Multiplayer verbunden · ${result.peers.length} weitere Personen im Raum.`;
       } catch {
         if (this.request !== request) return;
+        this.clearModels();
         this.showPeers([]);
         this.status.textContent = "Multiplayer nicht erreichbar. Einzelspiel bleibt möglich.";
       } finally {
@@ -285,6 +377,7 @@
         return;
       }
       if (this.room && this.room !== room) {
+        this.clearModels();
         this.request?.abort();
         this.request = null;
         this.showPeers([]);
@@ -309,7 +402,7 @@
       const world = pose => pack(this.position.copy(pose.position).applyMatrix4(rig.matrixWorld),
         this.quaternion.copy(pose.orientation).premultiply(this.rigRotation));
       const data = {room, head: world(viewer.transform), left: null, right: null,
-        hands: F.AvatarModels.showsHands(), pointing: pointing(this.el)};
+        hands: F.AvatarModels.showsHands(), pointing: pointing(this.el), modelCommand: this.modelCommand()};
       for (const hand of ["left", "right"]) {
         const space = F.getSource(this.el, hand)?.gripSpace;
         const pose = space && frame.getPose(space, reference);

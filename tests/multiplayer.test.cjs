@@ -131,9 +131,34 @@ async function test() {
     await ok({token: moved.token, leave: true});
     await ok({token: b.token, leave: true});
     await wait(80);
-    const after = await ok({...state, token: a.token});
+    const model = "welcome-model-10";
+    const transform = [0, 1.48, 4, 0, 0, 0, 1, 0, 0, 0, 1, 1];
+    const movedTransform = [1, 1.7, 4, 0, 0, 0, 1, 0, 0.6, 0, 0.8, 1.5];
+    const command = (action, t = transform, name = model) => ({action, model: name, transform: t});
+    const after = await ok({...state, token: a.token, modelCommand: command("grab")});
     assert.deepEqual(after.peers, []);
-    await ok({...state, profile});
+    assert.equal(after.models[0].owner, after.self);
+    const second = await ok({...state, profile, modelCommand: command("grab", movedTransform)});
+    assert.equal(second.models[0].owner, after.self, "Ein zweiter Grip übernimmt nicht");
+    assert.deepEqual(second.models[0].transform, transform);
+    await wait(80);
+    const movedModel = await ok({...state, token: a.token, modelCommand: command("move", movedTransform)});
+    assert.deepEqual(movedModel.models[0].transform, movedTransform);
+    const rejectedMove = await ok({...state, token: second.token, modelCommand: command("move")});
+    assert.deepEqual(rejectedMove.models[0].transform, movedTransform, "Nur der Besitzer kann bewegen");
+    await wait(80);
+    const invalid = await ok({...state, token: a.token, modelCommand: command("move", [...movedTransform.slice(0, 11), -1])});
+    assert.deepEqual(invalid.models[0].transform, movedTransform);
+    await wait(80);
+    const released = await ok({...state, token: a.token, modelCommand: command("release", movedTransform)});
+    assert.equal(released.models[0].owner, null);
+    const handedOver = await ok({...state, token: second.token, modelCommand: command("grab")});
+    assert.equal(handedOver.models[0].owner, second.self);
+    assert.deepEqual(handedOver.models[0].transform, movedTransform, "Neuer Grip übernimmt aktuelle Position");
+    await ok({token: second.token, leave: true});
+    await wait(80);
+    assert.equal((await ok({...state, token: a.token})).models[0].owner, null);
+    assert.deepEqual((await ok({...state, room: "team-b"})).models, [], "Räume teilen keine Modelle");
     console.log("Multiplayer: echter lokaler HTTP-Test für Zutritt, Datenübertragung, Raumtrennung und Austritt bestanden.");
   } finally { server.close(); }
 }

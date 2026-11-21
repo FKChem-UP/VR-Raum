@@ -3,10 +3,12 @@
 const http = require("node:http");
 const {randomUUID} = require("node:crypto");
 const {normalize, available, choices} = require("../js/avatar-profile.js");
+const {sharedModels} = require("./shared-models.cjs");
 const validRoom = room => typeof room === "string" && /^(welcome|vorlesung-[1-8]|team-[ab])$/.test(room);
 
 function createServer(origin) {
   const peers = new Map();
+  const updateModels = sharedModels();
   const reply = (res, status, data) => {
     res.writeHead(status, {"Content-Type": "application/json", "Cache-Control": "no-store"});
     res.end(JSON.stringify(data));
@@ -48,6 +50,7 @@ function createServer(origin) {
       const prior = peers.get(token);
       if (data.leave === true) {
         if (prior) peers.delete(token);
+        updateModels(null, null, null, peers);
         return reply(res, 200, {ok: true});
       }
       if (!validRoom(data.room) ||
@@ -70,11 +73,13 @@ function createServer(origin) {
           if (!options[key].includes(profile[key])) profile[key] = options[key][Math.floor(Math.random() * options[key].length)];
         }
       }
-      peers.set(token, {id: prior?.id || randomUUID(), room: data.room, time: now,
+      const self = prior?.id || randomUUID();
+      peers.set(token, {id: self, room: data.room, time: now,
         head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
         .map(([, {id, head, left, right, hands, profile, pointing}]) => ({id, head, left, right, hands, profile, pointing}));
-      reply(res, 200, {token, profile, peers: nearby});
+      const models = updateModels(data.room, self, data.modelCommand, peers);
+      reply(res, 200, {token, self, profile, peers: nearby, models});
     } catch {
       if (!res.destroyed) reply(res, 400, {error: "Ungültige Nachricht"});
     }
