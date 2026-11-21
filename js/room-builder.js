@@ -1914,10 +1914,11 @@
      * Die erste nicht bedienbare a-plane bleibt die
      * Bedienungstafel.
      */
+    const structureRoom = F.StructureRoom?.config;
     framedPanel(
       parent,
       {
-        x: WELCOME_REAR.sideX,
+        x: -WELCOME_REAR.sideX,
         y: WELCOME_REAR.y,
         z: c.depth / 2 - 0.28
       },
@@ -1936,17 +1937,20 @@
       c.colors
     );
 
+    // An der Rückwand (180°) liegt Welt-+X links vom Ablaufposter,
+    // wenn man vom Raum aus auf die Tafel schaut.
     framedPanel(
       parent,
       {
-        x: -WELCOME_REAR.sideX,
+        x: WELCOME_REAR.sideX,
         y: WELCOME_REAR.y,
         z: c.depth / 2 - 0.28
       },
       "0 180 0",
       WELCOME_REAR.sideWidth,
       WELCOME_REAR.sideHeight,
-      textBoard([
+      structureRoom ? welcomeCard({id: structureRoom.id, title: "Strukturraum",
+        posterDescription: "CIF-Bibliothek · Strukturen laden und frei vergrößern. Zum Betreten Trigger halten."}) : textBoard([
         "Willkommen",
         "Festkörperchemie · Universität Potsdam",
         "8 Räume für die Vorlesung",
@@ -1954,7 +1958,7 @@
         "Raumtafeln mit Trigger auswählen",
         "Mehrspielerbetrieb folgt später"
       ], "#fffdf8", "#222222"),
-      null,
+      structureRoom?.id || null,
       c.colors
     );
 
