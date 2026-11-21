@@ -92,6 +92,7 @@ async function test() {
     assert.equal((await post(state, "https://other.test")).status, 403);
     assert.equal((await post({...state, head: [0, 0, 0, 0, 0, 0, 0]})).status, 400);
     assert.equal((await post({...state, hands: "true"})).status, 400);
+    assert.equal((await post({...state, pointing: [0, 1, 6, 26, 1, 6]})).status, 400);
     const firstProfile = {form: "classic", color: "#ac406c", style: "hat"};
     const a = await ok({...state, profile: firstProfile});
     const availability = await fetch(url.replace("/presence", "/availability"), {method: "POST",
@@ -100,12 +101,14 @@ async function test() {
     for (const key of Object.keys(firstProfile)) assert.ok(!available[key].includes(firstProfile[key]));
     for (const key of Object.keys(firstProfile)) assert.equal((await post({...state, profile: {[key]: firstProfile[key]}})).status, 409);
     const profile = {name: "Laborfuchs", form: "slim", color: "#31749b", style: "monocle"};
-    const b = await ok({...state, head: [1, 1.6, 6, 0, 0, 0, 1], hands: true, profile: {...profile, gender: "w", name: "  Laborfuchs\u202e "}});
+    const pointing = [1, 1.2, 6, 0, 1.4, 4];
+    const b = await ok({...state, head: [1, 1.6, 6, 0, 0, 0, 1], hands: true, pointing, profile: {...profile, gender: "w", name: "  Laborfuchs\u202e "}});
     assert.deepEqual(a.peers, []);
     assert.equal(b.peers.length, 1);
     assert.equal(b.peers[0].token, undefined);
     assert.deepEqual(b.peers[0].head, state.head);
     assert.equal(b.peers[0].hands, false, "Ältere Clients behalten Controller");
+    assert.equal(b.peers[0].pointing, null);
     const otherRoom = await ok({...state, room: "team-a", profile});
     assert.deepEqual(otherRoom.peers, []);
     await wait(80);
@@ -113,6 +116,10 @@ async function test() {
     assert.equal(update.token, a.token);
     assert.equal(update.peers[0].head[0], 1);
     assert.equal(update.peers[0].hands, true);
+    assert.deepEqual(update.peers[0].pointing, pointing);
+    await ok({...state, token: b.token, pointing: null});
+    await wait(80);
+    assert.equal((await ok({...state, token: a.token})).peers[0].pointing, null);
     assert.deepEqual(update.peers[0].profile, profile);
     assert.deepEqual(FallbackProfile(), {name: "x".repeat(24), color: "", form: "", style: ""});
     await wait(80);

@@ -13,6 +13,9 @@ function createServer(origin) {
   };
   const pose = value => Array.isArray(value) && value.length === 7 && value.every(Number.isFinite) &&
     value.slice(0, 3).every(n => Math.abs(n) <= 100) && Math.abs(Math.hypot(...value.slice(3)) - 1) < 0.01;
+  const ray = value => Array.isArray(value) && value.length === 6 &&
+    value.every(n => Number.isFinite(n) && Math.abs(n) <= 100) &&
+    Math.hypot(value[3] - value[0], value[4] - value[1], value[5] - value[2]) <= 25.01;
 
   return http.createServer({requestTimeout: 5000, headersTimeout: 5000, maxHeaderSize: 8192}, async (req, res) => {
     if (req.url === "/health" && req.method === "GET") return reply(res, 200, {ok: true});
@@ -49,7 +52,8 @@ function createServer(origin) {
       }
       if (!validRoom(data.room) ||
           !pose(data.head) || ![data.left, data.right].every(p => p === null || pose(p)) ||
-          (data.hands !== undefined && typeof data.hands !== "boolean")) {
+          (data.hands !== undefined && typeof data.hands !== "boolean") ||
+          (data.pointing != null && !ray(data.pointing))) {
         return reply(res, 400, {error: "Ungültige Raum- oder Positionsdaten"});
       }
       if (!prior) {
@@ -67,9 +71,9 @@ function createServer(origin) {
         }
       }
       peers.set(token, {id: prior?.id || randomUUID(), room: data.room, time: now,
-        head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile});
+        head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
-        .map(([, {id, head, left, right, hands, profile}]) => ({id, head, left, right, hands, profile}));
+        .map(([, {id, head, left, right, hands, profile, pointing}]) => ({id, head, left, right, hands, profile, pointing}));
       reply(res, 200, {token, profile, peers: nearby});
     } catch {
       if (!res.destroyed) reply(res, 400, {error: "Ungültige Nachricht"});

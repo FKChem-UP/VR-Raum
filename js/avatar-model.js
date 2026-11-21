@@ -54,30 +54,45 @@
     const shirt = p.material(color), skin = p.material("#e7b694"), dark = p.material("#22303b");
     // XR meldet die Augenhöhe. Gesicht und Schädel darum modellieren,
     // statt eine Kugel mit ihrem Mittelpunkt an der Augenpose zu zeigen.
-    const [faceWidth, faceHeight, shoulders] = ({slim: [0.084, 0.126, 0.18], broad: [0.102, 0.126, 0.23],
-      round: [0.101, 0.111, 0.201], tall: [0.092, 0.143, 0.207], compact: [0.086, 0.109, 0.19],
-      oval: [0.083, 0.136, 0.215]})[profile.form] || [0.094, 0.126, 0.205];
-    p.oval(head, skin, [0, -0.023, 0.035], [faceWidth, faceHeight, 0.091]);
+    // Breite, Höhe, Tiefe, Schulterbreite, Rumpflänge, Augenabstand.
+    const [faceWidth, faceHeight, depth, shoulders, torsoHeight, eyes] = ({
+      slim: [0.074, 0.129, 0.076, 0.153, 0.265, 0.029],
+      broad: [0.116, 0.119, 0.097, 0.259, 0.219, 0.045],
+      round: [0.110, 0.108, 0.104, 0.218, 0.235, 0.040],
+      tall: [0.092, 0.151, 0.086, 0.195, 0.302, 0.034],
+      compact: [0.089, 0.100, 0.085, 0.174, 0.185, 0.034],
+      oval: [0.079, 0.143, 0.095, 0.223, 0.212, 0.030]
+    })[profile.form] || [0.094, 0.126, 0.091, 0.205, 0.255, 0.035];
+    // Position der Gesichtsfront bleibt annähernd am Augenanker.
+    p.oval(head, skin, [0, -0.023, depth - 0.056], [faceWidth, faceHeight, depth]);
+    if (profile.form === "broad" || profile.form === "compact") {
+      p.oval(head, skin, [0, -0.079, 0.009], [faceWidth * 0.83, 0.055, 0.070]);
+    }
     for (const sign of [-1, 1]) {
-      p.oval(head, skin, [sign * 0.093, -0.022, 0.026], [0.016, 0.027, 0.018]);
-      p.oval(head, dark, [sign * 0.035, 0, -0.049], [0.011, 0.012, 0.008]);
+      p.oval(head, skin, [sign * faceWidth, -0.022, depth - 0.061], [0.016, 0.027, 0.018]);
+      p.oval(head, dark, [sign * eyes, 0, -0.049], [0.011, 0.012, 0.008]);
     }
     p.oval(head, skin, [0, -0.029, -0.059], [0.018, 0.023, 0.021]);
     p.oval(head, dark, [0, -0.067, -0.047], [0.023, 0.006, 0.008]);
-    p.oval(body, shirt, [0, -0.40, 0.065], [shoulders, 0.255, 0.108]);
+    p.oval(body, shirt, [0, -0.155 - torsoHeight, 0.065], [shoulders, torsoHeight, shoulders * 0.53]);
+    for (const sign of [-1, 1]) {
+      const sleeve = p.oval(body, shirt, [sign * shoulders * 0.81, -0.245, 0.065], [0.075, 0.108, 0.087]);
+      sleeve.rotation.z = sign * 0.27;
+    }
     p.oval(body, skin, [0, -0.175, 0.04], [0.054, 0.075, 0.049]);
     if (accessory === "hat") {
       p.mesh(head, new T.CylinderGeometry(0.128, 0.128, 0.013, 24), shirt, [0, 0.078, 0.035]);
       p.mesh(head, new T.CylinderGeometry(0.082, 0.088, 0.071, 24), shirt, [0, 0.115, 0.035]);
     } else if (accessory === "glasses") {
-      for (const sign of [-1, 1]) p.mesh(head, new T.TorusGeometry(0.025, 0.004, 8, 20), dark, [sign * 0.036, 0, -0.061]);
+      for (const sign of [-1, 1]) p.mesh(head, new T.TorusGeometry(0.025, 0.004, 8, 20), dark, [sign * eyes, 0, -0.061]);
       p.mesh(head, new T.BoxGeometry(0.027, 0.006, 0.006), dark, [0, 0.005, -0.062]);
     } else if (accessory === "monocle") {
       const gold = p.material("#ddb756");
-      p.mesh(head, new T.TorusGeometry(0.025, 0.004, 8, 20), gold, [0.036, 0, -0.061]);
+      p.mesh(head, new T.TorusGeometry(0.025, 0.004, 8, 20), gold, [eyes, 0, -0.061]);
       p.mesh(head, new T.CylinderGeometry(0.0015, 0.0015, 0.059, 8), gold, [0.059, -0.031, -0.058]);
     } else if (accessory === "cape") {
-      const cape = p.mesh(body, new T.BoxGeometry(0.37, 0.46, 0.022), dark, [0, -0.43, 0.17]);
+      const cape = p.oval(body, shirt, [0, -0.22 - torsoHeight * 0.9, 0.12 + shoulders * 0.35],
+        [shoulders * 1.02, torsoHeight * 1.02, 0.038]);
       cape.rotation.x = -0.16;
       p.oval(body, shirt, [0, -0.23, 0.087], [0.15, 0.04, 0.105]);
     } else if (accessory === "mohawk") {

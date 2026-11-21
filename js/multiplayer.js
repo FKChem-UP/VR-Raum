@@ -4,6 +4,15 @@
   const T = AFRAME.THREE;
   const pack = (p, q) => [p.x, p.y, p.z, q.x, q.y, q.z, q.w];
   const fields = ["form", "color", "style"];
+  function pointing(scene) {
+    if (F.Menu?.opened || F.HandMenu?.opened || F.Tutorial?.active || F.Draw?.mode === "paint") return null;
+    const hand = document.getElementById(F.HandMenu.laserHand() + "Hand");
+    const tools = hand?.components["fkc-controller"];
+    if (!tools?.source || !tools.line?.visible || tools.hit?.type !== "model" ||
+        !tools.hit.el.modelReady || !scene.contains(tools.hit.el)) return null;
+    const {origin, hit: {point}} = tools;
+    return [origin.x, origin.y, origin.z, point.x, point.y, point.z];
+  }
 
   AFRAME.registerComponent("fkc-multiplayer", {
     init() {
@@ -189,6 +198,22 @@
         if (this.avatars.get(peer.id)?.profileKey !== profileKey) {
           this.avatars.get(peer.id)?.dispose();
           const avatar = F.AvatarModels.build(peer.id, profile);
+          const geometry = new T.BufferGeometry();
+          geometry.setAttribute("position", new T.BufferAttribute(new Float32Array(6), 3));
+          const material = new T.LineBasicMaterial({color: profile.color || "#31749b"});
+          const beam = new T.Line(geometry, material);
+          beam.frustumCulled = false;
+          beam.visible = false;
+          beam.raycast = function () {};
+          const dot = new T.Mesh(new T.SphereGeometry(0.013, 12, 8),
+            new T.MeshBasicMaterial({color: profile.color || "#31749b"}));
+          dot.visible = false;
+          dot.raycast = function () {};
+          avatar.group.add(beam, dot);
+          const dispose = avatar.dispose;
+          avatar.dispose = () => { dispose(); geometry.dispose(); material.dispose(); dot.geometry.dispose(); dot.material.dispose(); };
+          avatar.beam = beam;
+          avatar.dot = dot;
           avatar.profileKey = profileKey;
           this.el.object3D.add(avatar.group);
           this.avatars.set(peer.id, avatar);
@@ -208,6 +233,17 @@
           avatar.body.rotation.y = Math.atan2(-this.position.x, -this.position.z);
         }
         avatar.setHands(peer.hands === true);
+        const ray = peer.pointing;
+        avatar.beam.visible = avatar.dot.visible = Array.isArray(ray) && ray.length === 6 && ray.every(Number.isFinite);
+        if (avatar.beam.visible) {
+          const position = avatar.beam.geometry.attributes.position;
+          position.array.set(ray);
+          position.needsUpdate = true;
+          avatar.dot.position.set(ray[3], ray[4], ray[5]);
+          // Minimal vor der Oberfläche, damit die Kugel nicht darin versinkt.
+          this.position.set(ray[0] - ray[3], ray[1] - ray[4], ray[2] - ray[5]).normalize();
+          avatar.dot.position.addScaledVector(this.position, 0.008);
+        }
       }
       for (const [id, avatar] of this.avatars) if (!visible.has(id)) {
         avatar.dispose(); this.avatars.delete(id);
@@ -272,7 +308,8 @@
       rig.getWorldQuaternion(this.rigRotation);
       const world = pose => pack(this.position.copy(pose.position).applyMatrix4(rig.matrixWorld),
         this.quaternion.copy(pose.orientation).premultiply(this.rigRotation));
-      const data = {room, head: world(viewer.transform), left: null, right: null, hands: F.AvatarModels.showsHands()};
+      const data = {room, head: world(viewer.transform), left: null, right: null,
+        hands: F.AvatarModels.showsHands(), pointing: pointing(this.el)};
       for (const hand of ["left", "right"]) {
         const space = F.getSource(this.el, hand)?.gripSpace;
         const pose = space && frame.getPose(space, reference);

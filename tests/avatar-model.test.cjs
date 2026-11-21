@@ -7,7 +7,9 @@ const vm = require("node:vm");
 class Group {
   constructor() {
     this.children = [];
-    this.position = this.scale = {set() {}};
+    const vector = () => ({set(...values) { this.values = values; }});
+    this.position = vector();
+    this.scale = vector();
     this.rotation = {};
   }
   add(...objects) { this.children.push(...objects); }
@@ -58,4 +60,11 @@ for (const style of ["hat", "monocle", "cape", "glasses", "mohawk", "hair", "cro
   custom.dispose();
   assert.equal(badge.material.map.disposed, true);
 }
+const narrow = models.build("one", {form: "slim", style: "none"});
+const broad = models.build("two", {form: "broad", style: "cape"});
+assert.ok(broad.head.children[0].scale.values[0] > narrow.head.children[0].scale.values[0] * 1.5);
+assert.ok(broad.body.children[0].scale.values[0] > narrow.body.children[0].scale.values[0] * 1.5);
+assert.notEqual(broad.body.children[0].scale.values[1], narrow.body.children[0].scale.values[1]);
+narrow.dispose();
+broad.dispose();
 console.log("Avatar: stabiles Aussehen, Körperteile, Zeigehände und Freigabe geprüft.");
