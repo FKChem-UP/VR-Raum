@@ -28,7 +28,8 @@
   <script defer src="./js/measurements.js?v=5"></script>
   <script defer src="./js/room-entry.js?v=2"></script>
   <script defer src="./js/hand-menu.js?v=21"></script>
-  <script defer src="./js/avatar-model.js?v=1"></script>
+  <script defer src="./js/avatar-profile.js?v=2"></script>
+  <script defer src="./js/avatar-model.js?v=3"></script>
   <script defer src="./js/pico-controller-model.js?v=6"></script>
   <script defer src="./js/tutorial.js?v=10"></script>
 
@@ -44,8 +45,8 @@
 
 
 
-  <script defer src="./js/multiplayer.js?v=2"></script>
-  <script defer src="./js/app.js?v=11"></script>
+  <script defer src="./js/multiplayer.js?v=6"></script>
+  <script defer src="./js/app.js?v=12"></script>
 </head>
 
 <body>
@@ -165,12 +166,43 @@
       </p>
     </section>
 
-    <details>
+    <details id="multiplayer-panel">
       <summary>Multiplayer-Pilot</summary>
       <p>Offener Testraum. Im VR-Modus sehen andere Teilnehmende im selben Vorlesungsraum deine Kopf- und Controllerpositionen.</p>
       <label for="multiplayer-url">HTTPS-Adresse des Multiplayer-Servers</label>
       <input id="multiplayer-url" type="url" autocomplete="off">
-      <button id="multiplayer-toggle" type="button">Gemeinsam beitreten</button>
+      <p>Optionales Avatarprofil: Nutze einen Spitznamen. Andere im Raum sehen deine Angaben.</p>
+      <label for="multiplayer-name">Anzeigename</label>
+      <input id="multiplayer-name" type="text" maxlength="24" autocomplete="off">
+      <label for="multiplayer-form">Avatarform</label>
+      <select id="multiplayer-form">
+        <option value="classic">Standard</option><option value="slim">Schmal</option><option value="broad">Breit</option>
+        <option value="round">Rund</option><option value="tall">Länglich</option>
+        <option value="compact">Kompakt</option><option value="oval">Oval</option>
+      </select>
+      <label for="multiplayer-color">Kleidungsfarbe</label>
+      <select id="multiplayer-color">
+        <option value="#31749b">Blau</option><option value="#ac406c">Pink</option>
+        <option value="#397d51">Grün</option><option value="#bd6030">Orange</option><option value="#7063a8">Violett</option>
+        <option value="#246f71">Türkis</option><option value="#925333">Braun</option>
+      </select>
+      <label for="multiplayer-style">Stil</label>
+      <select id="multiplayer-style">
+        <option value="hat">Hut</option><option value="monocle">Monokel</option>
+        <option value="cape">Cape</option><option value="glasses">Brille</option><option value="mohawk">Irokesenschnitt</option>
+        <option value="hair">Locken</option><option value="crown">Krone</option><option value="antenna">Antenne</option>
+        <option value="headband">Stirnband</option><option value="none">Ohne Accessoire</option>
+      </select>
+      <figure style="margin: 12px 0">
+        <canvas id="multiplayer-preview" width="208" height="176" aria-label="3D-Vorschau des Avatars"></canvas>
+        <figcaption id="multiplayer-preview-caption">Vorschau · Rückseite für Cape und Frisur ansehen</figcaption>
+        <div class="buttons">
+          <button id="multiplayer-randomize" type="button" class="primary-button" disabled>🎲 Avatar würfeln</button>
+          <button id="multiplayer-preview-turn" type="button">Vorschau drehen</button>
+        </div>
+      </figure>
+      <p id="multiplayer-availability" role="status">Freie Auswahl wird beim Öffnen für den aktuellen Raum geprüft.</p>
+      <button id="multiplayer-toggle" type="button" disabled>Gemeinsam beitreten</button>
       <p id="multiplayer-status" role="status">Einzelmodus</p>
     </details>
 

@@ -8,6 +8,7 @@ class Group {
   constructor() {
     this.children = [];
     this.position = this.scale = {set() {}};
+    this.rotation = {};
   }
   add(...objects) { this.children.push(...objects); }
   removeFromParent() { this.removed = true; }
@@ -19,8 +20,11 @@ class Mesh extends Group {
 let disposedControllers = 0;
 const F = {Settings: {}, PicoModels: {build: () => ({group: new Group(), dispose() { disposedControllers++; }})}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/avatar-model.js"), "utf8"), {
-  window: {FKCVR: F}, AFRAME: {THREE: {Group, Mesh, SphereGeometry: Resource,
-    CylinderGeometry: Resource, TorusGeometry: Resource, BoxGeometry: Resource, MeshStandardMaterial: Resource}}
+  window: {FKCVR: F}, document: {createElement: () => ({getContext: () => ({fillRect() {}, fillText() {}})})},
+  AFRAME: {THREE: {Group, Mesh, SphereGeometry: Resource, CylinderGeometry: Resource, TorusGeometry: Resource,
+    BoxGeometry: Resource, MeshStandardMaterial: Resource, CanvasTexture: Resource,
+    Sprite: class extends Group { constructor(material) { super(); this.material = material; } },
+    SpriteMaterial: class extends Resource { constructor(options) { super(); Object.assign(this, options); } }}}
 });
 const models = F.AvatarModels;
 assert.deepEqual(models.appearance("participant"), models.appearance("participant"));
@@ -47,4 +51,11 @@ assert.equal(disposedControllers, 2);
 assert.equal(avatar.group.removed, true);
 assert.equal(avatar.head.children[0].geometry.disposed, true);
 assert.equal(avatar.left.children[1].children[0].material.disposed, true);
+for (const style of ["hat", "monocle", "cape", "glasses", "mohawk", "hair", "crown", "antenna", "headband", "none"]) {
+  const custom = models.build("participant", {name: "Laborfuchs", form: "slim", color: "#31749b", style});
+  const badge = custom.body.children.at(-1);
+  assert.ok(badge.material.map);
+  custom.dispose();
+  assert.equal(badge.material.map.disposed, true);
+}
 console.log("Avatar: stabiles Aussehen, Körperteile, Zeigehände und Freigabe geprüft.");

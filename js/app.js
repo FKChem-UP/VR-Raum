@@ -22,6 +22,11 @@
    */
 
   const T = AFRAME.THREE;
+  const VR_EYE_HEIGHT = 1.60;
+
+  function fixedEyeHeight(scene) {
+    return scene.is("vr-mode") && !scene.is("ar-mode");
+  }
 
   function immersive(scene) {
     if (!scene) return false;
@@ -631,12 +636,13 @@
   /*
    * Wenn beim XR-Eintritt noch keine Viewerpose vorliegt,
    * die Platzierung im nächsten gültigen XR-Frame abschließen.
-   * Keine Timer und keine wiederholte dauerhafte Zentrierung.
+   * Danach nur die vertikale VR-Augenhöhe nachführen, nicht X/Z oder Blickrichtung.
    */
   AFRAME.registerComponent("fkc-spawn-sync", {
     tick: function () {
       if (F.app && typeof F.app.finishPendingSpawn === "function") {
         F.app.finishPendingSpawn();
+        F.app.updateVREyeHeight();
       }
     }
   });
@@ -656,6 +662,8 @@
       this.headQuaternion = new T.Quaternion();
       this.headForward = new T.Vector3();
       this.rotatedHead = new T.Vector3();
+      this.heightHead = new T.Vector3();
+      this.heightQuaternion = new T.Quaternion();
 
       installNavigationFix(this.scene, this.rig);
       installControllerFix(this.scene);
@@ -679,6 +687,9 @@
 
       this.scene.addEventListener("exit-vr", () => {
         this.pendingSpawn = null;
+        const rig = this.rig.object3D;
+        rig.position.y = 0;
+        rig.updateWorldMatrix(true, false);
       });
 
       this.bindInterface();
@@ -938,7 +949,7 @@
 
       rig.position.set(
         spawn.x - this.rotatedHead.x,
-        0,
+        fixedEyeHeight(this.scene) && hasXRPose ? VR_EYE_HEIGHT - this.rotatedHead.y : 0,
         spawn.z - this.rotatedHead.z
       );
 
@@ -993,6 +1004,15 @@
       if (this.applySpawn(pending, true)) {
         this.pendingSpawn = null;
       }
+    },
+
+    updateVREyeHeight: function () {
+      if (!fixedEyeHeight(this.scene)) return;
+      const rig = this.rig.object3D;
+      if (!readLocalHead(this.scene, rig, this.heightHead, this.heightQuaternion)) return;
+      this.heightHead.multiply(rig.scale).applyQuaternion(rig.quaternion);
+      rig.position.y = VR_EYE_HEIGHT - this.heightHead.y;
+      rig.updateWorldMatrix(true, false);
     }
   };
 
