@@ -19,6 +19,8 @@
       this.avatars = new Map();
       this.models = new Map();
       this.grips = new Map();
+      this.variantRequests = new Map();
+      this.appliedVariants = new WeakMap();
       this.position = new T.Vector3();
       this.quaternion = new T.Quaternion();
       this.rigRotation = new T.Quaternion();
@@ -173,6 +175,8 @@
 
     clearPresence() {
       this.clearModels();
+      this.variantRequests.clear();
+      this.appliedVariants = new WeakMap();
       this.request?.abort();
       this.request = null;
       if (this.endpoint && this.token) {
@@ -187,6 +191,23 @@
     sharesModel(root) {
       return !!(this.endpoint && this.self && this.el.is("vr-mode") && !F.Tutorial?.active &&
         root.id.startsWith(F.app?.currentId + "-model-"));
+    },
+
+    requestVariant(root, variant) {
+      if (!this.endpoint || !this.el.is("vr-mode") || F.Tutorial?.active ||
+          !root.id.startsWith(F.app?.currentId + "-model-")) return false;
+      if (this.room && this.room !== F.app.currentId) {
+        F.Menu.notify("Bitte warten, bis der gemeinsame Raum verbunden ist.");
+        return true;
+      }
+      const owner = this.models.get(root.id)?.owner;
+      if (owner && owner !== this.self) {
+        F.Menu.notify("Das Modell wird gerade von jemand anderem gehalten.");
+        return true;
+      }
+      this.variantRequests.set(root.id, {model: root.id, variant});
+      this.appliedVariants.delete(root);
+      return true;
     },
 
     clearModels() {
@@ -278,7 +299,19 @@
       }
       for (const model of result.models) {
         const root = document.getElementById(model.model);
-        if (!root?.modelReady || !this.sharesModel(root) || (model.owner === this.self && root === this.ownedRoot)) continue;
+        if (!root?.modelReady || !this.sharesModel(root)) continue;
+        if (model.variant && root.fkcVariants?.some(option => option.id === model.variant) &&
+            !this.variantRequests.has(root.id) && this.appliedVariants.get(root) !== model.variant) {
+          this.appliedVariants.set(root, model.variant);
+          if (root.fkcVariantId !== model.variant && root.fkcPendingVisual?.dataset.variantId !== model.variant) {
+            F.switchVariant(root, model.variant, true);
+          } else if (root.fkcVariantId === model.variant && root.fkcPendingVisual &&
+              root.fkcPendingVisual.dataset.variantId !== model.variant) {
+            root.fkcPendingVisual.remove();
+            root.fkcPendingVisual = null;
+          }
+        }
+        if (!model.transform || (model.owner === this.self && root === this.ownedRoot)) continue;
         const body = root.querySelector(".manip-body").object3D;
         root.object3D.position.fromArray(model.transform);
         root.object3D.quaternion.fromArray(model.transform, 3);
@@ -372,6 +405,11 @@
         const result = await response.json();
         if (this.request !== request) return;
         this.token = result.token;
+        if (data.variantCommand && this.variantRequests.get(data.variantCommand.model) === data.variantCommand) {
+          this.variantRequests.delete(data.variantCommand.model);
+          const actual = result.models?.find(model => model.model === data.variantCommand.model)?.variant;
+          if (actual !== data.variantCommand.variant) F.Menu.notify("Gemeinsamer Ansichtswechsel nicht übernommen.");
+        }
         if (result.profile) this.profile = F.AvatarProfile.normalize(result.profile);
         this.showPeers(result.peers);
         this.remoteAnnotations = result.peers.flatMap(peer => F.SharedAnnotations.normalize(peer.annotations, data.room));
@@ -398,6 +436,8 @@
       }
       if (this.room && this.room !== room) {
         this.clearModels();
+        this.variantRequests.clear();
+        this.appliedVariants = new WeakMap();
         this.request?.abort();
         this.request = null;
         this.showPeers([]);
@@ -423,7 +463,8 @@
         this.quaternion.copy(pose.orientation).premultiply(this.rigRotation));
       const data = {room, head: world(viewer.transform), left: null, right: null,
         hands: F.AvatarModels.showsHands(), pointing: pointing(this.el), modelCommand: this.modelCommand(),
-        annotations: F.SharedAnnotations.collect(this.el, room)};
+        annotations: F.SharedAnnotations.collect(this.el, room),
+        variantCommand: this.variantRequests.values().next().value};
       for (const hand of ["left", "right"]) {
         const space = F.getSource(this.el, hand)?.gripSpace;
         const pose = space && frame.getPose(space, reference);

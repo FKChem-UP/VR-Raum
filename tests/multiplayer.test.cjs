@@ -63,6 +63,19 @@ function testClientOptIn() {
   assert.equal(client.endpoint, "https://example.test/presence");
   assert.equal(client.profile.name, "Laborfuchs");
   client.room = "welcome";
+  const model = {id: "welcome-model-10", modelReady: true, fkcVariantId: "co-complex",
+    fkcVariants: [{id: "co-complex"}, {id: "co-coordination"}]};
+  ui.set(model.id, model);
+  const switches = [];
+  F.switchVariant = (...args) => switches.push(args);
+  assert.equal(client.requestVariant(model, "co-coordination"), true);
+  const variants = {self: "a", models: [{model: model.id, variant: "co-coordination"}]};
+  client.receiveModels(variants);
+  assert.equal(switches.length, 0, "Nicht vor Bestätigung der ausstehenden Wahl anwenden");
+  client.variantRequests.clear();
+  client.receiveModels(variants);
+  client.receiveModels(variants);
+  assert.deepEqual(switches, [[model, "co-coordination", true]], "Empfang startet genau einen lokalen Ladevorgang");
   F.Tutorial = {active: true};
   client.tick(1);
   assert.equal(client.room, null, "Tutorial ist vom Pilot getrennt");
@@ -165,6 +178,22 @@ async function test() {
     await wait(80);
     assert.equal((await ok({...state, token: a.token})).models[0].owner, null);
     assert.deepEqual((await ok({...state, room: "team-b"})).models, [], "Räume teilen keine Modelle");
+    await wait(80);
+    const variantCommand = {model, variant: "co-coordination"};
+    const changed = await ok({...state, token: a.token, variantCommand});
+    assert.equal(changed.models[0].variant, "co-coordination");
+    assert.deepEqual(changed.models[0].transform, movedTransform, "Ansicht ändert nicht die Modellpose");
+    const newcomer = await ok({...state, profile});
+    assert.equal(newcomer.models[0].variant, "co-coordination", "Späterer Beitritt übernimmt die Ansicht");
+    await wait(80);
+    const unauthorizedVariant = await ok({...state, token: newcomer.token,
+      variantCommand: {model, variant: "c60-cif"}});
+    assert.equal(unauthorizedVariant.models[0].variant, "co-coordination");
+    await wait(80);
+    const activeGrip = await ok({...state, token: a.token, modelCommand: command("grab")});
+    assert.equal(activeGrip.models[0].owner, a.self);
+    const held = await ok({...state, token: newcomer.token, variantCommand: {model, variant: "co-cell"}});
+    assert.equal(held.models[0].variant, "co-coordination", "Fremder Grip sperrt Ansichtswechsel");
     console.log("Multiplayer: echter lokaler HTTP-Test für Zutritt, Datenübertragung, Raumtrennung und Austritt bestanden.");
   } finally { server.close(); }
 }

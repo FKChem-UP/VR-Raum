@@ -795,7 +795,7 @@
   /*
    * MODELLVARIANTEN
    */
-  F.switchVariant = function (root, variantId) {
+  F.switchVariant = function (root, variantId, fromMultiplayer = false) {
     if (
       !root ||
       !root.isConnected ||
@@ -807,6 +807,8 @@
     );
 
     if (!variant) return;
+
+    if (!fromMultiplayer && F.getScene().components["fkc-multiplayer"]?.requestVariant(root, variantId)) return;
 
     if (root.fkcVariantId === variantId) {
       F.Menu.notify("Diese Darstellung ist bereits ausgewählt.");
@@ -830,6 +832,7 @@
     const pending = document.createElement("a-entity");
     pending.className = "pending-visual";
     pending.dataset.pendingVariant = "true";
+    pending.dataset.variantId = variantId;
 
     pending.setAttribute("fkc-normalize", {
       targetSize: root.fkcModelSize || 0.5,

@@ -81,7 +81,7 @@ function createServer(origin) {
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
         .map(([, {id, head, left, right, hands, profile, pointing, annotations}]) =>
           ({id, head, left, right, hands, profile, pointing, annotations}));
-      const models = updateModels(data.room, self, data.modelCommand, peers);
+      const models = updateModels(data.room, self, data.modelCommand, peers, data.variantCommand);
       reply(res, 200, {token, self, profile, peers: nearby, models});
     } catch {
       if (!res.destroyed) reply(res, 400, {error: "Ungültige Nachricht"});

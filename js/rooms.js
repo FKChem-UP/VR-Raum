@@ -416,4 +416,4 @@
     model: "assets/models/BODIPY.glb",
     slide: ""
   });
-})(window.FKCVR);
+})(typeof module === "object" ? module.exports : window.FKCVR);
