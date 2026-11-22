@@ -26,7 +26,7 @@
   }
   const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
     "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Vergleichswinkel einstellen", "Animation pausieren"];
-  const hints = ["Strukturteil geschafft! Geh zur beschrifteten Station vor dir.", "Ziele auf die Station und drücke den Trigger.",
+  const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf „Bragg-Animation auswählen“ und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
     "Wähle 0,5×. Die Wellenlänge bleibt gleich.", "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
   const cues = {3: "play", 4: "slow", 5: "compare", 6: "play"};
@@ -88,6 +88,21 @@
     const texture = keep(new T.CanvasTexture(canvas));
     const panel = new T.Mesh(keep(new T.PlaneGeometry(1.75, 0.63)), keep(new T.MeshBasicMaterial({map: texture, side: T.DoubleSide})));
     panel.position.set(0, -0.77, 0.10); el.object3D.add(panel);
+    // Flächiges Ziel von vorn und hinten, auch bevor die Wellen sichtbar sind.
+    const sign = document.createElement("canvas"); sign.width = 768; sign.height = 144;
+    const signContext = sign.getContext("2d");
+    signContext.fillStyle = "#24664d"; signContext.fillRect(0, 0, sign.width, sign.height);
+    signContext.fillStyle = "#ffffff"; signContext.font = "bold 46px Arial";
+    signContext.textAlign = "center"; signContext.textBaseline = "middle";
+    signContext.fillText("Bragg-Animation auswählen", 384, 72, 720);
+    const signMaterial = keep(new T.MeshBasicMaterial({map: keep(new T.CanvasTexture(sign))}));
+    const signGeometry = keep(new T.PlaneGeometry(1.35, 0.25));
+    for (const facing of [1, -1]) {
+      const signMesh = new T.Mesh(signGeometry, signMaterial);
+      signMesh.position.set(0.13, 0.43, facing * 0.02);
+      signMesh.rotation.y = facing === 1 ? 0 : Math.PI;
+      el.object3D.add(signMesh);
+    }
     const ctx = canvas.getContext("2d"); let previous = "", lastFrame = "";
     function update() {
       const frame = `${state.angle}:${state.time}`;

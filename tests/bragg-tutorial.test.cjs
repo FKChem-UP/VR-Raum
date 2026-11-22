@@ -27,15 +27,24 @@ for (let i = 0; i < 90; i++) B.command(s, "plus"); assert.equal(s.angle, 70);
 for (let i = 0; i < 90; i++) B.command(s, "minus"); assert.equal(s.angle, 10);
 B.command(s, "reset"); assert.deepEqual(s, B.initial());
 
-// Übergang ohne Raumwechsel oder Neubau der Tafel; Station nur durch Auswahl aktivieren.
-const board = {}, station = {el: {}, state: s};
+// Übergang ohne Raumwechsel, mit freier Bewegung und Trigger-Auswahl.
+const board = {}, station = {el: {}, state: s, dispose() {}};
 F.releaseModel = F.invalidateHits = () => {}; B.station = () => station;
-const tutorial = Object.assign({board, group: {}, target: {object3D: {visible: true}},
-  body: {querySelectorAll: () => []}, el: {components: {}}}, components["fkc-tutorial"]);
+const welcomeWalkable = (x, z) => Math.hypot(x, z) >= 2.73;
+const room = {isWalkable: welcomeWalkable};
+F.app = {activeRoom: room};
+const tutorial = Object.assign({board, group: {object3D: {}}, target: {object3D: {visible: true}},
+  body: {querySelectorAll: () => []}, el: {components: {}, object3D: {}}}, components["fkc-tutorial"]);
 F.Tutorial.active = true; tutorial.beginAnimation();
 assert.equal(tutorial.board, board); assert.equal(tutorial.phase, "bragg");
-tutorial.click({el: station.el}); assert.equal(tutorial.selectedAnimation, null);
-tutorial.animationStep = 1; tutorial.click({el: station.el}); assert.equal(tutorial.selectedAnimation, station.el);
+assert.equal(tutorial.selectedAnimation, null);
+for (const z of [3, 2, 1, 0.25, 0, -1, -2]) assert.ok(room.isWalkable(-0.55, z), "Weg bis durch die Station bleibt frei");
+assert.equal(room.isWalkable(-0.55, 8.1), false);
+tutorial.click({el: station.el}); assert.equal(tutorial.selectedAnimation, station.el);
+assert.equal(B.progress(0, false, true, false, s), 0, "Früher Klick ersetzt nicht das Hingehen");
 tutorial.animationStep = 5;
 assert.equal(F.Tutorial.menuTarget({components: {"fkc-tutorial": tutorial}}, station.el), "compare");
+tutorial.close();
+assert.equal(room.isWalkable, welcomeWalkable, "Begrüßungsraum erhält seine Kollisionsregel zurück");
+assert.equal(room.isWalkable(-0.55, 0.25), false);
 console.log("Bragg-Geometrie, Phase, Winkelgrenzen, Steuerung und Tutorialfortsetzung geprüft.");

@@ -244,7 +244,7 @@
     },
     click: function (hit) {
       if (this.animation && hit.el === this.animation.el) {
-        if (F.Tutorial.active && this.phase === "bragg" && this.animationStep >= 1) this.selectedAnimation = hit.el;
+        if (F.Tutorial.active && this.phase === "bragg") this.selectedAnimation = hit.el;
         return;
       }
       if (!F.Tutorial.active || !hit.uv) return;
@@ -272,6 +272,17 @@
       this.animationStep = 0;
       this.animation = F.Bragg.station(this.group);
       this.selectedAnimation = null;
+      // Der sichtbare Tutorialboden (18 × 16 m) ersetzt hier die Kollisionen
+      // des ausgeblendeten Begrüßungsraums, einschließlich des Demo-Tischs.
+      const room = F.app?.activeRoom;
+      if (room) {
+        const previous = room.isWalkable;
+        const walkable = (x, z) => Math.abs(x) <= 8.7 && Math.abs(z) <= 7.7;
+        room.isWalkable = walkable;
+        this.restoreWalkable = () => {
+          if (room.isWalkable === walkable) room.isWalkable = previous;
+        };
+      }
       F.invalidateHits();
     },
     tick: function (time, delta) {
@@ -365,6 +376,8 @@
     },
     close: function () {
       const returnToSpawn = ["training", "bragg", "done"].includes(this.phase);
+      this.restoreWalkable?.();
+      this.restoreWalkable = null;
       this.selectedAnimation = null;
       if (this.animation) { this.animation.dispose(); this.animation = null; }
       if (this.hiddenOverlays) {
