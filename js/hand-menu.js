@@ -22,6 +22,8 @@
   }
 
   function selectedModel(scene) {
+    const tutorial = scene.components?.["fkc-tutorial"];
+    if (tutorial?.phase === "bragg") return tutorial.selectedAnimation;
     const model = scene.lastSelectedModel;
     return model && model.isConnected && model.modelReady &&
       model.classList.contains("interactable") ? model : null;
@@ -223,7 +225,9 @@
       // Abstand von der Hand zum Betrachter statt mitrotierender Handflächenachse.
       // Im Tutorial oberhalb und etwas vor den Controller setzen. Die normale
       // Einstellung außerhalb des Tutorials bleibt weiter vom Kopf entfernt.
-      const tutorial = !!(F.Tutorial && F.Tutorial.allowsModel(model));
+      const chapter = scene.components["fkc-tutorial"];
+      const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      const tutorial = !!animation || !!(F.Tutorial && F.Tutorial.allowsModel(model));
       this.position.addScaledVector(this.toHead, tutorial ? Math.min(0.05, distance - 0.20) : -0.10);
       if (tutorial) this.position.y += 0.07;
       // Trotz deckender Textur in der Overlay-Gruppe nach der Tutorialtafel.
@@ -265,7 +269,7 @@
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
       const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
-        cue, pulse,
+        cue, pulse, animation?.state.angle, animation?.state.speed, animation?.state.running,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
@@ -310,7 +314,9 @@
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
-      ctx.fillText(this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
+      const chapter = this.el.components["fkc-tutorial"];
+      const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      ctx.fillText(animation ? "Animationssteuerung" : this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
         painting ? "Malstift" : "Modellwerkzeuge", 28, 48, 510);
       ctx.font = "28px Arial";
       ctx.fillText(model.dataset.title || "3D-Modell", 28, 88, 710);
@@ -441,6 +447,22 @@
         });
         y += compactRow ? 85 : 100;
       };
+      if (animation) {
+        const state = animation.state;
+        const control = (id, title, selected = false) => button(title, () => {
+          F.Bragg.command(state, id);
+          if (id === "reset" && chapter.animationStep >= 3) { chapter.animationStep = 3; chapter.render(); }
+        }, selected, id);
+        control("play", state.running ? "Pause" : "Start", state.running);
+        text("Abspieltempo");
+        for (const [id, speed] of [["slow", 0.5], ["normal", 1], ["fast", 2]]) control(id, `${speed}×`, state.speed === speed);
+        text(`Detektorwinkel 2θ: ${state.angle.toFixed(1)}°`);
+        control("bragg", "Bragg-Stellung", state.angle === F.Bragg.bragg);
+        control("compare", "Vergleich: halbe Welle versetzt", state.angle === F.Bragg.comparison);
+        control("minus", "−1°"); control("plus", "+1°"); control("reset", "Animation zurücksetzen");
+        this.texture.needsUpdate = true;
+        return;
+      }
       if (this.page === "settings") {
         // Kompaktere Einstellungszeilen lassen Platz für Palette und Reichweite.
         button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });

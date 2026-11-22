@@ -44,6 +44,10 @@
         Number.isInteger(data.fkcBond?.a) && Number.isInteger(data.fkcBond?.b)));
     },
     menuTarget(scene, root) {
+      const chapter = scene.components["fkc-tutorial"];
+      if (this.active && chapter?.phase === "bragg" && chapter.selectedAnimation === root && !F.Menu?.opened) {
+        return F.Bragg.cues[chapter.animationStep] || null;
+      }
       if (!this.allowsModel(root) || F.Menu?.opened || root.fkcPendingVisual) return null;
       const tutorial = scene.components["fkc-tutorial"];
       if (!tutorial || tutorial.phase !== "training" || tutorial.target !== root) return null;
@@ -203,22 +207,28 @@
       ctx.fillStyle = "#203f30"; ctx.font = "bold 64px Arial";
       const training = this.phase === "training";
       const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : 0;
+      const animation = this.phase === "bragg";
       ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" :
+        animation ? `Animation · ${this.animationStep + 1} / ${F.Bragg.tasks.length}` :
         `Tutorial · ${this.step + 1} / ${tasks.length}`, 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        this.phase === "done" ? [`Alle ${tasks.length} Aufgaben abgeschlossen.`, "Du kannst jetzt den VR-Raum erkunden."] :
+        animation ? F.Bragg.tasks : this.phase === "done" ? ["Struktur und Bragg-Animation abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] :
           tasks.slice(first, first + tasksPerPage);
       const menuPalm = training ? palm(F.HandMenu.laserHand()) : "";
       this.renderedPalm = menuPalm;
       lines.forEach((line, i) => {
         const index = first + i;
         if (training && index === 3) line += ` (${menuPalm} drehen)`;
-        ctx.fillStyle = training ? (index < this.step ? "#397c40" : index === this.step ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((training ? (index < this.step ? "✓ " : `${index + 1} · `) : "") + line, 50, training ? 153 + i * 41 : 180 + i * 55, 924);
+        const current = animation ? this.animationStep : this.step;
+        ctx.fillStyle = training || animation ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
+        ctx.fillText((training || animation ? (index < current ? "✓ " : `${index + 1} · `) : "") + line, 50, training || animation ? 153 + i * 41 : 180 + i * 55, 924);
       });
-      if (training) {
+      if (animation) {
+        ctx.font = "30px Arial"; ctx.fillStyle = "#203f30";
+        ctx.fillText(F.Bragg.hints[this.animationStep], 50, 451, 924);
+      } else if (training) {
         ctx.font = "30px Arial";
         ctx.fillStyle = "#203f30";
         ctx.fillText(this.step === 3 ? `Lass beide Grips los und dreh die ${menuPalm} zum Kopf.` : hints[this.step], 50, 451, 924);
@@ -233,6 +243,10 @@
       this.texture.needsUpdate = true;
     },
     click: function (hit) {
+      if (this.animation && hit.el === this.animation.el) {
+        if (F.Tutorial.active && this.phase === "bragg" && this.animationStep >= 1) this.selectedAnimation = hit.el;
+        return;
+      }
       if (!F.Tutorial.active || !hit.uv) return;
       const x = hit.uv.x * 1024, y = (1 - hit.uv.y) * 640;
       const button = this.buttons.find(button => x >= button.x && x <= button.x + button.w && y >= 480 && y <= 580);
@@ -244,7 +258,23 @@
       if (uv) this.cursor.position.set((uv.x - 0.5) * boardWidth, (uv.y - 0.5) * boardHeight,
         this.phase === "question" ? 0 : 0.002);
     },
-    tick: function () {
+    beginAnimation: function () {
+      F.releaseModel(this.target);
+      this.target.object3D.visible = false;
+      this.target.modelReady = false;
+      this.el.lastSelectedModel = this.el.lastSelectedTarget = null;
+      this.el.components["fkc-hand-menu"]?.hide();
+      this.el.components["fkc-measurements"]?.reset(this.target);
+      for (const visual of this.body.querySelectorAll(".model-visual, .pending-visual")) visual.remove();
+      if (F.Measure?.enabled) F.Measure.setEnabled(false);
+      F.Draw?.setMode("laser");
+      this.phase = "bragg";
+      this.animationStep = 0;
+      this.animation = F.Bragg.station(this.group);
+      this.selectedAnimation = null;
+      F.invalidateHits();
+    },
+    tick: function (time, delta) {
       if (!this.el.is("vr-mode")) return;
       if (!F.app || !F.app.activeRoom || F.app.pendingSpawn) return;
       if (!F.HandMenu.readViewerHead(this.el, F.getRig(), this.head)) {
@@ -274,7 +304,7 @@
       }
       if (this.phase === "training" && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
       const menu = this.el.components["fkc-hand-menu"];
-      if (menu && (this.phase !== "training" || this.step < 3)) menu.hide();
+      if (menu && this.phase !== "bragg" && (this.phase !== "training" || this.step < 3)) menu.hide();
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
       const tools = laser && laser.components["fkc-controller"];
       this.updateCursor(tools && tools.source && tools.line.visible ? tools.hit : null);
@@ -287,6 +317,21 @@
       } else {
         // Der Weltpunkt bleibt rechts vom Modell, auch beim Blick zur Tafel.
         this.board.object3D.lookAt(this.head);
+        if (this.phase === "bragg") {
+          const {state, el} = this.animation;
+          if (state.running) state.time += Math.min(delta || 0, 100) / 1000 * state.speed;
+          this.animation.update();
+          const p = el.object3D.getWorldPosition(this.modelWorld);
+          const next = F.Bragg.progress(this.animationStep, Math.hypot(this.head.x - p.x, this.head.z - p.z) < 1.8,
+            this.selectedAnimation === el, F.HandMenu.opened && menu?.model === el, state);
+          if (next !== this.animationStep) {
+            this.animationStep = next;
+            if (next === 1) this.board.object3D.position.set(p.x + 1.85, this.head.y, p.z - 0.25);
+            if (next === F.Bragg.tasks.length) { this.phase = "done"; this.selectedAnimation = null; menu?.hide(); }
+            this.render();
+          }
+          return;
+        }
         if (this.phase === "training" && this.target.modelReady) {
           const manip = this.target.components["fkc-manipulable"];
           const position = this.target.object3D.getWorldPosition(this.modelWorld);
@@ -312,14 +357,16 @@
           if (next !== this.step) {
             this.step = next;
             if (F.PicoModels) F.PicoModels.tutorial(next);
-            if (next === tasks.length) this.phase = "done";
+            if (next === tasks.length) this.beginAnimation();
             this.render();
           }
         }
       }
     },
     close: function () {
-      const returnToSpawn = this.phase === "training" || this.phase === "done";
+      const returnToSpawn = ["training", "bragg", "done"].includes(this.phase);
+      this.selectedAnimation = null;
+      if (this.animation) { this.animation.dispose(); this.animation = null; }
       if (this.hiddenOverlays) {
         for (const [object, visible] of this.hiddenOverlays) object.visible = visible;
         this.hiddenOverlays.clear();
