@@ -10,20 +10,41 @@ for (const file of ["bragg-tutorial", "tutorial"]) {
 }
 const B = F.Bragg, s = B.initial();
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-10);
-const g = B.geometry(B.bragg), other = B.geometry(B.comparison);
+const g = B.geometry(B.angleFor(1)), other = B.geometry(B.angleFor(1.5));
 assert.ok(g.matched && !other.matched);
-close(g.extra, 1); close(other.extra, 1.5);
+close(g.extra, 0.7107); close(other.extra, 1.5 * 0.7107);
 close(Math.cos(other.periods * 2 * Math.PI), -1);
+for (const [source, wavelength] of [["mo", 0.7107], ["cu", 1.5406]]) {
+  for (const n of source === "mo" ? [1, 2, 3] : [1]) {
+    const result = B.geometry(B.angleFor(n, source), source);
+    assert.equal(result.matched, true, `Bragg-Bedingung gilt auch für ungerades n = ${n}`);
+    close(result.extra, n * wavelength);
+  }
+  const off = B.geometry(B.angleFor(1.5, source), source);
+  assert.equal(off.matched, false);
+  close(off.periods, 1.5);
+  assert.ok(B.angleFor(1.5, source) <= 80);
+}
+assert.equal(B.geometry(0).matched, false);
+const fixedAngle = s.angle;
+B.command(s, "cu");
+close(s.angle, fixedAngle);
+assert.equal(B.geometry(s.angle, s.source).matched, false);
+B.command(s, "bragg");
+assert.equal(B.geometry(s.angle, s.source).matched, true);
+B.command(s, "compare");
+assert.equal(B.progress(5, true, true, true, s), 6);
+B.command(s, "reset");
 assert.equal(B.progress(0, false, true, true, s), 0);
 assert.equal(B.progress(0, true, false, false, s), 1);
 assert.equal(B.progress(1, true, true, false, s), 2);
 assert.equal(B.progress(2, true, true, true, s), 3);
 B.command(s, "play"); assert.equal(B.progress(3, true, true, true, s), 3);
 s.time = 4; assert.equal(B.progress(3, true, true, true, s), 4);
-B.command(s, "slow"); assert.equal(B.progress(4, true, true, true, s), 5); close(s.angle, B.bragg);
+B.command(s, "slow"); assert.equal(B.progress(4, true, true, true, s), 5); close(s.angle, B.angleFor(1));
 B.command(s, "compare"); assert.equal(B.progress(5, true, true, true, s), 6);
 B.command(s, "play"); assert.equal(B.progress(6, true, true, true, s), 7);
-for (let i = 0; i < 90; i++) B.command(s, "plus"); assert.equal(s.angle, 70);
+for (let i = 0; i < 90; i++) B.command(s, "plus"); assert.equal(s.angle, 80);
 for (let i = 0; i < 90; i++) B.command(s, "minus"); assert.equal(s.angle, 10);
 B.command(s, "reset"); assert.deepEqual(s, B.initial());
 
