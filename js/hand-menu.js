@@ -451,7 +451,9 @@
         const state = animation.state;
         const control = (id, title, selected = false) => button(title, () => {
           F.Bragg.command(state, id);
-          if (id === "reset" && chapter.animationStep >= 3) { chapter.animationStep = 3; chapter.render(); }
+          if (id === "reset" && chapter.animationStep >= 3 && chapter.animationStep < F.Bragg.tasks.length) {
+            chapter.animationStep = 3; chapter.render();
+          }
         }, selected, id);
         control("play", state.running ? "Pause" : "Start", state.running);
         text("Abspieltempo");

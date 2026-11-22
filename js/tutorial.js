@@ -208,13 +208,18 @@
       const training = this.phase === "training";
       const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : 0;
       const animation = this.phase === "bragg";
-      ctx.fillText(this.phase === "question" ? "Tutorial?" : this.phase === "done" ? "Gut gemacht!" :
+      const structurePractice = this.phase === "structure-practice";
+      const animationPractice = animation && this.animationStep === F.Bragg.tasks.length;
+      ctx.fillText(this.phase === "question" ? "Tutorial?" : structurePractice ? "Strukturteil geschafft!" :
+        animationPractice ? "Animationsteil geschafft!" :
         animation ? `Animation · ${this.animationStep + 1} / ${F.Bragg.tasks.length}` :
         `Tutorial · ${this.step + 1} / ${tasks.length}`, 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        animation ? F.Bragg.tasks : this.phase === "done" ? ["Struktur und Bragg-Animation abgeschlossen.", "Du kannst jetzt den VR-Raum erkunden."] :
+        structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
+        animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Das Animationsmenü bleibt verfügbar."] :
+        animation ? F.Bragg.tasks :
           tasks.slice(first, first + tasksPerPage);
       const menuPalm = training ? palm(F.HandMenu.laserHand()) : "";
       this.renderedPalm = menuPalm;
@@ -222,10 +227,11 @@
         const index = first + i;
         if (training && index === 3) line += ` (${menuPalm} drehen)`;
         const current = animation ? this.animationStep : this.step;
-        ctx.fillStyle = training || animation ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((training || animation ? (index < current ? "✓ " : `${index + 1} · `) : "") + line, 50, training || animation ? 153 + i * 41 : 180 + i * 55, 924);
+        const numbered = training || (animation && !animationPractice);
+        ctx.fillStyle = numbered ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
+        ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line, 50, numbered ? 153 + i * 41 : 180 + i * 55, 924);
       });
-      if (animation) {
+      if (animation && !animationPractice) {
         ctx.font = "30px Arial"; ctx.fillStyle = "#203f30";
         ctx.fillText(F.Bragg.hints[this.animationStep], 50, 451, 924);
       } else if (training) {
@@ -235,7 +241,9 @@
       }
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
-        [{x: 80, w: 860, title: this.phase === "done" ? "Zum Begrüßungsraum" : "Tutorial beenden", action: () => this.close()}];
+        structurePractice ? [{x: 80, w: 490, title: "Teil 2: Bragg-Animation", action: () => { this.beginAnimation(); this.render(); }},
+          {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
+        [{x: 80, w: 860, title: animationPractice ? "Zum Begrüßungsraum" : "Tutorial beenden", action: () => this.close()}];
       for (const button of this.buttons) {
         ctx.fillStyle = "#b9dcc4"; ctx.fillRect(button.x, 480, button.w, 100);
         ctx.fillStyle = "#203f30"; ctx.fillText(button.title, button.x + 30, 547, button.w - 60);
@@ -315,7 +323,8 @@
       }
       if (this.phase === "training" && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
       const menu = this.el.components["fkc-hand-menu"];
-      if (menu && this.phase !== "bragg" && (this.phase !== "training" || this.step < 3)) menu.hide();
+      if (menu && this.phase !== "bragg" && this.phase !== "structure-practice" &&
+          (this.phase !== "training" || this.step < 3)) menu.hide();
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
       const tools = laser && laser.components["fkc-controller"];
       this.updateCursor(tools && tools.source && tools.line.visible ? tools.hit : null);
@@ -338,7 +347,6 @@
           if (next !== this.animationStep) {
             this.animationStep = next;
             if (next === 1) this.board.object3D.position.set(p.x + 1.85, this.head.y, p.z - 0.25);
-            if (next === F.Bragg.tasks.length) { this.phase = "done"; this.selectedAnimation = null; menu?.hide(); }
             this.render();
           }
           return;
@@ -368,14 +376,14 @@
           if (next !== this.step) {
             this.step = next;
             if (F.PicoModels) F.PicoModels.tutorial(next);
-            if (next === tasks.length) this.beginAnimation();
+            if (next === tasks.length) this.phase = "structure-practice";
             this.render();
           }
         }
       }
     },
     close: function () {
-      const returnToSpawn = ["training", "bragg", "done"].includes(this.phase);
+      const returnToSpawn = ["training", "structure-practice", "bragg"].includes(this.phase);
       this.restoreWalkable?.();
       this.restoreWalkable = null;
       this.selectedAnimation = null;

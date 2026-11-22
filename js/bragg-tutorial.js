@@ -26,7 +26,7 @@
   }
   const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
     "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Vergleichswinkel einstellen", "Animation pausieren"];
-  const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf „Bragg-Animation auswählen“ und drücke den Trigger.",
+  const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf die Netzebenen oder den Infotext darunter und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
     "Wähle 0,5×. Die Wellenlänge bleibt gleich.", "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
   const cues = {3: "play", 4: "slow", 5: "compare", 6: "play"};
@@ -77,32 +77,45 @@
     const detector = box(0.02, 0.40, 0.35, basic(0x8aa7bc, 0.55), rig);
     const spot = new T.Mesh(keep(new T.SphereGeometry(0.031, 14, 10)), basic(0x138041));
     detector.add(spot); spot.position.x = -0.018;
+    // WebGL-Linienbreite ist auf vielen Geräten auf einen Pixel beschränkt.
+    // Echte Geometrie macht die Wellen auch in der Pico sichtbar.
+    const segmentCount = 128;
+    const cylinder = keep(new T.CylinderGeometry(1, 1, 1, 8));
+    const pose = new T.Object3D(), up = new T.Vector3(0, 1, 0);
+    const start = new T.Vector3(), end = new T.Vector3(), direction = new T.Vector3();
+    function thickWave(color, radius) {
+      const obj = keep(new T.InstancedMesh(cylinder, basic(color), segmentCount));
+      obj.instanceMatrix.setUsage(T.DynamicDrawUsage);
+      obj.frustumCulled = false;
+      obj.raycast = function () {};
+      rig.add(obj);
+      return {obj, set(point) {
+        start.fromArray(point(0));
+        for (let i = 0; i < segmentCount; i++) {
+          end.fromArray(point((i + 1) / segmentCount));
+          direction.subVectors(end, start);
+          const length = direction.length();
+          pose.position.copy(start).lerp(end, 0.5);
+          pose.quaternion.setFromUnitVectors(up, direction.normalize());
+          pose.scale.set(radius, length + radius * 0.4, radius);
+          pose.updateMatrix();
+          obj.setMatrixAt(i, pose.matrix);
+          start.copy(end);
+        }
+        obj.instanceMatrix.needsUpdate = true;
+      }};
+    }
     const waves = [];
     for (const lower of [false, true]) for (const outgoing of [false, true]) {
       // Mittlere Teilstücke der unteren Bahn sind genau die beiden Zusatzwege.
       for (const extra of lower ? [false, true] : [false]) {
-        waves.push({lower, outgoing, extra, wave: line(97, lower ? 0x743a99 : 0x126b9b)});
+        waves.push({lower, outgoing, extra, wave: thickWave(lower ? 0x743a99 : 0x126b9b, extra ? 0.011 : 0.006)});
       }
     }
     const canvas = document.createElement("canvas"); canvas.width = 1024; canvas.height = 368;
     const texture = keep(new T.CanvasTexture(canvas));
     const panel = new T.Mesh(keep(new T.PlaneGeometry(1.75, 0.63)), keep(new T.MeshBasicMaterial({map: texture, side: T.DoubleSide})));
     panel.position.set(0, -0.77, 0.10); el.object3D.add(panel);
-    // Flächiges Ziel von vorn und hinten, auch bevor die Wellen sichtbar sind.
-    const sign = document.createElement("canvas"); sign.width = 768; sign.height = 144;
-    const signContext = sign.getContext("2d");
-    signContext.fillStyle = "#24664d"; signContext.fillRect(0, 0, sign.width, sign.height);
-    signContext.fillStyle = "#ffffff"; signContext.font = "bold 46px Arial";
-    signContext.textAlign = "center"; signContext.textBaseline = "middle";
-    signContext.fillText("Bragg-Animation auswählen", 384, 72, 720);
-    const signMaterial = keep(new T.MeshBasicMaterial({map: keep(new T.CanvasTexture(sign))}));
-    const signGeometry = keep(new T.PlaneGeometry(1.35, 0.25));
-    for (const facing of [1, -1]) {
-      const signMesh = new T.Mesh(signGeometry, signMaterial);
-      signMesh.position.set(0.13, 0.43, facing * 0.02);
-      signMesh.rotation.y = facing === 1 ? 0 : Math.PI;
-      el.object3D.add(signMesh);
-    }
     const ctx = canvas.getContext("2d"); let previous = "", lastFrame = "";
     function update() {
       const frame = `${state.angle}:${state.time}`;
@@ -122,11 +135,14 @@
         const last = Math.min(b, front - L - h);
         wave.obj.visible = last > a;
         if (!wave.obj.visible) continue;
-        if (extra) wave.obj.material.color.setHex(g.matched ? 0x138041 : 0xc0332d);
+        if (extra) wave.obj.material.color.setHex(g.matched ? 0x0aaf36 : 0xd9312b);
         wave.set(t => {
           const s = a + (last - a) * t;
-          return [scale * s * g.cos, (lower ? -depth : 0) + scale * s * g.sin * (outgoing ? 1 : -1),
-            0.033 * Math.sin(tau * (s + L + h - front))];
+          // Wellen quer zum Strahl in der sichtbaren Seitenansicht zeichnen.
+          const sign = outgoing ? 1 : -1;
+          const oscillation = 0.026 * Math.sin(tau * (s + L + h - front));
+          return [scale * s * g.cos - sign * g.sin * oscillation,
+            (lower ? -depth : 0) + scale * s * sign * g.sin + g.cos * oscillation, 0.05];
         });
       }
       const arrived = front >= 2 * L + g.extra;
