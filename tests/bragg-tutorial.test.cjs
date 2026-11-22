@@ -14,6 +14,27 @@ const g = B.geometry(B.angleFor(1)), other = B.geometry(B.angleFor(1.5));
 assert.ok(g.matched && !other.matched);
 close(g.extra, 0.7107); close(other.extra, 1.5 * 0.7107);
 close(Math.cos(other.periods * 2 * Math.PI), -1);
+for (const geometry of [g, other]) {
+  const [start, center, end] = B.lowerPath(geometry);
+  for (const edge of [start, end]) close(Math.hypot(edge[0] - center[0], edge[1] - center[1]), geometry.extra / 2);
+  close(start[0] * geometry.cos - start[1] * geometry.sin, 0);
+  close(end[0] * geometry.cos + end[1] * geometry.sin, 0);
+}
+close(B.waveComparison(0.25, g.periods)[2], 2);
+close(B.waveComparison(0.25, other.periods)[2], 0);
+close(B.waveComparison(0.25, 0.25)[2], 1);
+const sweep = B.initial();
+B.command(sweep, "sweep");
+B.advance(sweep, 0.1);
+close(sweep.angle, B.angleFor(1) + 0.6);
+close(sweep.time, 0);
+sweep.angle = 79.8; B.advance(sweep, 0.1);
+close(sweep.angle, 79.6); assert.equal(sweep.sweep, -1);
+sweep.angle = 10.2; B.advance(sweep, 0.1);
+close(sweep.angle, 10.4); assert.equal(sweep.sweep, 1);
+B.command(sweep, "sweep"); B.advance(sweep, 0.1); close(sweep.angle, 10.4);
+B.command(sweep, "sweep"); B.command(sweep, "bragg");
+assert.equal(sweep.sweep, 0); close(sweep.angle, B.angleFor(1));
 for (const [source, wavelength] of [["mo", 0.7107], ["cu", 1.5406]]) {
   for (const n of source === "mo" ? [1, 2, 3] : [1]) {
     const result = B.geometry(B.angleFor(n, source), source);

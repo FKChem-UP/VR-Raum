@@ -14,14 +14,32 @@
     return {theta, sin, cos, extra, periods, wavelength,
       matched: Math.round(periods) > 0 && Math.abs(periods - Math.round(periods)) < 1e-7};
   }
-  function initial() { return {angle: bragg, source: defaultSource, speed: 1, running: false, time: 0}; }
+  function lowerPath(g) {
+    const h = g.extra / 2;
+    return [[-h * g.cos, -d + h * g.sin], [0, -d], [h * g.cos, -d + h * g.sin]];
+  }
+  function waveComparison(cycles, phaseOffset) {
+    const upper = Math.sin(tau * cycles), lower = Math.sin(tau * (cycles + phaseOffset));
+    return [upper, lower, upper + lower];
+  }
+  function initial() { return {angle: bragg, source: defaultSource, speed: 1, running: false, time: 0, sweep: 0}; }
+  function advance(s, seconds) {
+    if (s.running) s.time += seconds * s.speed;
+    if (!s.sweep) return;
+    const angle = s.angle + s.sweep * seconds * 6;
+    if (angle >= maxAngle) { s.angle = 2 * maxAngle - angle; s.sweep = -1; }
+    else if (angle <= minAngle) { s.angle = 2 * minAngle - angle; s.sweep = 1; }
+    else s.angle = angle;
+  }
   function command(s, id) {
+    if (["bragg", "compare", "minus", "plus"].includes(id)) s.sweep = 0;
     switch (id) {
       case "reset": Object.assign(s, initial()); break;
       case "play": s.running = !s.running; break;
       case "slow": s.speed = 0.5; break;
       case "normal": s.speed = 1; break;
       case "fast": s.speed = 2; break;
+      case "sweep": s.sweep = s.sweep ? 0 : s.angle >= maxAngle ? -1 : 1; break;
       case "mo": case "cu": s.source = id; break; // Wirkung von λ bei gleichem Winkel zeigen.
       case "bragg": s.angle = angleFor(1, s.source); break;
       case "compare": s.angle = angleFor(1.5, s.source); break;
@@ -74,7 +92,26 @@
         attr.needsUpdate = true; }};
     }
     const bracket = line(4, 0x243945);
-    bracket.set(t => [[-0.52, 0, 0.23], [-0.55, 0, 0.23], [-0.55, -depth, 0.23], [-0.52, -depth, 0.23]][Math.round(t * 3)]);
+    bracket.set(t => [[-0.59, 0, 0.24], [-0.64, 0, 0.24], [-0.64, -depth, 0.24], [-0.59, -depth, 0.24]][Math.round(t * 3)]);
+    const distanceLabel = document.createElement("canvas"); distanceLabel.width = 384; distanceLabel.height = 96;
+    const distanceCtx = distanceLabel.getContext("2d");
+    distanceCtx.fillStyle = "#f6fafb"; distanceCtx.fillRect(0, 0, 384, 96);
+    distanceCtx.fillStyle = "#193947"; distanceCtx.font = "bold 52px Arial";
+    distanceCtx.textAlign = "center"; distanceCtx.fillText("d = 2,00 Å", 192, 65);
+    const distanceMesh = new T.Mesh(keep(new T.PlaneGeometry(0.32, 0.08)),
+      keep(new T.MeshBasicMaterial({map: keep(new T.CanvasTexture(distanceLabel)), side: T.DoubleSide})));
+    distanceMesh.position.set(-0.82, -depth / 2, 0.24);
+    distanceMesh.raycast = function () {}; rig.add(distanceMesh);
+    const guideGeometry = keep(new T.BufferGeometry());
+    const guidePositions = new T.Float32BufferAttribute(new Float32Array(2 * 6 * 2 * 3), 3);
+    guideGeometry.setAttribute("position", guidePositions);
+    const guides = new T.LineSegments(guideGeometry, keep(new T.LineBasicMaterial({color: 0xa32929})));
+    guides.frustumCulled = false; rig.add(guides);
+    const marks = [0, 1, 2].map(() => {
+      const marker = new T.Mesh(sphere, basic(0xa32929));
+      marker.scale.setScalar(0.52); marker.raycast = function () {}; rig.add(marker);
+      return marker;
+    });
     const arc = line(33, 0x675996, el.object3D), thetaArc = line(25, 0x28647b);
     const baseline = line(2, 0x777777, el.object3D); baseline.set(t => [t * 0.45, 0, 0.012]);
     const track = line(55, 0x536976, el.object3D);
@@ -137,6 +174,16 @@
       const g = geometry(state.angle, state.source), half = g.extra / 2;
       if (equationKey !== settings) {
         equationKey = settings;
+        const path = lowerPath(g);
+        path.forEach(([x, y], i) => marks[i].position.set(x * scale, y * scale, 0.05));
+        let index = 0;
+        for (const [x, y] of [path[0], path[2]]) {
+          for (let dash = 0; dash < 6; dash++) for (const end of [0, 0.63]) {
+            const t = (dash + end) / 5.63;
+            guidePositions.setXYZ(index++, x * scale * t, y * scale * t, 0.054);
+          }
+        }
+        guidePositions.needsUpdate = true;
         liveCtx.fillStyle = "#f6fafb"; liveCtx.fillRect(0, 0, 1024, 190);
         liveCtx.fillStyle = "#193947"; liveCtx.font = "30px Arial";
         liveCtx.fillText(`${state.source === "mo" ? "Mo" : "Cu"} Kα  ·  2θ = ${format(state.angle, 1)}°`, 24, 42);
@@ -181,20 +228,28 @@
       ctx.fillText(`Zusatzweg unten: ${format(g.extra, 2)} Å = ${format(g.periods, 2)} λ`, 20, 141);
       ctx.fillStyle = arrived && !g.matched ? "#9e312d" : "#1e614c";
       ctx.fillText(!arrived ? "Detektor: Wellen noch nicht angekommen" : g.matched ? "Bragg-Reflex · in Phase" : "Keine Bragg-Stellung · phasenverschoben", 20, 187);
-      ctx.fillStyle = "#193947"; ctx.fillText("Detektorvergleich (oben / unten):", 20, 233);
-      if (arrived) for (const [row, offset] of [[0, 0], [1, g.periods]]) {
-        ctx.strokeStyle = row ? "#743a99" : "#126b9b"; ctx.lineWidth = 4; ctx.beginPath();
-        for (let i = 0; i <= 250; i++) {
-          const x = 530 + i * 1.8, y = 215 + row * 36 + 13 * Math.sin(tau * ((i / 65 - front) / g.wavelength + offset));
+      ctx.fillStyle = "#e3edf2"; ctx.fillRect(20, 201, 478, 103); ctx.fillRect(522, 201, 482, 103);
+      ctx.fillStyle = "#193947"; ctx.font = "24px Arial";
+      ctx.fillText("Einzelwellen · oben / unten", 34, 227);
+      ctx.fillText("Summe · gleiche Amplitudenskala", 536, 227);
+      if (arrived) for (const [row, left, baselineY, color] of [
+        [0, 34, 248, "#126b9b"], [1, 34, 282, "#743a99"], [2, 536, 265, "#193947"]]) {
+        ctx.strokeStyle = "#9eafb9"; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.moveTo(left, baselineY); ctx.lineTo(left + 450, baselineY); ctx.stroke();
+        ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.lineJoin = "round"; ctx.beginPath();
+        for (let i = 0; i <= 180; i++) {
+          // Der Detektorvergleich läuft absichtlich langsamer als die Raumwellen.
+          const value = waveComparison(2 * i / 180 - state.time * 0.48, g.periods)[row];
+          const x = left + i * 2.5, y = baselineY - 13 * value;
           if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         } ctx.stroke();
       }
-      ctx.fillText("λ Wellenlänge · d Ebenenabstand · θ Winkel zur Netzebene", 20, 308);
+      ctx.fillText("λ Wellenlänge · d Ebenenabstand · θ Winkel zur Netzebene", 20, 326);
       ctx.fillText("n Beugungsordnung (1, 2, …) · keine Intensitätssimulation", 20, 348);
       texture.needsUpdate = true;
     }
     update();
     return {el, state, update, dispose() { el.remove(); resources.forEach(resource => resource.dispose()); }};
   }
-  F.Bragg = {station, geometry, initial, command, tasks, hints, cues, progress, angleFor};
+  F.Bragg = {station, geometry, lowerPath, waveComparison, initial, advance, command, tasks, hints, cues, progress, angleFor};
 })(window.FKCVR);

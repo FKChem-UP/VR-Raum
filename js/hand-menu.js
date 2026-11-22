@@ -269,7 +269,7 @@
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
       const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
-        cue, pulse, animation?.state.source, animation?.state.angle, animation?.state.speed, animation?.state.running,
+        cue, pulse, animation?.state.source, animation?.state.angle.toFixed(1), animation?.state.speed, animation?.state.running, animation?.state.sweep,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
@@ -463,7 +463,9 @@
         text(`Detektorwinkel 2θ: ${state.angle.toFixed(1)}°`);
         control("bragg", "Bragg-Stellung", state.angle === F.Bragg.angleFor(1, state.source));
         control("compare", "Vergleich: halbe Welle versetzt", state.angle === F.Bragg.angleFor(1.5, state.source));
-        control("minus", "−1°"); control("plus", "+1°"); control("reset", "Animation zurücksetzen");
+        row([["minus", "−1°"], ["plus", "+1°"]].map(([id, label]) => ({label, kind: "plain", action: () => F.Bragg.command(state, id)})));
+        control("sweep", state.sweep ? "Winkellauf anhalten" : "Automatischer Winkellauf", !!state.sweep);
+        control("reset", "Animation zurücksetzen");
         this.texture.needsUpdate = true;
         return;
       }

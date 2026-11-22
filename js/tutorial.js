@@ -339,7 +339,7 @@
         this.board.object3D.lookAt(this.head);
         if (this.phase === "bragg") {
           const {state, el} = this.animation;
-          if (state.running) state.time += Math.min(delta || 0, 100) / 1000 * state.speed;
+          F.Bragg.advance(state, Math.min(delta || 0, 100) / 1000);
           this.animation.update();
           const p = el.object3D.getWorldPosition(this.modelWorld);
           const next = F.Bragg.progress(this.animationStep, Math.hypot(this.head.x - p.x, this.head.z - p.z) < 1.8,
