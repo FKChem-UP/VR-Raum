@@ -657,16 +657,28 @@ window.FKCVR = window.FKCVR || {};
 
       if (!best) {
         const tools = this.el.components["fkc-controller"];
-        if (tools && tools.source && tools.updateRay && F.findHit) {
+        if (tools && tools.source && tools.updateRay) {
           tools.updateRay();
-          const hit = F.findHit(tools.raycaster, true);
-          if (hit && hit.type === "model" && hit.el.modelReady &&
-              (!F.Tutorial?.active || F.Tutorial.allowsPull(hit.el)) &&
-              hit.el.components["fkc-manipulable"]?.hands.length === 0) {
-            if (multiplayer?.grab(hit.el, this, true)) return;
-            this.pulling = hit.el;
+          let target = null;
+          let nearest = tools.raycaster.far;
+          const point = new V();
+          this.el.sceneEl.querySelectorAll(".interactable").forEach(root=>{
+            if (!root.modelReady || root.components["fkc-manipulable"]?.hands.length !== 0 ||
+                (F.Tutorial?.active && !F.Tutorial.allowsPull(root))) return;
+            for(let node=root.object3D;node;node=node.parent)if(!node.visible)return;
+            const hitbox=root.querySelector(".hitbox");
+            if(!hitbox)return;
+            hitbox.object3D.updateWorldMatrix(true,true);
+            this.bounds.setFromObject(hitbox.object3D);
+            if(this.bounds.isEmpty() || !tools.raycaster.ray.intersectBox(this.bounds,point))return;
+            const distance=point.distanceTo(tools.raycaster.ray.origin);
+            if(distance<nearest){nearest=distance;target=root;}
+          });
+          if (target) {
+            if (multiplayer?.grab(target, this, true)) return;
+            this.pulling = target;
             this.pullTime = 0;
-            F.selectModel(hit.el);
+            F.selectModel(target);
           }
         }
       }

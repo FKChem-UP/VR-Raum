@@ -545,6 +545,7 @@
 
         if (!(F.Menu && F.Menu.opened) && this.hit.type === "model") {
           if (!(grabber && grabber.grabbed)) {
+            if (F.Draw?.mode !== "paint" && F.StructureAnalysis?.click(this.hit)) return;
             if (F.AtomPlane?.click(this.hit)) return;
             F.selectModel(this.hit.el);
             if (!F.Draw || F.Draw.mode !== "paint") {

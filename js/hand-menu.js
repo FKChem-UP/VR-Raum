@@ -212,7 +212,7 @@
       }
       F.HandMenu.opened = true;
       if (!wasOpen) {
-        if(!["draw","plane"].includes(this.page) && !(this.page === "settings" && this.returnPage === "draw"))this.page = "model";
+        if(!["draw","plane","analysis"].includes(this.page) && !(this.page === "settings" && this.returnPage === "draw"))this.page = "model";
         this.offset = 0;
         this.infoOffset = 0;
         F.Menu.blockDrawing();
@@ -268,6 +268,7 @@
       if (performance.now() >= this.pressUntil) this.pressedIndex = -1;
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
+      if(this.page === "analysis" && !F.StructureAnalysis?.validate(model))this.page="model";
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
       const plane = F.AtomPlane?.get(model);
       const mirror = chapter?.phase === "mirror" ? chapter.mirror : null;
@@ -279,7 +280,7 @@
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
-        F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
+        F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness, model.fkcHydrogenThickness, F.StructureAnalysis?.revision,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size, plane?.points.length, !!plane?.mesh,
         plane?.name, plane?.color, plane?.thickness, plane?.opacity, plane?.visible,
@@ -467,6 +468,31 @@
         y += height + 13;
       };
       const tile = (label, action, selected=false, cueId=null) => ({kind:"plain", label, action, selected, cueId});
+      if(this.page==="analysis" && F.StructureAnalysis?.state){
+        const tool=F.StructureAnalysis,state=tool.state;
+        text("Struktur analysieren");
+        text(state.ringMode ? `Ring ${state.first?2:1}: im Umlauf wählen (${state.points.size})` :
+          `Trigger: Atome auswählen oder abwählen (${state.points.size})`,false);
+        if(state.ringMode){
+          if(state.result){
+            const r=state.result;
+            text(`Schwerpunktabstand: ${r.distance.toFixed(3)} Å`,false);
+            text(`Winkel der Ringebenen: ${r.angle.toFixed(1)}°`,false);
+            text(`Senkrecht zu Ring 1: ${r.height.toFixed(3)} Å`,false);
+            text(`Versatz in Ebene 1: ${r.offset.toFixed(3)} Å`,false);
+          }else if(state.points.size>=3)row([tile(state.first?"Ring 2 auswerten":"Ring 1 übernehmen",()=>tool.acceptRing())],true);
+        }else if(state.points.size){
+          const actions=[];
+          if(structure?.contactExpansion)actions.push(tile("Kontakte erweitern",()=>tool.apply(false)));
+          if(state.points.size===1)actions.push(tile("Koordinationshülle",()=>tool.apply(true)));
+          if(actions.length)row(actions,true);
+        }
+        row([tile(state.ringMode?"Ringvergleich neu":"Zwei Ringe vergleichen",()=>{tool.begin(model);tool.state.ringMode=true;}),
+          tile("Auswahl leeren",()=>tool.begin(model))],true);
+        row([tile("Zum Modellmenü",()=>{tool.cancel();this.page="model";}),
+          tile("Analysegeometrie zurücksetzen",()=>{F.CIF.resetSelectionGeometry(model);tool.begin(model);})],true);
+        this.texture.needsUpdate=true;return;
+      }
       const drawingActions = (undo, clear, cueId=null) => row([
         tile("Letzten Strich entfernen",undo,false,cueId), tile("Alle Zeichnungen zurücksetzen",clear)
       ]);
@@ -543,6 +569,11 @@
           row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %", kind: "bond-size", factor,
             selected: (model.fkcBondThickness || 1) === factor,
             action: () => F.CIF.setBondThickness(model, factor)})));
+          if(structure.hydrogenContacts?.length || structure.environmentCell?.hydrogenContacts?.length){
+            text("H-Brücken · Dicke");
+            row([0.5,1,2].map(factor=>tile(`${factor*100} %`,()=>F.CIF.setHydrogenThickness(model,factor),
+              (model.fkcHydrogenThickness || 1)===factor)),true);
+          }
           text("Atomgröße · nur Ball-and-Stick");
           row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %", kind: "atom-size", factor,
             selected: (model.fkcAtomScale || 1) === factor,
@@ -609,6 +640,9 @@
         const order=Object.keys(labelModes);
         const display = [{heading:"Atomlabels",label:labelModes[mode],kind:"plain",
           action:()=>F.AtomLabels.setMode(model,order[(order.indexOf(mode)+1)%order.length])}];
+        if(structure && !chapter?.phase && F.StructureAnalysis)display.push(tile("Struktur analysieren",()=>{
+          F.StructureAnalysis.begin(model);this.page="analysis";
+        }));
         if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
         if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
@@ -625,9 +659,10 @@
           button(structure.mode === "cell-complete" ? "Elementarzelle normal" : "Elementarzelle erweitern",
             () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
         }
-        if (structure && structure.hydrogenContacts && structure.hydrogenContacts.length) {
+        const hydrogen = structure?.hydrogenContacts?.length ? structure.hydrogenContacts : structure?.environmentCell?.hydrogenContacts;
+        if (hydrogen?.length) {
           const enabled = !!model.fkcShowHydrogenContacts;
-          button((structure.hydrogenContacts.some(contact=>contact.inferred) ? "Mögliche H-Brücken: " : "H-Brücken: ") +
+          button((hydrogen.some(contact=>contact.inferred) ? "Mögliche H-Brücken: " : "H-Brücken: ") +
             (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
             () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }

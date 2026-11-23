@@ -607,6 +607,35 @@
     });
   }
 
+  function environmentHydrogenDashes(base, records) {
+    const cell=base.environmentCell;
+    const contacts=cell?.hydrogenContacts || [];
+    const key=(label,f)=>`${label}:${f.map(v=>Math.round(v*1e6)).join(",")}`;
+    const atoms=new Map();
+    const neighbors=new Set();
+    for(const atom of base.atoms)atoms.set(key(atom.cifLabel,atom.fractional),{atom,alpha:1});
+    for(const {candidate,alpha} of records)for(const atom of candidate.atoms){
+      const id=key(atom.cifLabel,atom.fractional);
+      if(!atoms.has(id)){atoms.set(id,{atom,alpha});neighbors.add(id);}
+    }
+    const result=[];
+    for(const [id,{atom,alpha}] of atoms)for(const contact of contacts){
+      if(atom.cifLabel!==contact.hydrogenLabel)continue;
+      const f=atom.fractional;
+      const src=cell.atoms[contact.a].fractional;
+      if(f.some((v,i)=>Math.abs(v-src[i]-Math.round(v-src[i]))>1e-6))continue;
+      const endKey=key(contact.acceptorLabel,f.map((v,i)=>v+contact.deltaFractional[i]));
+      const target=atoms.get(endKey);
+      if(!target || (!neighbors.has(id)&&!neighbors.has(endKey)))continue;
+      const start=atom.positionAngstrom,end=target.atom.positionAngstrom;
+      const length=Math.hypot(...end.map((v,i)=>v-start[i]));
+      if(length<EPS)continue;
+      const point=d=>start.map((v,i)=>v+(end[i]-v)*d/length);
+      for(let d=0;d<length;d+=0.34)result.push({start:point(d),end:point(Math.min(d+0.20,length)),alpha:Math.min(alpha,target.alpha)});
+    }
+    return result;
+  }
+
   function createStructure(source, mode = "molecule") {
     if(mode.startsWith("cif-network:")) {
       const [,view,ruleText,center,ligand,cutoff,count,label] = mode.split(":");
@@ -655,7 +684,7 @@
       const [,view,center,ligand,cutoff,count,label] = mode.split(":");
       if(view === "bonded") {
         const structure=F.CIFStructure.createBondedStructure(source,ligand,center);
-        return structure.mode === "cell" ? {...structure,bondSegments:cellBondSegments(structure)} : structure;
+        return structure.mode === "cell" ? expandableCell(structure) : structure;
       }
       const reader = F.StructureCell;
       let cell = {...reader.read(source,{maxPositions:600}),measurePositions:true};
@@ -665,7 +694,7 @@
         if(view === "independent") return reader.independentMolecules(cell);
         if(view === "ice-supercell") return reader.supercell(cell,[2,2,1]);
         if(view === "packing") return F.CIFStructure.completeCell(cell);
-        return {...cell,canComplete:true,showHydrogenByDefault:view==="ice-cell",bondSegments:cellBondSegments(cell)};
+        return expandableCell({...cell,canComplete:true,showHydrogenByDefault:view==="ice-cell"});
       }
       if(view === "sites" || view === "shell") {
         cell=reader.occupiedSites(cell);
@@ -680,8 +709,7 @@
     }
     if (["co-precursor-molecule", "co-precursor-cell", "co-precursor-coordination"].includes(mode)) {
       const structure = F.CIFStructure.createBondedStructure(source, mode.slice("co-precursor-".length), "Co");
-      if (structure.mode === "cell") structure.bondSegments = cellBondSegments(structure);
-      return structure;
+      return structure.mode === "cell" ? expandableCell(structure) : structure;
     }
     if (mode === "library-cell") return F.StructureCell.read(source);
     if (mode === "practical-cell" || mode === "practical-sites") {
@@ -698,7 +726,15 @@
       fail("Unbekannter Darstellungsmodus: " + mode);
     }
     if (/^[ \t]*data_NaCl[ \t\r]*$/im.test(source)) {
-      return F.NaClStructure.createStructure(source, mode);
+      const base=F.NaClStructure.createStructure(source, mode);
+      if(!F.StructureCell)return base;
+      const cutoff=base.cellLengthsAngstrom[0]/2+1e-6;
+      const cell=F.StructureCell.network({...base,mode:"cell",
+        atoms:F.NaClStructure.createStructure(source,"cell").atoms,
+        cellMatrix:base.cellLengthsAngstrom.map((v,i)=>[0,1,2].map(j=>i===j?v:0))},[["Na","Cl",cutoff]]);
+      if(mode==="cell")return F.StructureCell.expandable({...base,cellMatrix:cell.cellMatrix},cell);
+      const local=F.StructureCell.coordination(cell,"Na","Cl",cutoff,6);
+      return F.StructureCell.expandable(local,cell,cell.atoms.find(atom=>atom.id===local.atoms[0].sourceSiteId).fractional);
     }
     if (/^[ \t]*_atom_site_aniso_label(?:[ \t\r\n]|$)/im.test(source)) {
       if (!F.CIFStructure) throw new Error("Co-Strukturmodul nicht geladen.");
@@ -708,8 +744,7 @@
       // Das Elementsymbol ist unabhängig vom frei vergebenen CIF-Atomlabel.
       if (sites && sites.rows.some(row => row._atom_site_type_symbol === "Co")) {
         const structure = F.CIFStructure.createCoStructure(source, mode, parsed);
-        if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
-        return structure;
+        return mode === "cell" ? expandableCell(structure) : structure;
       }
     }
     // Auch die Zellansicht muss die Einzelkäfigprüfungen bestehen.
@@ -727,19 +762,28 @@
     if (mode === "molecule") return {...molecule, mode, environmentCell:cell,
       originAngstrom:molecule.chosenCenterFractional.map((v,i)=>v*molecule.cellLengthsAngstrom[i]),
       atoms:molecule.atoms.map(atom=>({...atom,fractional:atom.fractional.map((v,i)=>v+atom.cellShift[i])}))};
-    cell.bondSegments = cellBondSegments(cell);
-    return cell;
+    return F.StructureCell ? expandableCell(cell) : {...cell,bondSegments:cellBondSegments(cell)};
   }
 
-  function contactStructure(base, depth) {
+  function expandableCell(cell) {
+    const base={...cell,bondSegments:cellBondSegments(cell)};
+    if(!F.StructureCell)return base;
+    const bonds=cell.bonds.map(bond=>({...bond,cellShift:bond.deltaFractional.map((v,i)=>
+      Math.round(v+cell.atoms[bond.a].fractional[i]-cell.atoms[bond.b].fractional[i]))}));
+    return F.StructureCell.expandable(base, {...cell,bonds});
+  }
+
+
+  function contactStructure(base, depth, selectedIds = null) {
     const {cell,bonds,origin,limit,initialDepth=0}=base.contactExpansion;
-    const {atoms,bonds:visibleBonds} = F.StructureCell.expandContacts(cell,bonds,base.atoms,depth+initialDepth,origin,limit);
+    const {atoms,bonds:visibleBonds} = F.StructureCell.expandContacts(cell,bonds,base.atoms,depth+(selectedIds ? 0 : initialDepth),origin,limit,selectedIds);
     const bondSegments=base.mode==="cell" ? visibleBonds.flatMap(bond=>{
       const start=atoms[bond.a].positionAngstrom,end=atoms[bond.b].positionAngstrom;
       const mid=start.map((n,i)=>(n+end[i])/2);
       return [[start,mid],[mid,end]].map(([startAngstrom,endAngstrom],half)=>({...bond,id:`${bond.id}-${half}`,half,startAngstrom,endAngstrom}));
     }) : [];
-    return {...base,atoms,bonds:visibleBonds,bondSegments,contactDepth:depth};
+    // Hydrogen contacts store indices into the unchanged prefix of the atom list.
+    return {...base,atoms,bonds:visibleBonds,bondSegments,contactDepth:selectedIds ? base.contactDepth : depth};
   }
 
   // Numerisch prüfbarer Einstieg, unabhängig von sichtbarer VR-Skalierung.
@@ -816,6 +860,7 @@
     group.traverse(mesh => {
       if (mesh.userData.fkcHydrogenContacts) {
         mesh.visible = !!group.userData.fkcShowHydrogenContacts && !group.userData.fkcHideHydrogen;
+        mesh.scale.x=mesh.scale.z=0.024*(group.userData.fkcHydrogenThickness || 1);
       } else if (mesh.userData.fkcAtom) {
         mesh.visible = !(group.userData.fkcHideHydrogen && mesh.userData.fkcAtom.element === "H");
         // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
@@ -826,7 +871,7 @@
           styleId === "ball-stick" ? style.atomRadius * (group.userData.fkcAtomScale || 1) *
             (mesh.userData.fkcAtom.element === "H" ? 0.5 : 1) : style.atomRadius);
       } else if (mesh.userData.fkcPolyhedron) {
-        mesh.visible = styleId === "polyhedral";
+        mesh.visible = mesh.userData.fkcPolyhedron.selected || styleId === "polyhedral";
       } else if (mesh.userData.fkcBond) {
         mesh.visible = style.bondRadius > 0;
         const structure = group.userData.fkcStructure;
@@ -848,7 +893,7 @@
   }
 
   F.CIF = {
-    createStructure, contactStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements, hydrogenContactDashes,
+    createStructure, contactStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements, hydrogenContactDashes, environmentHydrogenDashes,
     maxContactDepth: 3,
     setContactDepth(root, depth) {
       const visual = root?.querySelector(".model-visual");
@@ -865,32 +910,79 @@
         F.setStatus(error.message);
         return false;
       }
+      component.contactBase = base;
+      this.replaceContactVisual(root, visual, component, structure, built);
+      F.setStatus(`Kontaktschalen: ${depth} · ${structure.atoms.length} sichtbare Positionen`);
+      return true;
+    },
+    extendSelection(root, ids, polyhedron = false) {
+      const visual = root?.querySelector(".model-visual");
+      const component = visual?.components["fkc-cif-model"];
+      const current = visual?.fkcStructure;
+      if (!component?.built || !current || root.fkcPendingVisual || !ids.size) return false;
+      if (!polyhedron && !current.contactExpansion) return false;
+      try {
+        let next = current.contactExpansion ? contactStructure(current, 1, ids) : {...current};
+        if (polyhedron) {
+          const center=next.atoms.findIndex(atom=>ids.has(atom.id));
+          if(center<0)return false;
+          // Ohne Periodengraph sind nur explizit sichtbare, vollständige Kanten zulässig.
+          const known=next.polyhedra?.find(entry=>entry.center===center);
+          const neighbors=known?.neighbors || [...new Set((current.contactExpansion || !["cell","cell-complete"].includes(next.mode) ? next.bonds : [])
+            .flatMap(b=>b.a===center?[b.b]:b.b===center?[b.a]:[]))];
+          if(neighbors.length<4 || neighbors.length>12)throw new Error("Keine vollständige räumliche Koordinationshülle für diesen Platz.");
+          polyhedronTriangles(neighbors.map(i=>next.atoms[i].positionAngstrom));
+          next={...next,polyhedra:[...(next.polyhedra||[]).filter(p=>p.center!==center),{center,neighbors,selected:true}]};
+        } else if (next.atoms.length===current.atoms.length) {
+          F.setStatus("Keine weiteren Kontakte für diese Auswahl im Datensatz.");return false;
+        }
+        const built=buildMesh(next);
+        component.contactBase ||= current;
+        this.replaceContactVisual(root,visual,component,next,built);
+        F.setStatus(polyhedron ? "Koordinationshülle eingeblendet." : `${next.atoms.length-current.atoms.length} Kontaktpositionen ergänzt.`);
+        return true;
+      } catch(error){F.setStatus(error.message);return false;}
+    },
+    resetSelectionGeometry(root) {
+      const visual=root?.querySelector(".model-visual");
+      const component=visual?.components["fkc-cif-model"];
+      if(!component?.contactBase || root.fkcPendingVisual)return false;
+      const base=component.contactBase;
+      this.replaceContactVisual(root,visual,component,base,buildMesh(base));
+      return true;
+    },
+    replaceContactVisual(root,visual,component,structure,built) {
       const previous = component.built;
-      for (const key of ["fkcBondColorMode", "fkcBondColor", "fkcBondThickness", "fkcHideHydrogen", "fkcAtomScale", "fkcShowHydrogenContacts"]) {
+      for (const key of ["fkcBondColorMode", "fkcBondColor", "fkcBondThickness", "fkcHideHydrogen", "fkcAtomScale", "fkcShowHydrogenContacts", "fkcHydrogenThickness"]) {
         built.group.userData[key] = previous.group.userData[key];
       }
       applyStyle(built.group, previous.group.userData.fkcStyle || "ball-stick");
       const scene = F.getScene();
       scene?.components["fkc-atom-labels"]?.clear();
       scene?.components["fkc-measurements"]?.reset(root);
-      component.contactBase = base;
       component.built = built;
       visual.fkcStructure = structure;
       // Kein model-loaded: Der Koordinatenrahmen und Griffbereich der Basis bleiben stehen.
       visual.setObject3D("mesh", built.group);
       previous.dispose();
       F.invalidateHits();
-      F.setStatus(`Kontaktschalen: ${depth} · ${structure.atoms.length} sichtbare Positionen`);
-      return true;
     },
     setHydrogenContacts(root, enabled) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
-      if (!mesh || !visual.fkcStructure?.hydrogenContacts?.length || root.fkcPendingVisual) return false;
+      if (!mesh || !(visual.fkcStructure?.hydrogenContacts?.length || visual.fkcStructure?.environmentCell?.hydrogenContacts?.length) || root.fkcPendingVisual) return false;
       root.fkcShowHydrogenContacts = !!enabled;
       mesh.userData.fkcShowHydrogenContacts = root.fkcShowHydrogenContacts;
       applyStyle(mesh, mesh.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(mesh);
       return true;
+    },
+    setHydrogenThickness(root,factor) {
+      const group=root.querySelector(".model-visual")?.getObject3D("mesh");
+      if(!group || ![0.5,1,2].includes(factor))return;
+      root.fkcHydrogenThickness=group.userData.fkcHydrogenThickness=factor;
+      applyStyle(group,group.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(group);
     },
     setAtomOptions(root, hideHydrogen, atomScale) {
       if (atomScale !== undefined && ![0.5, 0.75, 1].includes(atomScale)) return false;
@@ -919,6 +1011,7 @@
       const built = buildMesh(structure);
       Object.assign(built.group.userData, {fkcHideHydrogen: root.fkcHideHydrogen,
         fkcShowHydrogenContacts: root.fkcShowHydrogenContacts,
+        fkcHydrogenThickness:root.fkcHydrogenThickness,
         fkcAtomScale: root.fkcAtomScale || 1, fkcBondThickness: root.fkcBondThickness || 1,
         fkcBondColorMode: root.fkcBondColorMode || "auto", fkcBondColor: root.fkcBondColor || "#949494"});
       applyStyle(built.group, root.fkcStyle || "ball-stick");
@@ -1003,6 +1096,7 @@
         }
       }
       state.refresh = false;
+      state.rebuildHydrogen?.();
     },
     clickEnvironment(hit) {
       const id = hit.mesh && hit.mesh.userData.fkcEnvironmentId;
@@ -1081,12 +1175,15 @@
     const mixedMaterial = structure.atoms.some(atom=>atom.siteOccupants) ?
       new T.MeshStandardMaterial({color:"#ffffff",vertexColors:true,roughness:0.6}) : null;
     const mixedGeometries = new Map();
+    const mixedMeshes = [];
+    const facingWorld = new T.Vector3(), facingLocal = new T.Vector3(), meshWorld = new T.Vector3();
+    const localRotation = new T.Quaternion(), worldRotation = new T.Quaternion();
     function mixedSphere(occupants) {
       const key=occupants.map(site=>site.element).join(":");
       if(!mixedGeometries.has(key)){
         const geometry=sphere.toNonIndexed();
         const positions=geometry.getAttribute("position");
-        const colors=occupants.slice(0,2).map(site=>new T.Color(elements[site.element].color));
+        const colors=occupants.slice(0,2).map(site=>new T.Color(({Hg:"#ce4686",Ag:"#36cbe8"})[site.element] || elements[site.element].color));
         const values=[];
         for(let i=0;i<positions.count;i+=3){
           const color=colors[positions.getX(i)+positions.getX(i+1)+positions.getX(i+2)>=0?0:1];
@@ -1096,18 +1193,6 @@
         mixedGeometries.set(key,geometry);
       }
       return mixedGeometries.get(key);
-    }
-    const partialMaterials = new Map();
-    function partialMaterial(atom, source) {
-      const key = `${atom.siteOccupants ? "mixed" : atom.element}:${atom.occupancy}`;
-      if (!partialMaterials.has(key)) {
-        const material = source.clone();
-        material.transparent = true;
-        material.opacity = Math.min(0.8, Math.max(0.18, atom.occupancy));
-        material.depthWrite = false;
-        partialMaterials.set(key, material);
-      }
-      return partialMaterials.get(key);
     }
 
     const bondMaterial = new T.MeshStandardMaterial({
@@ -1122,6 +1207,7 @@
     });
 
     const axis = new T.Vector3(0, 1, 0);
+    const axisX = new T.Vector3(1, 0, 0);
 
     structure.atoms.forEach(atom => {
       if (!atomMaterials.has(atom.element)) {
@@ -1130,9 +1216,10 @@
           color: elements[atom.element].color, roughness: 0.45, metalness: 0}));
       }
       const atomMaterial = atom.siteOccupants ? mixedMaterial : atomMaterials.get(atom.element);
-      const mesh = new T.Mesh(atom.siteOccupants ? mixedSphere(atom.siteOccupants) : sphere,
-        atom.occupancy < 1 ? partialMaterial(atom, atomMaterial) : atomMaterial);
-
+      const mesh = new T.Mesh(atom.siteOccupants ? mixedSphere(atom.siteOccupants) : sphere, atomMaterial);
+      if(atom.siteOccupants) {
+        mixedMeshes.push(mesh);
+      }
       mesh.name = atom.id;
       mesh.position.fromArray(atom.positionAngstrom);
 
@@ -1183,6 +1270,7 @@
         mesh.userData.fkcNeutralMaterial = material;
       }
       group.add(mesh);
+      return mesh;
     }
 
     if (structure.mode === "cell" || structure.mode === "cell-complete") {
@@ -1241,23 +1329,49 @@
       polyhedronMaterials.push(material);
     });
     const dashes = hydrogenContactDashes(structure);
-    let contactLines;
-    if (dashes.length) {
-      const geometry = new T.BufferGeometry();
-      geometry.setAttribute("position", new T.Float32BufferAttribute(dashes.flat(2), 3));
-      contactLines = new T.LineSegments(geometry, new T.LineBasicMaterial({color: "#df2525"}));
-      contactLines.userData.fkcHydrogenContacts = true;
-      contactLines.visible = false;
-      contactLines.raycast = function () {};
-      group.add(contactLines);
+    const hydrogenRed = new T.MeshBasicMaterial({color:"#df2525"});
+    const hydrogenPreview = new T.MeshBasicMaterial({color:"#df2525",transparent:true,opacity:0.25,depthWrite:false});
+    const addDash=(start,end,material)=>{
+      const dash=rod(start,end,"H-Kontakt",material,0.024*(group.userData.fkcHydrogenThickness||1));
+      if(!dash)return null;
+      dash.userData.fkcHydrogenContacts=true;dash.visible=false;dash.raycast=()=>{};
+      return dash;
+    };
+    dashes.forEach(([a,b])=>addDash(a,b,hydrogenRed));
+    const env=group.userData.fkcEnvironment;
+    if(env){
+      let meshes=[];
+      env.rebuildHydrogen=()=>{
+        meshes.forEach(mesh=>mesh.removeFromParent());meshes=[];
+        if(!group.userData.fkcShowHydrogenContacts || group.userData.fkcHideHydrogen)return;
+        const visible=[...env.records].filter(([id,r])=>r.built.group.visible)
+          .map(([id,r])=>({candidate:r.candidate,alpha:env.selected.has(id)?1:0.25}));
+        meshes=environmentHydrogenDashes(structure,visible).flatMap(d=>{
+          const mesh=addDash(d.start,d.end,d.alpha===1?hydrogenRed:hydrogenPreview);
+          if(!mesh)return [];
+          mesh.visible=true;return [mesh];
+        });
+      };
     }
     return {
       group,
-      dispose: function () {
-        if (contactLines) {
-          contactLines.geometry.dispose();
-          contactLines.material.dispose();
+      faceMixed(camera) {
+        if(!mixedMeshes.length || !camera)return;
+        camera.getWorldPosition(meshWorld);
+        group.getWorldQuaternion(worldRotation).invert();
+        for(const mesh of mixedMeshes){
+          mesh.getWorldPosition(facingWorld);
+          facingWorld.subVectors(meshWorld,facingWorld).normalize();
+          if(!facingWorld.lengthSq())continue;
+          // Die Trennebene enthält die Blickrichtung: Beide Halbkugeln bleiben sichtbar.
+          facingLocal.set(0,1,0).cross(facingWorld);
+          if(facingLocal.lengthSq()<1e-8)facingLocal.set(0,0,1).cross(facingWorld);
+          facingLocal.normalize().applyQuaternion(worldRotation);
+          mesh.quaternion.copy(localRotation.setFromUnitVectors(axisX,facingLocal));
         }
+      },
+      dispose: function () {
+        hydrogenRed.dispose(); hydrogenPreview.dispose();
         const environment = group.userData.fkcEnvironment;
         if (environment) for (const record of environment.records.values()) {
           record.materials.forEach(material => material.dispose());
@@ -1270,7 +1384,6 @@
         atomMaterials.forEach(material => material.dispose());
         mixedMaterial?.dispose();
         mixedGeometries.forEach(geometry=>geometry.dispose());
-        partialMaterials.forEach(material => material.dispose());
         bondMaterial.dispose();
         frameMaterial.dispose();
       }
@@ -1302,6 +1415,10 @@
 
     update: function () {
       this.load();
+    },
+
+    tick: function () {
+      this.built?.faceMixed(this.el.sceneEl?.camera);
     },
 
     load: async function () {
@@ -1345,6 +1462,7 @@
         if(root && structure.defaultStyle)root.fkcStyle=structure.defaultStyle;
         built.group.userData.fkcShowHydrogenContacts = root && root.fkcShowHydrogenContacts;
         built.group.userData.fkcAtomScale = root && root.fkcAtomScale || 1;
+        built.group.userData.fkcHydrogenThickness = root?.fkcHydrogenThickness || 1;
         applyStyle(built.group, structure.defaultStyle || (root && root.fkcStyle) || "ball-stick");
 
         this.built = built;

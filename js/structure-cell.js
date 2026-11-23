@@ -58,7 +58,7 @@
   }
 
   // Strukturregeln liefern die Kanten; die Suche kennt keine Elementsymbole.
-  function expandContacts(cell, contacts, seeds, depth, origin = [0, 0, 0], limit = 256) {
+  function expandContacts(cell, contacts, seeds, depth, origin = [0, 0, 0], limit = 256, selectedIds = null) {
     const adjacency = cell.atoms.map(() => []);
     for (const bond of contacts) {
       adjacency[bond.a].push({site: bond.b, shift: bond.cellShift, bond});
@@ -71,6 +71,7 @@
       const end = atoms.length;
       for (; first < end; first++) {
         const current = atoms[first];
+        if (step === 0 && selectedIds && !selectedIds.has(current.id)) continue;
         for (const edge of adjacency[current.siteIndex]) {
           const base = cell.atoms[edge.site];
           const cellShift = current.cellShift.map((value, axis) => value + edge.shift[axis]);

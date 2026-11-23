@@ -2388,12 +2388,9 @@
       door,
       {x: 0, y: 1.95, z: 0.075},
       "0 0 0",
-      0.96,
-      0.54,
-      textBoard([
-        "Zurück",
-        "zum Begrüßungsraum"
-      ], "#eee7d5"),
+      1.32,
+      0.55,
+      textBoard(["Zurück"], "#eee7d5"),
       "welcome"
     );
 

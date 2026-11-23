@@ -171,13 +171,15 @@ for (const [start, end] of contactDashes) {
 }
 assert.equal(F.CIF.hydrogenContactDashes(cell).length, 0);
 assert.equal(F.CIF.hydrogenContactDashes(coComplex).length, 0);
-const contactOverlay = {visible: false, userData: {fkcHydrogenContacts: true}};
+const contactOverlay = {visible: false, scale:{}, userData: {fkcHydrogenContacts: true}};
 const contactGroup = {userData: {fkcStructure: coCell}, traverse: visit => visit(contactOverlay)};
 const contactRoot = {querySelector: () => ({fkcStructure: coCell, getObject3D: () => contactGroup})};
 F.CIF.applyStyle(contactGroup, "ball-stick");
 assert.equal(contactOverlay.visible, false);
 assert.equal(F.CIF.setHydrogenContacts(contactRoot, true), true);
 assert.equal(contactOverlay.visible, true);
+F.CIF.setHydrogenThickness(contactRoot,2);
+assert.equal(contactOverlay.scale.x,0.048);
 contactGroup.userData.fkcHideHydrogen = true;
 F.CIF.applyStyle(contactGroup, "space-filling");
 assert.equal(contactOverlay.visible, false);

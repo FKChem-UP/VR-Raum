@@ -74,6 +74,11 @@ for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
     if(v.cifMode==="cif-excerpt:hkust:focus") {
       assert.equal(structure.atoms.filter(a=>a.element==="Cu").length,2);
       assert.equal(structure.atoms.filter(a=>a.element==="O").length,5);
+      const terminal=structure.atoms.find(a=>a.element==="O" &&
+        F.CIF.contactStructure(structure,1,new Set([a.id])).atoms.length>structure.atoms.length);
+      assert.ok(terminal);
+      const targeted=F.CIF.contactStructure(structure,1,new Set([terminal.id]));
+      assert.ok(targeted.atoms.length<F.CIF.contactStructure(structure,1).atoms.length);
     }
     assert.ok(structure.atoms.length && structure.atoms.every(a=> F.CIF.elements[a.element] && a.positionAngstrom.every(Number.isFinite)),v.title);
     assert.equal(new Set(structure.atoms.map(a=>a.id)).size,structure.atoms.length,v.title);
@@ -102,6 +107,13 @@ assert.equal(iceLarge.atoms.length,4*iceCell.atoms.length);
 assert.ok(iceLarge.hydrogenContacts.length>iceCell.hydrogenContacts.length);
 const nic = fs.readFileSync(path.join(root,"assets/praktikum/Nikotinsaeureamid_NICOAM05.cif"),"utf8");
 assert.ok(F.CIFStructure.environmentCandidates(F.CIF.createStructure(nic,"cif-view:molecule"),3).length>0);
+const nicMolecule=F.CIF.createStructure(nic,"cif-view:molecule");
+const candidates=F.CIFStructure.environmentCandidates(nicMolecule,3);
+const preview=F.CIF.environmentHydrogenDashes(nicMolecule,candidates.map(candidate=>({candidate,alpha:0.25})));
+assert.ok(preview.length>0 && preview.every(dash=>dash.alpha===0.25));
+const accepted=F.CIF.environmentHydrogenDashes(nicMolecule,candidates.map(candidate=>({candidate,alpha:1})));
+assert.equal(accepted.length,preview.length);
+assert.ok(accepted.every(dash=>dash.alpha===1));
 assert.ok(F.CIF.createStructure(nic,"cif-view:molecular-cell").hydrogenContacts.every(c=>c.inferred));
 assert.ok(F.CIF.createStructure(nic,"cif-view:molecular-cell").hydrogenContacts.length>0);
 for(const id of ["vorlesung-1","vorlesung-2","vorlesung-3","vorlesung-6","vorlesung-7","vorlesung-8","team-a","team-b"]){

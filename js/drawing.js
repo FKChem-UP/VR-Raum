@@ -35,20 +35,51 @@
     setMode(mode) {
       if (!["laser", "paint"].includes(mode)) return;
       if (mode === "paint") F.AtomPlane?.cancel();
+      if (mode === "paint") F.StructureAnalysis?.cancel();
       this.mode = mode;
       if (mode === "paint" && F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
       if (F.Menu) F.Menu.blockDrawing();
     },
     strokes: [],
 
+    paintObject(hit, previous) {
+      const mesh = hit.mesh;
+      const atom = mesh?.userData.fkcAtom;
+      const bond = mesh?.userData.fkcBond;
+      if (hit.type !== "model" || (!atom && !bond)) return null;
+      const key = atom ? atom.id : bond.bondId || bond.id || `${bond.a}:${bond.b}`;
+      const group = mesh.parent;
+      if (previous?.paintKey === key && previous.paintParent === group && !previous.removed) return previous;
+      const meshes = atom ? [mesh] : group.children.filter(candidate => {
+        const edge = candidate.userData.fkcBond;
+        return edge && (edge.bondId || edge.id || `${edge.a}:${edge.b}`) === key;
+      });
+      const material = new T.MeshBasicMaterial({color:this.color,opacity:this.opacity,transparent:true,depthWrite:false,
+        polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+      const overlays = meshes.map(target => {
+        const overlay = new T.Mesh(target.geometry, material);
+        overlay.userData.fkcDrawing = true;
+        overlay.renderOrder = 3;
+        overlay.raycast = () => {};
+        target.add(overlay);
+        return overlay;
+      });
+      if(this.strokes.length >= MAX_STROKES)this.remove(this.strokes[0]);
+      const stroke = {owner:hit.el,paintKey:key,paintParent:group,overlays,material};
+      this.strokes.push(stroke);
+      return stroke;
+    },
+
     remove: function (stroke) {
       if (!stroke || stroke.removed) return;
 
       stroke.removed = true;
-      stroke.group.removeFromParent();
-
-      stroke.geometry.dispose();
-      stroke.dotGeometry.dispose();
+      if(stroke.overlays)stroke.overlays.forEach(mesh=>mesh.removeFromParent());
+      else {
+        stroke.group.removeFromParent();
+        stroke.geometry.dispose();
+        stroke.dotGeometry.dispose();
+      }
       stroke.material.dispose();
 
       const index = this.strokes.indexOf(stroke);
@@ -209,7 +240,7 @@
     sample: function (stroke, hit, hand) {
       hit = this.surfaceHit(hit);
       if (!hit) return null;
-      return this.sampleSurface(stroke, hit);
+      return this.paintObject(hit,stroke) || this.sampleSurface(stroke, hit);
     },
 
     // Bereits als Zeichenfläche bestätigter Treffer (auch geführter Laserstrich).
