@@ -380,6 +380,10 @@
     "Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15");
   const copperExcerpt = (record, kind) => views(record,[[`cif-excerpt:${kind}:all`,"CIF-Ausschnitt"],
     [`cif-excerpt:${kind}:focus`,"Cu-Knoten · Umgebung"]]);
+  const hkustFramework = views(practicalCif("HKUST-1 · Gerüst und Pore", "HKUST-1_ohneH.cif", "CSD FIQCEN", undefined,
+    "Periodisches Cu–BTC-Gerüst aus geprüften Symmetrieplätzen. Die große Pore ist aus Nachbarzellen um den Ursprung zusammengesetzt. Axiale O-Plätze separat; ihre Besetzung und die Porengäste sind im Export nicht eindeutig belegt. Messung zwischen Atomzentren, nicht freie Porenweite."),[
+    ["cif-hkust:pore","Große Pore"],["cif-hkust:cell","Elementarzelle · Gerüst"],
+    ["cif-hkust:axial","Zelle · axiale O-Plätze"],["cif-excerpt:hkust:focus","Cu-Knoten"]]);
   const coPrecursor = practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15",
     "co-precursor-molecule", "Die Komplexansicht zeigt das einkernige Kation. Am Co koordinieren zwei N- und zwei O-Atome der Pyridinmethanol-Liganden sowie zwei O-Atome aus gebundenem Wasser. Die Chlorid-Gegenionen und die CIF-Wasserstoffbrücken sind in der Elementarzelle sichtbar.");
   coPrecursor.variantAlignment = "individual";
@@ -393,8 +397,7 @@
     ["HKUST-1", "#15766f", "#a8e3d3", [
       copperExcerpt(practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", undefined,
         "Cu₂-Schaufelrad: vier Carboxylat-O, ein axiales Wasser-O und das zweite Cu, soweit im Export vorhanden. Umgebung wächst nur innerhalb des Ausschnitts."),"hkust"),
-      copperExcerpt(practicalCif("HKUST-1 · Referenzausschnitt", "HKUST-1_ohneH.cif", "CSD FIQCEN", undefined,
-        "Cu–Cu-Kontakt und Cu–O-Koordination aus den exportierten Positionen. Umgebung wächst nur innerhalb des Ausschnitts."),"hkust"),
+      hkustFramework,
       copperExcerpt(practicalCif("Nebenprodukt VUXBUL · Ausschnitt", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL", undefined,
         "Cu–O- und Ligandenbindungen aus den exportierten Positionen. Umgebung wächst nur innerhalb des Ausschnitts."),"vuxbul")]],
     ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#f6c7b9", [
@@ -501,7 +504,7 @@
   welcome("vorlesung-6", lattice({model:"assets/structures/Cu.cif", info:"Quelle: Cu.cif · kubisch dichteste Packung. Die zwölf Stäbe der Koordinationsansicht markieren nächste Nachbarn, keine kovalenten Bindungen."},
     [[shell("Cu","Cu",2.8,12),"12 nächste Nachbarn"],["cif-network:packing:Cu/Cu/2.8","Dichteste Packung"]],"Cu/Cu/2.8"));
   welcome("vorlesung-8", molecular({model:"assets/structures/S8.cif",info:"Quelle: S8.cif · elementarer Schwefel."}));
-  welcome("team-a", room("team-a").zones[1].models[0]);
+  welcome("team-a", hkustFramework);
 
   Object.assign(v1.stations[4], {
     title: "Eis",

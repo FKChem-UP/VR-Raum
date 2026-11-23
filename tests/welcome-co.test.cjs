@@ -17,7 +17,7 @@ const F = {getScene: () => ({addEventListener() {}, querySelectorAll: () => []})
   }}};
 const context = {window: {FKCVR: F}, THREE: {}, AFRAME: {THREE: {}, registerComponent() {}},
   document: {getElementById: id => nodes.get(id)}, console: {info() {}}};
-for (const name of ["cif-structure", "structure-cell", "zns-structure", "cif-model", "rooms", "vr-tools"]) {
+for (const name of ["cif-structure", "structure-cell", "hkust-structure", "zns-structure", "cif-model", "rooms", "vr-tools"]) {
   vm.runInNewContext(fs.readFileSync(path.join(root, "js", name + ".js"), "utf8"), context);
 }
 const index = F.rooms.findIndex(room => room.id === "team-b");
@@ -27,7 +27,7 @@ assert.equal(teamB.zones[0].models.length, 4);
 assert.ok(teamB.zones[0].models.slice(2).every(entry => !entry.model));
 assert.equal(teamB.zones[4].wall, "back");
 assert.equal(teamB.zones[4].along, 0);
-const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:78, HKUST_1_mitH:65, HKUST_1_ohneH:57,
+const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:78, HKUST_1_mitH:65, HKUST_1_ohneH:624,
   Nebenprodukt_VUXBUL:60, YBa2Cu3O7_2016:13, YBa2Cu3O7_2026:13, YBa2Cu3O6_tetragonal_HT:12,
   Eu_Komplex2017:544, Verbindung1_cis_Co_Edukt:156, CoFe2O4:56, Nikotinsaeureamid_NICOAM05:60,
   AgHgI4_Tieftemperaturform:7, AgHgI4_Hochtemperaturform:8, Vanillin_YUHTEA:152};
@@ -61,6 +61,24 @@ for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
   }
 }
 const activeModels = [...F.welcomeRoom.exhibits, ...F.rooms.filter(r=>r.zones).flatMap(r=>r.stations)];
+const hkust = F.welcomeRoom.exhibits.find(entry=>entry.roomId==="team-a");
+assert.equal(hkust.cifMode,"cif-hkust:pore");
+const hkustSource=fs.readFileSync(path.join(root,hkust.model),"utf8");
+const framework=F.CIF.createStructure(hkustSource,"cif-hkust:cell").contactExpansion.cell;
+assert.equal(framework.atoms.length,624);
+assert.equal(framework.bonds.length,792);
+assert.equal(framework.bonds.filter(b=>framework.atoms[b.a].element==="Cu" && framework.atoms[b.b].element==="Cu").length,24);
+assert.ok(framework.bonds.some(b=>b.cellShift.some(Boolean)));
+const pore=F.CIF.createStructure(hkustSource,"cif-hkust:pore");
+assert.equal(pore.atoms.length,312);
+for(const axis of [0,1,2]) {
+  assert.ok(pore.atoms.some(a=>a.positionAngstrom[axis]>7));
+  assert.ok(pore.atoms.some(a=>a.positionAngstrom[axis]<-7));
+}
+assert.equal(F.CIF.contactStructure(pore,1).atoms.length,384);
+const axial=F.CIF.createStructure(hkustSource,"cif-hkust:axial").contactExpansion.cell;
+assert.equal(axial.atoms.filter(a=>a.cifLabel==="O1").length,48);
+assert.ok(axial.atoms.every(a=>a.cifLabel!=="O3"));
 const molecules = {H2O:3,S8:8,BENZIL03_monoklin:26,BENZIL04_trigonal:26,Vanillin_YUHTEA:19,Nikotinsaeureamid_NICOAM05:15};
 for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
   for(const v of s.variants || [s]) {

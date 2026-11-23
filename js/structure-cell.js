@@ -1,7 +1,7 @@
 "use strict";
 
 (function (F) {
-  function read(source, {explicit = false, maxPositions = 512} = {}) {
+  function read(source, {explicit = false, maxPositions = 512, labels = null, mergeTolerance = 0} = {}) {
     const {parse, numeric, cellMatrix, cartesian, symmetryPoint} = F.CIFStructure;
     const {values, loops} = parse(source);
     const lengths = ["a", "b", "c"].map(axis => numeric(values["_cell_length_" + axis]));
@@ -15,6 +15,7 @@
     const atoms = [];
     for (const site of sites.rows) {
       const label = site._atom_site_label;
+      if (labels && !labels.has(label)) continue;
       const element = /^([A-Z][a-z]?)(?:\d*[+-])?$/.exec(site._atom_site_type_symbol)?.[1];
       const occupancy = numeric(site._atom_site_occupancy ?? "1");
       if (!label || !element || occupancy <= 0 || occupancy > 1) throw new Error("Ungültige Atomposition in der CIF.");
@@ -29,12 +30,19 @@
           const difference = Math.abs(value - fractional[axis]);
           return Math.min(difference, 1 - difference) < 1e-7;
         }))) continue;
+        if (mergeTolerance && atoms.some(atom => atom.element === element && atom.occupancy === occupancy &&
+            Math.hypot(...cartesian(fractional.map((v,i)=>{
+              const d=v-atom.fractional[i];return d-Math.round(d);
+            }),matrix)) < mergeTolerance)) continue;
         images.push(fractional);
         const modelNumber = atoms.length + 1;
         if (modelNumber > maxPositions) throw new Error("Zu viele Positionen für die Zellansicht.");
         atoms.push({id: "site-" + modelNumber, modelNumber, cifLabel: label, element, occupancy, fractional,
           positionAngstrom: cartesian(fractional, matrix)});
       }
+    }
+    if (labels && [...labels].some(label=>!atoms.some(atom=>atom.cifLabel===label))) {
+      throw new Error("Nicht alle geprüften CIF-Ausgangsplätze wurden gefunden.");
     }
     const operations = symmetry?.rows.map(row=>row._symmetry_equiv_pos_as_xyz || row._space_group_symop_operation_xyz) || [];
     return {kind: "positions", name: "CIF-Zellpositionen", mode: "cell", atoms, bonds: [], bondSegments: [], operations,

@@ -638,6 +638,7 @@
   }
 
   function createStructure(source, mode = "molecule") {
+    if(mode.startsWith("cif-hkust:"))return F.HKUSTStructure.build(source,mode.slice("cif-hkust:".length));
     if(mode.startsWith("cif-network:")) {
       const [,view,ruleText,center,ligand,cutoff,count,label] = mode.split(":");
       const S=F.StructureCell;

@@ -613,7 +613,7 @@
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
-          label: /^cif-(view|network|excerpt):/.test(variant.cifMode) ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
+          label: /^cif-(view|network|excerpt|hkust):/.test(variant.cifMode) ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
             "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle",
             "co-precursor-molecule": "Komplexkation", "co-precursor-cell": "Zelle", "co-precursor-coordination": "Koordination"})[variant.cifMode] ||
             (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
