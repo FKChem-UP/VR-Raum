@@ -4,12 +4,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const F = {Settings: {laserHand: "right"}};
+const F = {Settings: {laserHand: "right", lasers:{right:"#ff9d38"},laserDiameter:0.003}};
 F.Draw = {mode: "laser", color: "#ffcc33", opacity: 0.35, strokes: [],
   setMode(mode) { this.mode = mode; }, clear() {}, remove() {}};
 const components = {};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/hand-menu.js"), "utf8"), {
-  window: {FKCVR: F},
+  window: {FKCVR: F}, document:{getElementById:()=>null},
   AFRAME: {THREE: {}, registerComponent: (name, component) => { components[name] = component; }}
 });
 const state = {open: false, since: null};
@@ -76,6 +76,7 @@ assert.equal(F.HandMenu.readViewerHead(fallback, null, position), true);
 assert.equal(cameraUpdated, true);
 assert.equal(F.HandMenu.readViewerHead({}, null, position), false);
 const ctx = {};
+for (const method of ["save","restore","translate","ellipse"]) ctx[method]=()=>{};
 const drawnTexts = [];
 const drawnRectangles = [];
 for (const method of ["fillRect", "fillText", "strokeRect", "beginPath", "moveTo", "lineTo", "stroke", "arc", "fill"]) {
@@ -93,7 +94,7 @@ F.Measure = {
 };
 F.CIF = {styles: ["ball-stick", "space-filling", "wires", "capped-sticks"].map(id => ({id})), setStyle() {}};
 F.CIF.availableStyles = structure => structure.polyhedra ? F.CIF.styles.concat({id: "polyhedral"}) : F.CIF.styles;
-F.AtomLabels = {setMode() {}};
+F.AtomLabels = {modes:{hover:"Beim Anvisieren",all:"Alle","no-h":"Keine H","no-ch":"Keine C/H",off:"Aus"},setMode() {}};
 const model = {
   dataset: {title: "C60"},
   fkcVariants: [1, 2, 3].map(id => ({id, title: "Ansicht " + id})),
@@ -194,16 +195,23 @@ model.querySelector = originalQuery;
 const atomOptions = [];
 F.CIF.setAtomOptions = (...args) => atomOptions.push(args);
 menu.buttons.find(button => button.label === "tool-mode").action();
+assert.equal(F.Draw.mode, "laser", "Pinsel öffnet das Zeichenmenü, ohne gleich zu malen");
+menu.render(structure);
+menu.buttons.find(button => button.label === "Malmodus: Aus").action();
 assert.equal(F.Draw.mode, "paint");
 menu.render(structure);
 assert.equal(menu.buttons.some(button => button.kind === "variant"), false, "Malen hat keine Atom-/Messwerkzeuge");
-menu.buttons.at(-1).action();
-menu.render(structure);
-assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
 menu.buttons.find(button => button.label === "Rot").action();
 assert.equal(F.Draw.color, "#ee5151");
 menu.buttons.find(button => button.label === "20 %").action();
 assert.equal(F.Draw.opacity, 0.2);
+menu.buttons.at(-1).action();
+menu.render(structure);
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
+menu.buttons.find(button => button.label === "Rot").action();
+assert.equal(F.Settings.lasers.right,"#ee5151");
+menu.buttons.find(button => button.label === "6 mm").action();
+assert.equal(F.Settings.laserDiameter,0.006);
 menu.buttons[0].action();
 menu.render(structure);
 menu.buttons.find(button => button.label === "tool-mode").action();

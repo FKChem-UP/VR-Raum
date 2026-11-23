@@ -511,12 +511,11 @@
         this.updateHit();
 
         const grabber = this.el.components["fkc-grabber"];
-        if (F.Draw?.mode === "paint" && !F.Menu?.opened && !F.HandMenu?.opened && !grabber?.grabbed && !grabber?.pulling &&
+        if (F.Draw?.mode === "paint" && !F.Menu?.opened && !grabber?.grabbed && !grabber?.pulling &&
             (!this.hit || F.Draw.surfaceHit(this.hit))) {
           this.drawingAllowed = true;
           if (this.hit) {
             this.el.sceneEl.lastSelectedTarget = this.hit.el;
-            if (this.hit.type === "model") F.selectModel(this.hit.el);
           }
           this.sampleDrawing();
           return;
@@ -536,7 +535,7 @@
           } else if (!(F.Menu && F.Menu.opened)) {
             const roomId = this.hit.el.dataset.roomId;
 
-            if (roomId && F.app) {
+            if (roomId && F.app && F.Draw?.mode !== "paint") {
               if (F.RoomEntry) F.RoomEntry.begin(this.hit, this);
             }
           }
@@ -549,7 +548,7 @@
             if (F.AtomPlane?.click(this.hit)) return;
             F.selectModel(this.hit.el);
             if (!F.Draw || F.Draw.mode !== "paint") {
-              if (F.CIF && F.CIF.clickEnvironment(this.hit)) return;
+              if (this.hit.mesh?.userData.fkcEnvironmentId && !F.Measure?.enabled && F.CIF?.clickEnvironment(this.hit)) return;
               if (F.Measure && F.Measure.click(this.hit)) return;
               if (F.AtomLabels && F.AtomLabels.toggle(this.hit)) return;
             }
@@ -610,8 +609,7 @@
           return;
         }
 
-        if (this.states.trigger && !(F.Menu && F.Menu.opened) &&
-            !(F.HandMenu && F.HandMenu.opened)) {
+        if (this.states.trigger && !F.Menu?.opened) {
           this.sampleDrawing();
         }
 

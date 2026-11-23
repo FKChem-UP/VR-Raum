@@ -29,7 +29,7 @@
     if (tutorial?.phase === "mirror" && scene.lastSelectedModel !== tutorial.mirror.root) return null;
     const model = scene.lastSelectedModel;
     return model && model.isConnected && model.modelReady &&
-      model.classList.contains("interactable") ? model : null;
+      model.classList.contains("interactable") ? model : F.Tutorial?.active ? null : document.getElementById("room-root");
   }
 
   function readViewerHead(scene, rig, position, forward, orientation) {
@@ -211,7 +211,7 @@
       }
       F.HandMenu.opened = true;
       if (!wasOpen) {
-        this.page = "model";
+        if(!["draw","plane"].includes(this.page) && !(this.page === "settings" && this.returnPage === "draw"))this.page = "model";
         this.offset = 0;
         this.infoOffset = 0;
         F.Menu.blockDrawing();
@@ -219,7 +219,7 @@
       }
       if (this.model !== model) {
         this.model = model;
-        this.page = "model";
+        if(!["draw","plane"].includes(this.page))this.page = "model";
         this.offset = 0;
         this.infoOffset = 0;
         this.signature = "";
@@ -284,7 +284,8 @@
         plane?.name, plane?.color, plane?.thickness, plane?.opacity, plane?.visible,
         F.AtomPlane?.active?.root===model ? F.AtomPlane.active.points.length : null,
         F.AtomPlane?.active?.midpoint, F.AtomPlane?.midpointCount(model)].join("|");
-      const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
+      const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" +
+        [F.Settings.strokeRadius,F.Settings.laserDiameter,F.Settings.lasers?.[laserHand()]].join("|");
       if (modeSignature !== this.signature) {
         this.signature = modeSignature;
         this.render(structure, cue, pulse);
@@ -320,15 +321,17 @@
       this.buttons = [];
       const chapter = this.el.components["fkc-tutorial"];
       const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      const roomDrawing = model.id === "room-root";
+      const drawing = ["draw","plane"].includes(this.page) || roomDrawing || painting;
       ctx.fillStyle = animation ? "#fbe7e5" : painting ? "#faf5e7" : "#edf4ee";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
       const locked = chapter?.phase === "mirror" && !chapter.mirror.drawingMenu;
       ctx.fillText(animation ? "Animationssteuerung" : this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
-        painting ? "Malstift" : "Modellwerkzeuge", 28, 48, 510);
+        drawing ? "Zeichenmenü" : "Modellwerkzeuge", 28, 48, 510);
       ctx.font = "28px Arial";
-      ctx.fillText(model.dataset.title || "3D-Modell", 28, 88, 710);
+      ctx.fillText(model.dataset.title || (roomDrawing ? "Raum" : "3D-Modell"), 28, 88, 710);
       let y = 115;
       const text = value => {
         ctx.fillStyle = "#203f30";
@@ -506,11 +509,16 @@
       }
       if (this.page === "settings") {
         // Kompaktere Einstellungszeilen lassen Platz für Palette und Reichweite.
-        button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
+        button("Zurück", () => { this.page = this.returnPage || "model"; });
         text("Handmenügröße · gilt für die Sitzung");
         row([["small", "Kleiner (85 %)"], ["standard", "Standard (100 %)"], ["large", "Größer (115 %)"]].map(
           ([size,title])=>tile(title,()=>F.HandMenu.setSize(size),F.HandMenu.size===size)));
-        if (painting) {
+        if (this.returnPage === "draw" || roomDrawing) {
+          text("Laserfarbe · aktive Hand");
+          paintColors(color=>{F.Settings.lasers[laserHand()]=color;},undefined,F.Settings.lasers?.[laserHand()]);
+          text("Laserbreite · unabhängig von der Strichdicke");
+          row([1,3,6].map(mm=>tile(`${mm} mm`,()=>{F.Settings.laserDiameter=mm/1000;},F.Settings.laserDiameter===mm/1000)),true);
+        } else if (painting) {
           text("Malfarbe · unabhängig von der Laserfarbe");
           paintColors(color=>{F.Draw.color=color;});
           text("Strichdicke");
@@ -540,9 +548,12 @@
         this.texture.needsUpdate = true;
         return;
       }
-      if (painting) {
+      if (drawing) {
+        row([tile(`Malmodus: ${painting ? "An" : "Aus"}`,()=>F.Draw.setMode(painting?"laser":"paint"),painting),
+          ...(!roomDrawing && F.AtomPlane?.get(model)?.mesh ? [this.page === "plane" ?
+            tile("Zum Zeichenmenü",()=>{this.page="draw";}) : tile("Ebenen bearbeiten",()=>{this.page="plane";})] : [])],true);
         const plane=F.AtomPlane?.get(model);
-        if(plane?.mesh){
+        if(this.page==="plane" && plane?.mesh){
           const style=change=>F.AtomPlane.style(plane,change);
           text(`${plane.name || "Ebene"} · Farbe`);paintColors(color=>style({color}),undefined,plane.color);
           text("Dicke der Ebene");row([0.004,0.008,0.016].map(thickness=>tile(thickness*1000+" mm",()=>style({thickness}),plane.thickness===thickness)),true);
@@ -551,14 +562,11 @@
             tile(plane.visible?"Ebene ausblenden":"Ebene einblenden",()=>style({visible:!plane.visible})),
             tile("Ebene entfernen",()=>F.AtomPlane.clear(model))],true);
         }else{
-          text("Trigger halten: Oberfläche markieren");
-          text("Laser/Malstift oben wechselt zurück zur Atomauswahl.");
-          text("Farbe, Dicke und Deckkraft im Zahnrad einstellen.");
-          text("Zeichnungen am ausgewählten Modell");
-          drawingActions(() => {
-            const stroke = F.Draw.strokes.filter(s=>s.owner===model || model.contains(s.owner)).at(-1);
-            if (stroke) F.Draw.remove(stroke);
-          }, () => F.Draw.clear(model));
+          text("Stiftfarbe"); paintColors(color=>{F.Draw.color=color;});
+          text("Strichdicke"); row([2,4,8,16].map(mm=>tile(`${mm*2} mm`,()=>{F.Settings.strokeRadius=mm/1000;},F.Settings.strokeRadius===mm/1000)),true);
+          text("Deckkraft"); row([0.2,0.35,0.6,1].map(opacity=>tile(`${opacity*100} %`,()=>{F.Draw.opacity=opacity;},F.Draw.opacity===opacity)),true);
+          const room = document.getElementById("room-root");
+          drawingActions(()=>{const stroke=F.Draw.strokes.filter(s=>room?.contains(s.owner)).at(-1);if(stroke)F.Draw.remove(stroke);},()=>{if(room)F.Draw.clear(room);});
         }
         if(F.AtomPlane?.midpointCount(model)){
           row([tile("Mittelpunkte entfernen",()=>F.AtomPlane.clearMidpoints(model))],true);
@@ -591,8 +599,10 @@
           })));
         }
         const mode = model.fkcAtomLabels || "hover";
-        const display = [{heading:"Atomlabels",label:({hover:"Beim Anvisieren",all:"Alle",off:"Aus"}[mode]),kind:"plain",
-          action:()=>F.AtomLabels.setMode(model,{hover:"all",all:"off",off:"hover"}[mode])}];
+        const labelModes = F.AtomLabels.modes;
+        const order=Object.keys(labelModes);
+        const display = [{heading:"Atomlabels",label:labelModes[mode],kind:"plain",
+          action:()=>F.AtomLabels.setMode(model,order[(order.indexOf(mode)+1)%order.length])}];
         if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
         if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
@@ -687,17 +697,17 @@
       ctx.fillRect(546, 14 + (modePressed ? 4 : 0), 106, 54);
       ctx.fillStyle = "#173527";
       ctx.font = "24px Arial";
-      if (chapter?.phase === "mirror") {
+      if (!drawing || chapter?.phase === "mirror") {
         // Pinsel aus Canvas-Pfaden statt geräteabhängigem Emoji.
         ctx.save(); ctx.translate(565, 47 + (modePressed ? 4 : 0));
         ctx.strokeStyle = "#264a36"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-2,1); ctx.lineTo(13,-18); ctx.stroke();
         ctx.beginPath(); ctx.ellipse(-5,5,5,8,0.55,0,2*Math.PI); ctx.fill(); ctx.restore();
         ctx.fillText("Pinsel",586,49,60); outlineCue("mirror:menu",546,14,106,54);
-      } else ctx.fillText(painting ? "✎ Malen" : "↗ Laser", 551, 49 + (modePressed ? 4 : 0), 96);
-      this.buttons.push({x: 546, y: 14, w: 106, h: 58, label: "tool-mode", action: () => {
+      } else ctx.fillText("Modell", 552, 49 + (modePressed ? 4 : 0), 91);
+      if(!roomDrawing)this.buttons.push({x: 546, y: 14, w: 106, h: 58, label: "tool-mode", action: () => {
         if (chapter?.phase === "mirror") chapter.mirror.menu();
-        else F.Draw.setMode(painting ? "laser" : "paint");
-        this.page = "model";
+        else if(drawing){F.Draw.setMode("laser");this.page="model";}
+        else this.page="draw";
       }});
       // Eigenständiger Headerbutton, kein zusätzlicher Platz in Werkzeugzeilen.
       const gearIndex = this.buttons.length;
@@ -708,7 +718,7 @@
       ctx.font = "38px Arial";
       ctx.fillText("⚙", 681, 55 + (gearPressed ? 4 : 0));
       if (locked) {ctx.fillStyle="rgba(185,185,185,0.68)";ctx.fillRect(664,14,76,58);}
-      else this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.page = "settings"; }});
+      else this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.returnPage=drawing?"draw":"model";this.page = "settings"; }});
       this.texture.needsUpdate = true;
     },
 

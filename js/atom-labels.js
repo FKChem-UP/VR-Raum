@@ -2,6 +2,13 @@
 
 (function (F) {
   const T = AFRAME.THREE;
+  const modes = {hover:"Beim Anvisieren",all:"Alle", "no-h":"Keine H", "no-ch":"Keine C/H",off:"Aus"};
+  const allowed = (root, atom) => {
+    const mode = root.fkcAtomLabels;
+    const element = atom.element?.toUpperCase();
+    return mode !== "off" && !(["no-h","no-ch"].includes(mode) && ["H","D","T"].includes(element)) &&
+      !(mode === "no-ch" && element === "C");
+  };
 
   function atomFromHit(hit) {
     if (!hit || hit.type !== "model" || !hit.el || !hit.el.isConnected ||
@@ -9,7 +16,7 @@
     const mesh = hit.mesh;
     const atom = mesh && mesh.userData && mesh.userData.fkcAtom;
     if (!atom || typeof atom.cifLabel !== "string" ||
-        !Number.isInteger(atom.modelNumber)) return null;
+        !Number.isInteger(atom.modelNumber) || !allowed(hit.el, atom)) return null;
     for (let object = mesh; object; object = object.parent) {
       if (!object.visible) return null;
       if (object === hit.el.object3D) return {mesh, atom};
@@ -18,11 +25,12 @@
   }
 
   F.AtomLabels = {
+    modes,
     atomFromHit,
     text: atom => atom.cifLabel,
     labelWidth: measuredWidth => Math.min(768, Math.max(72, Math.ceil(measuredWidth) + 48)),
     setMode(root, mode) {
-      if (!root || !["off", "hover", "all"].includes(mode)) return;
+      if (!root || !Object.hasOwn(modes,mode)) return;
       root.fkcAtomLabels = mode;
       const scene = F.getScene();
       const component = scene && scene.components["fkc-atom-labels"];
@@ -140,6 +148,7 @@
       // und dem Labelmodus; keine Originalmaterialien verändern.
       for (const [mesh, entry] of this.measureLabels) {
         if (entry.root.isConnected && mesh.parent &&
+            (!["no-h","no-ch"].includes(entry.root.fkcAtomLabels) || allowed(entry.root, entry.atom)) &&
             entry.root.object3D.getObjectById(mesh.id)) wanted.set(mesh, entry.atom);
       }
       for (const [mesh, entry] of this.pins) {
@@ -150,7 +159,7 @@
         } else if (atomFromHit(hit)) wanted.set(mesh, entry.atom);
       }
       this.el.querySelectorAll(".interactable").forEach(root => {
-        if (root.fkcAtomLabels !== "all" || !root.modelReady) return;
+        if (!["all","no-h","no-ch"].includes(root.fkcAtomLabels) || !root.modelReady) return;
         const visual = root.querySelector(".model-visual");
         if (!visual) return;
         visual.object3D.traverse(mesh => {

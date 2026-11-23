@@ -137,7 +137,7 @@
 
         el.object3D.traverse(object => {
           if (
-            !object.isMesh ||
+            (!object.isMesh && !(object.isSprite && object.userData.fkcConstruction)) ||
             used.has(object) ||
             isDrawingObject(object)
           ) return;
@@ -161,7 +161,7 @@
     const menuOpen = F.Menu && F.Menu.opened;
     const handMenuOpen = F.HandMenu && F.HandMenu.opened;
     const tutorialActive = F.Tutorial && F.Tutorial.active;
-    const measurement = tutorialActive && F.Measure?.enabled && F.Draw?.mode !== "paint" ? F.Measure.mode : null;
+    const measurement = F.Measure?.enabled && F.Draw?.mode !== "paint" ? F.Measure.mode : null;
 
     const targets = hitTargets.filter(target => {
       if (
@@ -183,9 +183,10 @@
       }
 
       if (handMenuOpen) {
-        // Menüoberfläche und ausgewähltes Modell zulassen, keine Raumaktionen.
         return (target.type === "action" && target.el.dataset.fkcHandMenu === "true") ||
-          (target.type === "model" && target.el === scene.lastSelectedModel);
+          (target.type === "model" && target.el.modelReady && (target.el === scene.lastSelectedModel || F.Draw?.mode === "paint")) ||
+          (F.Draw?.mode === "paint" && (target.type === "surface" ||
+            (target.type === "action" && !!target.el.dataset.roomId)));
       }
 
       if (
@@ -204,6 +205,7 @@
       targets.map(target => [target.mesh, target])
     );
 
+    if(scene.camera)raycaster.camera=scene.camera;
     const hits = raycaster.intersectObjects(
       targets.map(target => target.mesh),
       false
@@ -212,9 +214,15 @@
     if (!hits.length) return null;
 
     let hit = hits[0];
+    if(handMenuOpen)hit=hits.find(candidate=>lookup.get(candidate.object).el.dataset.fkcHandMenu === "true") || hit;
+    const foremost = lookup.get(hit.object);
+    if(foremost.type === "model") {
+      hit = hits.find(candidate => candidate.object.isSprite && candidate.object.userData.fkcConstruction &&
+        lookup.get(candidate.object).el === foremost.el) || hit;
+    }
     // Wenn ein Stab direkt am Atom beginnt, bevorzuge den nahen Atomtreffer.
     // In der Stabmitte bleibt die direkte Distanzmessung per Bindung erhalten.
-    if (measurement === "distance" && hit.object.userData.fkcBond) {
+    if ((measurement === "distance" || measurement === "pointPlane") && hit.object.userData.fkcBond) {
       const {el} = lookup.get(hit.object);
       for (const candidate of hits.slice(1)) {
         const target = lookup.get(candidate.object);
@@ -1899,7 +1907,7 @@
         } else {
           text("Original-CIF-Label und separate Modellnummer.\n" +
             "GLB-Modelle besitzen keine CIF-Atomlabels.");
-          [["off", "Aus"], ["hover", "Beim Anvisieren"], ["all", "Alle"]].forEach(([mode, title]) => {
+          Object.entries(F.AtomLabels.modes).forEach(([mode, title]) => {
             button(title, () => {
               const selected = this.getSelectedModel();
               if (selected !== model) return;

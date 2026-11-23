@@ -186,6 +186,8 @@
         ["molecule", "coordination"].includes(structure.mode);
       if (!point?.positionAngstrom && !directBond) return;
       const plane = construction && !construction.midpoint;
+      const environmentId = hit.mesh.userData.fkcEnvironmentId;
+      if(environmentId && !F.CIF?.environmentState(hit.el)?.selected.has(environmentId))return;
       if (plane && (mode !== "pointPlane" || !construction.normalAngstrom || this.root !== hit.el || this.points.length !== 1)) return;
       if (mode === "pointPlane" && !plane && this.root === hit.el && this.points.length === 1 && this.points[0] !== point) {
         F.setStatus("Wähle jetzt eine Ebene (E)."); return;
@@ -213,7 +215,7 @@
         if (index !== -1) {
           this.points.splice(index, 1);
           this.meshes.splice(index, 1);
-        } else { this.points.push(point); this.meshes.push(hit.mesh); }
+        } else { this.points.push(point); this.meshes.push(construction?.mesh || hit.mesh); }
       }
       this.syncLabels();
       this.line.visible = this.label.visible = false;

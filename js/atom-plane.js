@@ -28,9 +28,14 @@
     ctx.strokeText(record.name,64,48,116); ctx.fillText(record.name,64,48,116);
     const texture = new T.CanvasTexture(canvas);
     const sprite = new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:false,depthWrite:false}));
-    const size = 0.032 / record.baseScale;
+    const size = 0.055 / record.baseScale;
     sprite.scale.set(2*size,size,1); sprite.position.copy(record.mesh.position); sprite.position.y += size;
-    sprite.renderOrder = 1100; sprite.raycast = ()=>{};
+    sprite.renderOrder = 1100; sprite.userData.fkcConstruction = record;
+    sprite.raycast = function(raycaster,hits){
+      if(!raycaster.camera || F.Draw.mode === "paint" || !record.mesh?.visible ||
+          (!record.midpoint && (F.AtomPlane.active || (F.Measure?.enabled && !F.Measure.wantsPlane?.(record.root)))))return;
+      T.Sprite.prototype.raycast.call(this,raycaster,hits);
+    };
     record.visual.object3D.add(sprite); record.label = sprite;
   }
   function disposeMesh(mesh) {
@@ -104,13 +109,14 @@
       if(hit.el!==r.root){this.cancel();return false;}
       if(!atom || !r.accept(atom))return true;
       if(hit.mesh.userData.fkcEnvironmentId && !F.CIF.environmentState(r.root)?.selected.has(hit.mesh.userData.fkcEnvironmentId))return true;
-      if(r.points.some(p=>p.mesh===hit.mesh))return true;
-      const center=r.visual.object3D.worldToLocal(hit.mesh.getWorldPosition(new T.Vector3()));
+      const source=geometry?.mesh || hit.mesh;
+      if(r.points.some(p=>p.mesh===source))return true;
+      const center=r.visual.object3D.worldToLocal(source.getWorldPosition(new T.Vector3()));
       if(r.points.some(p=>p.center.distanceTo(center)<1e-8))return true;
       const pts=[...r.points.map(p=>p.center.toArray()),center.toArray()];
       const n=pts.length===3 ? normal(...pts) : null;
       if(pts.length===3 && !n){F.setStatus("Die drei Punkte liegen auf einer Geraden. Wähle einen anderen dritten Punkt.");return true;}
-      r.points.push({mesh:hit.mesh,center,positionAngstrom:atom.positionAngstrom});
+      r.points.push({mesh:source,center,positionAngstrom:atom.positionAngstrom});
       const add=(geometry,material)=>{
         const mesh=new T.Mesh(geometry,material);mesh.raycast=()=>{};mesh.userData.fkcDrawing=true;
         r.visual.object3D.add(mesh);return mesh;
@@ -154,10 +160,8 @@
       const mesh=record.mesh;
       delete mesh.userData.fkcDrawing;
       mesh.userData.fkcConstruction=record;
-      mesh.raycast=function(raycaster,hits){
-        if(!record.midpoint && (F.Draw.mode==="paint" || F.AtomPlane.active ||
-            (F.Measure?.enabled && !F.Measure.wantsPlane?.(record.root))))return;
-        T.Mesh.prototype.raycast.call(this,raycaster,hits);
+      if(record.midpoint)mesh.raycast=function(raycaster,hits){
+        if(F.Draw.mode!=="paint")T.Mesh.prototype.raycast.call(this,raycaster,hits);
       };
       F.invalidateHits?.();
     },

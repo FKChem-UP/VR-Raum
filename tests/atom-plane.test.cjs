@@ -17,7 +17,7 @@ const F={Draw:{mode:"laser",color:"#507dff",opacity:0.35,setMode(mode){this.mode
   setStatus(){},Measure:{setEnabled(){}}};
 const components={};
 const document={createElement:()=>({getContext:()=>({strokeText(){},fillText(){}})})};
-class Sprite extends Mesh {constructor(material){super(null,material);}}
+class Sprite extends Mesh {constructor(material){super(null,material);} raycast(ray,hits){hits.push(this);}}
 class SpriteMaterial extends Resource {constructor(options){super();Object.assign(this,options);}}
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../js/atom-plane.js"),"utf8"),{window:{FKCVR:F},document,AFRAME:{
   THREE:{Vector3:V,Mesh,MeshBasicMaterial:Material,BoxGeometry:Resource,SphereGeometry:Resource,
@@ -43,6 +43,17 @@ assert.equal(plane.mesh.scale.z,0.008);assert.equal(plane.mesh.material.opacity,
 assert.equal(plane.mesh.material.value,"#ffffff");
 assert.equal(plane.name,"E1");assert.equal(plane.label.visible,false);
 assert.equal(plane.normalAngstrom[2],1);
+tool.style(plane,{visible:true});
+const hits=[];
+plane.mesh.raycast({camera:{}},hits);
+assert.equal(hits.length,0,"Platte blockiert den Laser nicht");
+plane.label.raycast({camera:{}},hits);
+assert.equal(hits[0].userData.fkcConstruction,plane,"Label ist das Trefferziel");
+F.Measure.enabled=true; F.Measure.wantsPlane=()=>false;
+plane.label.raycast({camera:{}},hits);assert.equal(hits.length,1);
+F.Measure.wantsPlane=()=>true;
+plane.label.raycast({camera:{}},hits);assert.equal(hits.length,2);
+F.Measure.enabled=false;
 tool.begin(root,{midpoint:true});tool.click(a);tool.click(a);
 assert.equal(tool.active.points.length,1);
 const midpoint=tool.active;tool.click(b);
