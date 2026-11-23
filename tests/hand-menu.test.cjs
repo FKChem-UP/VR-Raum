@@ -82,7 +82,7 @@ const drawnRectangles = [];
 for (const method of ["fillRect", "fillText", "strokeRect", "beginPath", "moveTo", "lineTo", "stroke", "arc", "fill"]) {
   ctx[method] = function () {};
 }
-ctx.fillText = function (text, x, y) { drawnTexts.push({text, x, y}); };
+ctx.fillText = function (text, x, y) { drawnTexts.push({text, x, y, ink: this.fillStyle}); };
 ctx.fillRect = function (x, y, w, h) { drawnRectangles.push({x, y, w, h}); };
 let mode = "distance";
 let enabled = false;
@@ -104,6 +104,10 @@ const menu = Object.assign({ctx, model, offset: 0, texture: {},
   el: {components: {"fkc-measurements": {reset() {}}}}}, components["fkc-hand-menu"]);
 const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "Pa-3"}};
 menu.render(structure);
+const inkOf = title => drawnTexts.findLast(entry => entry.text === title)?.ink;
+assert.equal(inkOf("Modellmenü"),"#203f30");
+assert.equal(inkOf("Styles"),"#203f30");
+assert.equal(inkOf("Distanz"),"#191919");
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
 const labelTile=menu.buttons.find(b=>b.label==="Beim Anvisieren"), hydrogenTile=menu.buttons.find(b=>b.label==="Sichtbar");
 assert.equal(labelTile.y,hydrogenTile.y);assert.ok(labelTile.h>=70 && labelTile.x+labelTile.w < hydrogenTile.x);
@@ -197,6 +201,11 @@ F.CIF.setAtomOptions = (...args) => atomOptions.push(args);
 menu.buttons.find(button => button.label === "tool-mode").action();
 assert.equal(F.Draw.mode, "laser", "Pinsel öffnet das Zeichenmenü, ohne gleich zu malen");
 menu.render(structure);
+assert.equal(inkOf("Zeichenmenü"),"#6b4613");
+assert.equal(inkOf("Stiftfarbe"),"#6b4613");
+assert.equal(inkOf("Malmodus: Aus"),"#191919");
+assert.equal(inkOf("Schwarz"),"#ffffff");
+assert.equal(inkOf("Weiß"),"#000000");
 menu.buttons.find(button => button.label === "Malmodus: Aus").action();
 assert.equal(F.Draw.mode, "paint");
 menu.render(structure);
@@ -227,6 +236,13 @@ drawnTexts.length=0;menu.render(null,"mirror:menu",4);
 assert.ok(drawnTexts.some(entry=>entry.text==="Distanz"));
 assert.ok(drawnTexts.some(entry=>entry.text==="Winkel"));
 assert.deepEqual(Array.from(menu.buttons,b=>b.label),["tool-mode"],"Nur der Pinsel ist im Tutorial-Modellmenü anwählbar");
+menu.el.components["fkc-tutorial"] = {phase:"bragg",selectedAnimation:model,
+  animation:{state:{angle:30,speed:1,source:"mo",running:false}}};
+F.Bragg = {angleFor:()=>0};
+menu.render(null);
+assert.equal(inkOf("Animationsmenü"),"#782a2a");
+assert.equal(inkOf("Abspieltempo"),"#782a2a");
+assert.equal(inkOf("Start"),"#191919");
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

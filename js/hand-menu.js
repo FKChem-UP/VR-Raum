@@ -4,6 +4,7 @@
   const T = AFRAME.THREE;
   const WIDTH = 768;
   const HEIGHT = 900;
+  const textInk = "#191919";
   const inkPalette = [["#ffcc33","Gelb"],["#ee5151","Rot"],["#507dff","Blau"],["#45d77e","Grün"],
     ["#ffffff","Weiß"],["#000000","Schwarz"],["#9950ca","Lila"],["#ff922b","Orange"]];
 
@@ -322,20 +323,21 @@
       const chapter = this.el.components["fkc-tutorial"];
       const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
       const roomDrawing = model.id === "room-root";
-      const drawing = ["draw","plane"].includes(this.page) || roomDrawing || painting;
-      ctx.fillStyle = animation ? "#fbe7e5" : painting ? "#faf5e7" : "#edf4ee";
+      const drawing = ["draw","plane"].includes(this.page) || roomDrawing || painting ||
+        this.page === "settings" && this.returnPage === "draw" || chapter?.phase === "mirror" && chapter.mirror.drawingMenu;
+      const headingInk = animation ? "#782a2a" : drawing ? "#6b4613" : "#203f30";
+      ctx.fillStyle = animation ? "#fbe7e5" : drawing ? "#faf5e7" : "#edf4ee";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      ctx.fillStyle = "#203f30";
+      ctx.fillStyle = headingInk;
       ctx.font = "bold 38px Arial";
       const locked = chapter?.phase === "mirror" && !chapter.mirror.drawingMenu;
-      const menuName = animation ? "Animationsmenü" : drawing || this.page === "settings" && this.returnPage === "draw" ||
-        chapter?.phase === "mirror" && chapter.mirror.drawingMenu ? "Zeichenmenü" : "Modellmenü";
+      const menuName = animation ? "Animationsmenü" : drawing ? "Zeichenmenü" : "Modellmenü";
       ctx.fillText(menuName, 28, 48, 510);
       ctx.font = "28px Arial";
       ctx.fillText(model.dataset.title || (roomDrawing ? "Raum" : "3D-Modell"), 28, 88, 710);
       let y = 115;
-      const text = value => {
-        ctx.fillStyle = "#203f30";
+      const text = (value, heading = true) => {
+        ctx.fillStyle = heading ? headingInk : textInk;
         ctx.font = "28px Arial";
         ctx.fillText(value, 28, y + 30, 710);
         // Platz unter der Schriftgrundlinie für Unterlängen und Abstand zur
@@ -368,7 +370,7 @@
         ctx.lineWidth = hovered ? 4 : 2;
         ctx.strokeRect(b.x, b.y + shift, b.w, b.h);
         outlineCue(cueId, b.x, b.y + shift, b.w, b.h);
-        ctx.fillStyle = "#173527";
+        ctx.fillStyle = textInk;
         ctx.font = "29px Arial";
         ctx.fillText((selected ? "✓ " : "") + label, 43, y + (compact ? 25 : 29) + shift, 677);
         if (locked) { ctx.fillStyle = "rgba(185,185,185,0.68)"; ctx.fillRect(b.x,b.y,b.w,b.h+5); }
@@ -452,7 +454,7 @@
             ctx.lineTo(x + w / 2, y + shift + 38);
             ctx.stroke();
           }
-          ctx.fillStyle = entry.swatch ? F.HandMenu.legendInk(entry.color) : "#173527";
+          ctx.fillStyle = entry.swatch ? F.HandMenu.legendInk(entry.color) : textInk;
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
           if(entry.heading) ctx.fillText(entry.heading,x+w/2,y+shift+29,w-12);
@@ -685,20 +687,20 @@
             ctx.textAlign = "left";
             x += 58;
           }
-        } else text(chapter?.phase === "mirror" ? "BF₃ · B: Bor, F: Fluor" : "GLB: keine verlässliche Elementzuordnung.");
+        } else text(chapter?.phase === "mirror" ? "BF₃ · B: Bor, F: Fluor" : "GLB: keine verlässliche Elementzuordnung.", false);
         y += 48;
         // Nur Kurzinfo auf derselben Fläche; ausführlicher bestehender Modelltext
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
         if (structure) text(structure.atoms[0]?.cellWeight !== undefined
           ? `${structure.atoms.length} sichtbar · ${structure.cellAtomCount} pro Zelle`
-          : structure.spaceGroup.name + " · " + structure.atoms.length + " Atome");
+          : structure.spaceGroup.name + " · " + structure.atoms.length + " Atome", false);
       }
       const modeIndex = this.buttons.length;
       const modePressed = this.pressedIndex === modeIndex;
       ctx.fillStyle = painting ? "#ffe083" : "#b9dcc4";
       if (this.hoverIndex === modeIndex) ctx.fillStyle = "#fff0b8";
       ctx.fillRect(546, 14 + (modePressed ? 4 : 0), 106, 54);
-      ctx.fillStyle = "#173527";
+      ctx.fillStyle = textInk;
       ctx.font = "24px Arial";
       if (!drawing || chapter?.phase === "mirror") {
         // Pinsel aus Canvas-Pfaden statt geräteabhängigem Emoji.
@@ -717,7 +719,7 @@
       const gearPressed = this.pressedIndex === gearIndex;
       ctx.fillStyle = gearPressed ? "#f3bcbc" : this.hoverIndex === gearIndex ? "#fff0b8" : "#d5e2d9";
       ctx.fillRect(664, 14 + (gearPressed ? 4 : 0), 76, 54);
-      ctx.fillStyle = "#173527";
+      ctx.fillStyle = textInk;
       ctx.font = "38px Arial";
       ctx.fillText("⚙", 681, 55 + (gearPressed ? 4 : 0));
       if (locked) {ctx.fillStyle="rgba(185,185,185,0.68)";ctx.fillRect(664,14,76,58);}
