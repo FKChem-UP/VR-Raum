@@ -2511,7 +2511,7 @@
 
     gold(
       group, 0, 0.065, 0,
-      0.9, 0.13, 0.9, c.colors.goldDark
+      0.9, 0.13, 0.9, s.zone?.accent || c.colors.goldDark
     );
 
     gold(
@@ -2572,13 +2572,24 @@
       height: 0.17,
       material: {
         shader: "flat",
-        src: textBoard([s.title], "#75531e", "#f5e6bc")
+        src: textBoard([s.title], s.zone?.accent || "#75531e", s.zone ? "#ffffff" : "#f5e6bc")
       }
     }, group);
   }
 
   function station(parent, s, index, c, obstacles) {
     const p = placement(s, c);
+    if (s.zone) {
+      // Markierung, keine neue Kollision und keine Änderung der Laufwege.
+      const side = s.wall === "left" || s.wall === "right";
+      create("a-plane", {
+        position: {x: p.model.x, y: 0.022, z: p.model.z},
+        rotation: "-90 0 0",
+        width: side ? 5 : 5.4,
+        height: side ? 5.4 : 5,
+        material: {shader: "flat", color: s.zone.tint}
+      }, parent);
+    }
 
     const frame = create("a-entity", {
       position: p.poster,
@@ -2590,7 +2601,7 @@
       c.posterWidth + 0.36,
       c.posterHeight + 0.36,
       0.055,
-      c.colors.goldDark
+      s.zone?.accent || c.colors.goldDark
     );
 
     create("a-plane", {
@@ -2600,11 +2611,12 @@
       material: {
         shader: "flat",
         color: "#ffffff",
-        src: s.slide || textBoard([
+        src: s.slide || (s.zone ? textBoard([s.title, ...(s.boardLines || ["Praktikumsbereich · Strukturaufgabe folgt"])],
+          s.zone.tint, "#202824") : textBoard([
           s.title,
           "Vorlesungsfolie 16:9",
           "Hier kann eine eigene Folie erscheinen"
-        ], "#fbf8ee")
+        ], "#fbf8ee"))
       }
     }, frame);
 
@@ -2615,7 +2627,7 @@
 
     frameLayer(
       frame, c, 0.075, 0.07, 0.095, 0.063,
-      c.colors.gold
+      s.zone?.accent || c.colors.gold
     );
 
     frameLayer(
@@ -2628,6 +2640,7 @@
       c.colors.goldLight
     );
 
+    if (s.zone && !s.model && !s.variants?.length) return;
     pedestal(parent, s, p, c);
 
     obstacles.push({

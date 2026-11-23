@@ -22,6 +22,15 @@ for (const name of ["cif-structure", "cif-model", "rooms", "vr-tools"]) {
 }
 const index = F.rooms.findIndex(room => room.id === "team-b");
 const station = F.rooms[index].stations[0];
+for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
+  const stations = F.rooms.find(room => room.id === id).stations;
+  assert.equal(stations.length, count);
+  assert.equal(new Set(stations.map(s => s.zone.accent)).size, count);
+  assert.equal(new Set(stations.map(s => `${s.wall}:${s.along}`)).size, count);
+  stations.forEach((s, i) => assert.ok(s.title.startsWith(`${prefix}${i + 1} · `)));
+}
+assert.ok(station.boardLines.some(line => line.includes("Co–Cl")));
+assert.ok(station.boardLines.some(line => line.includes("zunächst nur Verbindung 2")));
 const exhibit = F.welcomeRoom.exhibits.find(entry => entry.roomId === "team-b");
 assert.equal(exhibit.model, "assets/structures/Co-Produkt1.cif");
 assert.equal(exhibit.model, station.model);

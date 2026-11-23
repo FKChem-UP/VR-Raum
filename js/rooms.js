@@ -337,7 +337,40 @@
       {id: "co-coordination", title: "Co – Koordinationsumgebung", model: "assets/structures/Co-Produkt1.cif", cifMode: "coordination"}
     ]
   };
-  Object.assign(room("team-b").stations[0], coModel, {title: "Co-Produkt1 – CIF-Testmodell"});
+  function practicalStations(roomId, experiments) {
+    const team = room(roomId);
+    const positions = [0, 2, 4, 6, 13];
+    team.stations = experiments.map(([title, accent, tint], index) => ({
+      ...team.stations[positions[index]],
+      title: `${team.title.at(-1)}${index + 1} · ${title}`,
+      zone: {accent, tint}
+    }));
+  }
+
+  practicalStations("team-a", [
+    ["Benzil", "#41628f", "#e4edf9"],
+    ["HKUST-1", "#15766f", "#d9f1eb"],
+    ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#fae7e2"],
+    ["Tribolumineszenz · Eu-Komplex", "#75519b", "#eee5f7"]
+  ]);
+  practicalStations("team-b", [
+    ["Co-Einkristalltransformation", "#654c99", "#eee7f8"],
+    ["Cobaltferrit", "#974339", "#f7e3de"],
+    ["Nicotinamid", "#206c80", "#dff0f5"],
+    ["Thermochromie · Ag₂[HgI₄]", "#a65913", "#ffecd7"],
+    ["Vanillin", "#48763e", "#e7f2df"]
+  ]);
+
+  Object.assign(room("team-b").stations[0], coModel, {
+    boardLines: [
+      "Verbindung 2 · das chloridoverbrückte Produkt",
+      "1. Öffne die Koordinationsansicht. Welche sechs Atome umgeben ein Co-Zentrum? Miss je einen Co–N-, Co–O- und Co–Cl-Abstand.",
+      "2. Wechsle zum vollständigen Komplex. Drehe ihn so, dass du siehst, welche Chloride beide Co-Zentren verbinden.",
+      "3. Wechsle zur Elementarzelle. Unterscheide Brückenliganden, freie Chloridionen und Gitterwasser.",
+      "Vergleich am PC: Was ändert sich gegenüber Verbindung 1, und was bleibt gleich? In VR ist hier zunächst nur Verbindung 2 geladen."
+    ],
+    info: "Verbindung 2 · Produkt der Einkristalltransformation.\n\n" + coModel.info
+  });
   Object.assign(F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "team-b"), coModel,
     {info: "Vorschau für Team B.\n\n" + coModel.info});
 
