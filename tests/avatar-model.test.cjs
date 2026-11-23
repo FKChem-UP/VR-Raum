@@ -31,6 +31,11 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/avatar-model.js")
 const models = F.AvatarModels;
 assert.deepEqual(models.appearance("participant"), models.appearance("participant"));
 const looks = Array.from({length: 30}, (_, i) => models.appearance("participant-" + i));
+const share = Array.from({length: 2048}, (_,i)=>models.appearance(`session-${i}`).feminine)
+  .filter(Boolean).length / 2048;
+assert.ok(share > 0.45 && share < 0.55);
+assert.equal(models.feminineLook({form:"slim",style:"hat"},false),true);
+assert.equal(models.feminineLook({form:"classic",style:"hat"},false),models.feminineLook({form:"classic",style:"hat"},true));
 assert.equal(new Set(looks.map(look => look.accessory)).size, 3);
 assert.ok(new Set(looks.map(look => look.color)).size > 1);
 const avatar = models.build("participant");

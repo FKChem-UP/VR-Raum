@@ -485,12 +485,14 @@
           const actions=[];
           if(structure?.contactExpansion)actions.push(tile("Kontakte erweitern",()=>tool.apply(false)));
           if(state.points.size===1)actions.push(tile("Koordinationshülle",()=>tool.apply(true)));
+          actions.push(tile("Auswahl ausblenden",()=>tool.hideSelected()));
           if(actions.length)row(actions,true);
         }
         row([tile(state.ringMode?"Ringvergleich neu":"Zwei Ringe vergleichen",()=>{tool.begin(model);tool.state.ringMode=true;}),
           tile("Auswahl leeren",()=>tool.begin(model))],true);
         row([tile("Zum Modellmenü",()=>{tool.cancel();this.page="model";}),
           tile("Analysegeometrie zurücksetzen",()=>{F.CIF.resetSelectionGeometry(model);tool.begin(model);})],true);
+        if(state.group?.userData.fkcHiddenSites?.size)row([tile("Ausgeblendete Atome wieder zeigen",()=>tool.hideSelected(true))],true);
         this.texture.needsUpdate=true;return;
       }
       const drawingActions = (undo, clear, cueId=null) => row([

@@ -76,6 +76,14 @@
       if(!state || (polyhedron && state.points.size!==1))return;
       if(F.CIF.extendSelection(state.root,new Set([...state.points.values()].map(entry=>entry.atom.id)),polyhedron))this.begin(state.root);
     },
+    hideSelected(restore = false){
+      const state=this.state;
+      if(!state || !this.validate(state.root))return;
+      const ids=[...state.points.values()].map(entry=>entry.atom.id);
+      F.CIF.setHiddenSites(state.visual,ids,restore);
+      this.begin(state.root);
+      F.setStatus(restore ? "Ausgeblendete Positionen wieder sichtbar." : `${ids.length} Positionen ausgeblendet.`);
+    },
     acceptRing(){
       const state=this.state;
       if(!state || state.result)return;

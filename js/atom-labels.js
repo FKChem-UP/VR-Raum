@@ -147,7 +147,7 @@
       // Messlabels sind eigene temporäre Auswahl, unabhängig von normalen Pins
       // und dem Labelmodus; keine Originalmaterialien verändern.
       for (const [mesh, entry] of this.measureLabels) {
-        if (entry.root.isConnected && mesh.parent &&
+        if (entry.root.isConnected && mesh.parent && mesh.visible !== false &&
             (!["no-h","no-ch"].includes(entry.root.fkcAtomLabels) || allowed(entry.root, entry.atom)) &&
             entry.root.object3D.getObjectById(mesh.id)) wanted.set(mesh, entry.atom);
       }

@@ -607,14 +607,15 @@
     });
   }
 
-  function environmentHydrogenDashes(base, records) {
+  function environmentHydrogenDashes(base, records, hidden) {
     const cell=base.environmentCell;
     const contacts=cell?.hydrogenContacts || [];
     const key=(label,f)=>`${label}:${f.map(v=>Math.round(v*1e6)).join(",")}`;
     const atoms=new Map();
     const neighbors=new Set();
-    for(const atom of base.atoms)atoms.set(key(atom.cifLabel,atom.fractional),{atom,alpha:1});
+    for(const atom of base.atoms)if(!hidden?.has(atom.id))atoms.set(key(atom.cifLabel,atom.fractional),{atom,alpha:1});
     for(const {candidate,alpha} of records)for(const atom of candidate.atoms){
+      if(hidden?.has(atom.id))continue;
       const id=key(atom.cifLabel,atom.fractional);
       if(!atoms.has(id)){atoms.set(id,{atom,alpha});neighbors.add(id);}
     }
@@ -850,6 +851,11 @@
     return styles.filter(style => style.id !== "polyhedral" || structure && structure.polyhedra && structure.polyhedra.length);
   }
 
+  function cellAxisVectors(structure) {
+    return structure.cellMatrix || structure.cellLengthsAngstrom.map((length,i)=>
+      [0,1,2].map(j=>i===j ? length : 0));
+  }
+
   function applyStyle(group, styleId) {
     if (group.userData.fkcEnvironment) group.userData.fkcEnvironment.refresh = true;
     if (styleId === "polyhedral" && !availableStyles(group.userData.fkcStructure).some(style => style.id === styleId)) {
@@ -857,12 +863,17 @@
     }
     const style = styles.find(entry => entry.id === styleId);
     if (!style) throw new Error("Nicht unterstützter CIF-Style: " + styleId);
+    const hidden = group.userData.fkcHiddenSites;
+    const atoms = group.userData.fkcStructure?.atoms || [];
+    const isHidden = index => hidden?.has(atoms[index]?.id);
     group.traverse(mesh => {
       if (mesh.userData.fkcHydrogenContacts) {
-        mesh.visible = !!group.userData.fkcShowHydrogenContacts && !group.userData.fkcHideHydrogen;
+        mesh.visible = !!group.userData.fkcShowHydrogenContacts && !group.userData.fkcHideHydrogen &&
+          !mesh.userData.fkcContactSites?.some(id=>hidden?.has(id));
         mesh.scale.x=mesh.scale.z=0.024*(group.userData.fkcHydrogenThickness || 1);
       } else if (mesh.userData.fkcAtom) {
-        mesh.visible = !(group.userData.fkcHideHydrogen && mesh.userData.fkcAtom.element === "H");
+        mesh.visible = !hidden?.has(mesh.userData.fkcAtom.id) &&
+          !(group.userData.fkcHideHydrogen && mesh.userData.fkcAtom.element === "H");
         // 1,70 Å: verwendete Van-der-Waals-Radiuskonvention für Kohlenstoff.
         // Die übrigen Radien sind rein visuelle Darstellungsradien.
         const element = elements[mesh.userData.fkcAtom.element];
@@ -871,9 +882,10 @@
           styleId === "ball-stick" ? style.atomRadius * (group.userData.fkcAtomScale || 1) *
             (mesh.userData.fkcAtom.element === "H" ? 0.5 : 1) : style.atomRadius);
       } else if (mesh.userData.fkcPolyhedron) {
-        mesh.visible = mesh.userData.fkcPolyhedron.selected || styleId === "polyhedral";
+        const poly = mesh.userData.fkcPolyhedron;
+        mesh.visible = (poly.selected || styleId === "polyhedral") && !isHidden(poly.center) && !poly.neighbors?.some(isHidden);
       } else if (mesh.userData.fkcBond) {
-        mesh.visible = style.bondRadius > 0;
+        mesh.visible = style.bondRadius > 0 && !isHidden(mesh.userData.fkcBond.a) && !isHidden(mesh.userData.fkcBond.b);
         const structure = group.userData.fkcStructure;
         const bond = mesh.userData.fkcBond;
         if (group.userData.fkcHideHydrogen && structure &&
@@ -893,8 +905,18 @@
   }
 
   F.CIF = {
-    createStructure, contactStructure, styles, availableStyles, polyhedronTriangles, applyStyle, elements, hydrogenContactDashes, environmentHydrogenDashes,
+    createStructure, contactStructure, styles, availableStyles, polyhedronTriangles, cellAxisVectors, applyStyle, elements, hydrogenContactDashes, environmentHydrogenDashes,
     maxContactDepth: 3,
+    setHiddenSites(visual, ids, restore = false) {
+      const group = visual.getObject3D("mesh");
+      if (!group?.userData.fkcStructure) return;
+      const hidden = group.userData.fkcHiddenSites ||= new Set();
+      if (restore) hidden.clear();
+      else for (const id of ids) hidden.add(id);
+      applyStyle(group,group.userData.fkcStyle || "ball-stick");
+      this.updateEnvironment(group);
+      F.invalidateHits?.();
+    },
     setContactDepth(root, depth) {
       const visual = root?.querySelector(".model-visual");
       const component = visual?.components["fkc-cif-model"];
@@ -953,6 +975,7 @@
     },
     replaceContactVisual(root,visual,component,structure,built) {
       const previous = component.built;
+      built.group.userData.fkcHiddenSites = previous.group.userData.fkcHiddenSites;
       for (const key of ["fkcBondColorMode", "fkcBondColor", "fkcBondThickness", "fkcHideHydrogen", "fkcAtomScale", "fkcShowHydrogenContacts", "fkcHydrogenThickness"]) {
         built.group.userData[key] = previous.group.userData[key];
       }
@@ -1009,6 +1032,7 @@
       component.originalCell = cell;
       const structure = enabled ? F.CIFStructure.completeCell(cell) : cell;
       const built = buildMesh(structure);
+      built.group.userData.fkcHiddenSites = component.built.group.userData.fkcHiddenSites;
       Object.assign(built.group.userData, {fkcHideHydrogen: root.fkcHideHydrogen,
         fkcShowHydrogenContacts: root.fkcShowHydrogenContacts,
         fkcHydrogenThickness:root.fkcHydrogenThickness,
@@ -1087,6 +1111,7 @@
         record.built.group.userData.fkcBondColor = group.userData.fkcBondColor;
         record.built.group.userData.fkcBondThickness = group.userData.fkcBondThickness;
         record.built.group.userData.fkcHideHydrogen = group.userData.fkcHideHydrogen;
+        record.built.group.userData.fkcHiddenSites = group.userData.fkcHiddenSites;
         record.built.group.userData.fkcAtomScale = group.userData.fkcAtomScale;
         applyStyle(record.built.group, group.userData.fkcStyle || "ball-stick");
         for (const material of record.materials.values()) {
@@ -1208,6 +1233,7 @@
 
     const axis = new T.Vector3(0, 1, 0);
     const axisX = new T.Vector3(1, 0, 0);
+    const axisResources = [];
 
     structure.atoms.forEach(atom => {
       if (!atomMaterials.has(atom.element)) {
@@ -1294,6 +1320,39 @@
             frameMaterial, 0.035);
         }));
       });
+      const vectors = cellAxisVectors(structure);
+      const size = Math.min(...vectors.map(v=>Math.hypot(...v)));
+      const axisLabel = (text, position, color) => {
+        const canvas = document.createElement("canvas");
+        canvas.width=canvas.height=128;
+        const ctx=canvas.getContext("2d");
+        ctx.font="bold 88px Arial";ctx.textAlign="center";
+        ctx.strokeStyle="#ffffff";ctx.lineWidth=10;ctx.strokeText(text,64,94);
+        ctx.fillStyle=color;ctx.fillText(text,64,94);
+        const texture=new T.CanvasTexture(canvas);
+        const material=new T.SpriteMaterial({map:texture,depthTest:false,depthWrite:false});
+        const label=new T.Sprite(material);
+        label.position.fromArray(position);
+        label.scale.setScalar(size*0.16);
+        label.renderOrder=980;label.raycast=()=>{};group.add(label);
+        axisResources.push(texture,material);
+      };
+      vectors.forEach((vector,i)=>{
+        const color=["#ae3030","#206331","#244ea5"][i];
+        const direction=new T.Vector3(...vector).normalize();
+        const length=Math.hypot(...vector)*0.78;
+        const arrow=new T.ArrowHelper(direction,new T.Vector3(),length,color,size*0.10,size*0.055);
+        arrow.traverse(mesh=>{mesh.raycast=()=>{};});
+        arrow.userData.fkcDrawing=true;group.add(arrow);
+        // ArrowHelper verwendet gemeinsam genutzte Geometrien.
+        axisResources.push(arrow.line.material,arrow.cone.material);
+        axisLabel("abc"[i],vector.map(v=>v*0.89),color);
+      });
+      const originMaterial=new T.MeshBasicMaterial({color:"#242424"});
+      const origin=new T.Mesh(sphere,originMaterial);
+      origin.scale.setScalar(size*0.025);origin.raycast=()=>{};origin.userData.fkcDrawing=true;
+      group.add(origin);axisResources.push(originMaterial);
+      axisLabel("0",vectors[2].map(v=>-v*0.065),"#242424");
     }
     if (structure.mode !== "cell") {
       structure.bonds.forEach(bond => {
@@ -1328,16 +1387,19 @@
       polyhedronGeometries.push(geometry);
       polyhedronMaterials.push(material);
     });
-    const dashes = hydrogenContactDashes(structure);
     const hydrogenRed = new T.MeshBasicMaterial({color:"#df2525"});
     const hydrogenPreview = new T.MeshBasicMaterial({color:"#df2525",transparent:true,opacity:0.25,depthWrite:false});
-    const addDash=(start,end,material)=>{
+    const addDash=(start,end,material,sites)=>{
       const dash=rod(start,end,"H-Kontakt",material,0.024*(group.userData.fkcHydrogenThickness||1));
       if(!dash)return null;
       dash.userData.fkcHydrogenContacts=true;dash.visible=false;dash.raycast=()=>{};
+      dash.userData.fkcContactSites=sites;
       return dash;
     };
-    dashes.forEach(([a,b])=>addDash(a,b,hydrogenRed));
+    for(const contact of structure.hydrogenContacts || []) {
+      const sites=[structure.atoms[contact.a]?.id,structure.atoms[contact.b]?.id];
+      hydrogenContactDashes({...structure,hydrogenContacts:[contact]}).forEach(([a,b])=>addDash(a,b,hydrogenRed,sites));
+    }
     const env=group.userData.fkcEnvironment;
     if(env){
       let meshes=[];
@@ -1346,7 +1408,7 @@
         if(!group.userData.fkcShowHydrogenContacts || group.userData.fkcHideHydrogen)return;
         const visible=[...env.records].filter(([id,r])=>r.built.group.visible)
           .map(([id,r])=>({candidate:r.candidate,alpha:env.selected.has(id)?1:0.25}));
-        meshes=environmentHydrogenDashes(structure,visible).flatMap(d=>{
+        meshes=environmentHydrogenDashes(structure,visible,group.userData.fkcHiddenSites).flatMap(d=>{
           const mesh=addDash(d.start,d.end,d.alpha===1?hydrogenRed:hydrogenPreview);
           if(!mesh)return [];
           mesh.visible=true;return [mesh];
@@ -1372,6 +1434,7 @@
       },
       dispose: function () {
         hydrogenRed.dispose(); hydrogenPreview.dispose();
+        axisResources.forEach(resource=>resource.dispose());
         const environment = group.userData.fkcEnvironment;
         if (environment) for (const record of environment.records.values()) {
           record.materials.forEach(material => material.dispose());

@@ -8,7 +8,16 @@
     let hash = 2166136261;
     for (const c of id) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
     hash >>>= 0;
-    return {color: colors[hash % colors.length], accessory: ["hat", "glasses", "hair"][Math.floor(hash / colors.length) % 3]};
+    return {color: colors[hash % colors.length], accessory: ["hat", "glasses", "hair"][Math.floor(hash / colors.length) % 3],
+      feminine: Boolean((hash ^ (hash >>> 16)) & 1)};
+  }
+
+  function feminineLook(profile, fallback) {
+    if (["slim", "round", "oval"].includes(profile.form)) return true;
+    if (["broad", "tall", "compact"].includes(profile.form)) return false;
+    // Für die Standardform bestimmt der Stil den Look, damit Vorschau und Raum übereinstimmen.
+    return profile.form === "classic" && profile.style ?
+      ["hat", "glasses", "hair", "crown", "none"].includes(profile.style) : fallback;
   }
 
   function parts() {
@@ -49,6 +58,7 @@
   function build(id, profile = {}) {
     const p = parts();
     const random = appearance(id);
+    const feminine = feminineLook(profile, random.feminine);
     const color = profile.color || random.color, accessory = profile.style || random.accessory;
     const group = new T.Group(), head = new T.Group(), body = new T.Group();
     const shirt = p.material(color), skin = p.material("#e7b694"), dark = p.material("#22303b");
@@ -75,6 +85,14 @@
     }
     p.oval(head, skin, [0, -0.029, -0.059], [0.018, 0.023, 0.021]);
     p.oval(head, dark, [0, jaw ? -0.073 : -0.067, jaw ? -0.063 : -0.053], [0.023, 0.006, 0.008]);
+    if (feminine) {
+      const hair = p.material("#493029");
+      p.oval(head, hair, [0, 0.055, depth - 0.043], [faceWidth * 1.04, 0.059, depth * 0.93]);
+      for (const side of [-1, 1]) {
+        p.oval(head, hair, [side * faceWidth * 0.83, -0.040, depth - 0.021], [0.032, 0.115, 0.064]);
+        p.oval(head, dark, [side * (eyes + 0.009), 0.008, -0.054], [0.013, 0.005, 0.005]);
+      }
+    }
     p.oval(body, shirt, [0, -0.155 - torsoHeight, 0.065], [shoulders, torsoHeight, shoulders * 0.53]);
     for (const sign of [-1, 1]) {
       const sleeve = p.oval(body, shirt, [sign * shoulders * 0.81, -0.245, 0.065], [0.075, 0.108, 0.087]);
@@ -151,6 +169,6 @@
     }};
   }
 
-  F.AvatarModels = {appearance, build, hand,
+  F.AvatarModels = {appearance, feminineLook, build, hand,
     showsHands() { return !!F.Settings?.showPointingHands && !F.Tutorial?.active; }};
 })(window.FKCVR);
