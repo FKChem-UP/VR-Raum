@@ -1028,7 +1028,8 @@
       const hitSphere = new T.Sphere();
       // Analytische Trefferfläche, keine zusätzliche sichtbare Geometrie/Bounds.
       mesh.raycast = function (raycaster, intersections) {
-        if (!["wires", "capped-sticks"].includes(group.userData.fkcStyle)) {
+        const choosingAngle = F.Tutorial?.active && F.Measure?.enabled && F.Measure.mode === "angle";
+        if (!choosingAngle && !["wires", "capped-sticks"].includes(group.userData.fkcStyle)) {
           originalRaycast.call(this, raycaster, intersections);
           return;
         }
@@ -1036,7 +1037,8 @@
         this.getWorldScale(worldScale);
         const localRadius = this.scale.x;
         hitSphere.center.copy(center);
-        hitSphere.radius = Math.max(worldScale.x, worldScale.y, worldScale.z) * 0.22 / localRadius;
+        const pickRadius = choosingAngle ? Math.max(0.28, localRadius * 1.18) : 0.22;
+        hitSphere.radius = Math.max(worldScale.x, worldScale.y, worldScale.z) * pickRadius / localRadius;
         if (!raycaster.ray.intersectSphere(hitSphere, hitPoint)) return;
         const distance = raycaster.ray.origin.distanceTo(hitPoint);
         if (distance < raycaster.near || distance > raycaster.far) return;

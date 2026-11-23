@@ -22,6 +22,15 @@
     const upper = Math.sin(tau * cycles), lower = Math.sin(tau * (cycles + phaseOffset));
     return [upper, lower, upper + lower];
   }
+  function wavePoint(s, lower, outgoing, g, front, scale) {
+    const sign = outgoing ? 1 : -1;
+    // Nur die gezeichnete Amplitude am Streuzentrum verjüngen; der optische
+    // Weg und die Phasenlage am Detektor bleiben unverändert.
+    const envelope = Math.min(1, Math.abs(s) / (0.18 * g.wavelength));
+    const amplitude = envelope * 0.026 * Math.sin(tau * (s + 6 + (lower ? g.extra / 2 : 0) - front) / g.wavelength);
+    return [scale * s * g.cos - sign * g.sin * amplitude,
+      (lower ? -d * scale : 0) + scale * s * sign * g.sin + g.cos * amplitude, 0];
+  }
   const holdSeconds = 3;
   function initial() { return {angle: bragg, source: defaultSource, speed: 1, running: false, time: 0, sweep: 0, sweepHold: 0}; }
   function advance(s, seconds) {
@@ -127,7 +136,8 @@
     const infoContent = {
       distance: ["Netzebenenabstand d", "d ist der senkrechte Abstand", "zwischen benachbarten Netzebenen.", "Hier: d = 2,00 Å."],
       path: ["Gangunterschied Δs", "Unten sind zwei Wege je d sin θ länger.", "Zusammen: Δs = 2d sin θ.", "Gilt Δs = nλ, sind die Wellen in Phase."],
-      waves: ["Wellen am Detektor", "λ: Wellenlänge · θ: Winkel zur Ebene.", "n: positive ganze Beugungsordnung.", "Die Summe zeigt Amplitude, keine Intensität."]
+      waves: ["Wellen am Detektor", "λ: Wellenlänge · θ: Winkel zur Ebene.", "n: positive ganze Beugungsordnung.", "Die Summe zeigt Amplitude, keine Intensität."],
+      detector: ["Weißer Reflexpunkt", "Sind beide Beiträge in Phase, addieren", "sich ihre Amplituden konstruktiv.", "Der Punkt markiert dies, keine gemessene Intensität."]
     };
     function card(width, height, w, h) {
       const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
@@ -167,7 +177,7 @@
     guideGeometry.setAttribute("position", guidePositions);
     const guides = new T.LineSegments(guideGeometry, keep(new T.LineBasicMaterial({color: 0xa32929})));
     guides.frustumCulled = false; rig.add(guides);
-    const marks = [0, 1, 2].map(() => {
+    const marks = [0, 2].map(() => {
       const marker = new T.Mesh(sphere, basic(0xa32929));
       marker.scale.setScalar(0.52); marker.raycast = function () {}; rig.add(marker);
       return marker;
@@ -177,8 +187,11 @@
     const track = line(55, 0x536976, el.object3D);
     track.set(t => { const a = (minAngle + t * (maxAngle - minAngle)) * Math.PI / 180; return [scale * L * Math.cos(a), scale * L * Math.sin(a), 0]; });
     const detector = box(0.02, 0.40, 0.35, basic(0x8aa7bc, 0.55), rig);
-    const spot = new T.Mesh(keep(new T.SphereGeometry(0.031, 14, 10)), basic(0x138041));
+    const spot = new T.Mesh(keep(new T.SphereGeometry(0.031, 14, 10)), basic(0xffffff));
     detector.add(spot); spot.position.x = -0.018;
+    const detectorBadge = badge.mesh.clone(); detectorBadge.userData.braggInfo = "detector";
+    detectorBadge.position.set(0.02, 0.27, 0.14); detector.add(detectorBadge);
+    spot.userData.braggInfo = "detector";
     // WebGL-Linienbreite ist auf vielen Geräten auf einen Pixel beschränkt.
     // Echte Geometrie macht die Wellen auch in der Pico sichtbar.
     const segmentCount = 128;
@@ -236,12 +249,12 @@
       if (equationKey !== settings) {
         equationKey = settings;
         const path = lowerPath(g);
-        path.forEach(([x, y], i) => marks[i].position.set(x * scale, y * scale, 0.05));
+        [path[0], path[2]].forEach(([x, y], i) => marks[i].position.set(x * scale, y * scale, 0));
         let index = 0;
         for (const [x, y] of [path[0], path[2]]) {
           for (let dash = 0; dash < 6; dash++) for (const end of [0, 0.63]) {
             const t = (dash + end) / 5.63;
-            guidePositions.setXYZ(index++, x * scale * t, y * scale * t, 0.054);
+            guidePositions.setXYZ(index++, x * scale * t, y * scale * t, 0);
           }
         }
         guidePositions.needsUpdate = true;
@@ -272,11 +285,7 @@
         if (extra) wave.obj.material.color.setHex(g.matched ? 0x0aaf36 : 0xd9312b);
         wave.set(t => {
           const s = a + (last - a) * t;
-          // Wellen quer zum Strahl in der sichtbaren Seitenansicht zeichnen.
-          const sign = outgoing ? 1 : -1;
-          const oscillation = 0.026 * Math.sin(tau * (s + L + h - front) / g.wavelength);
-          return [scale * s * g.cos - sign * g.sin * oscillation,
-            (lower ? -depth : 0) + scale * s * sign * g.sin + g.cos * oscillation, 0.05];
+          return wavePoint(s, lower, outgoing, g, front, scale);
         });
       }
       const arrived = front >= 2 * L + g.extra;
@@ -311,5 +320,5 @@
     update();
     return {el, state, update, toggleInfo, dispose() { el.remove(); resources.forEach(resource => resource.dispose()); }};
   }
-  F.Bragg = {station, geometry, lowerPath, waveComparison, initial, advance, command, tasks, hints, cues, progress, angleFor};
+  F.Bragg = {station, geometry, lowerPath, waveComparison, wavePoint, initial, advance, command, tasks, hints, cues, progress, angleFor};
 })(window.FKCVR);

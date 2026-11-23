@@ -637,7 +637,17 @@ window.FKCVR = window.FKCVR || {};
         if (this.bounds.isEmpty()) return;
 
         this.bounds.clampPoint(this.position, this.closest);
-        const distance = this.position.distanceTo(this.closest);
+        let distance = this.position.distanceTo(this.closest);
+        // Nur übernommene Bestandteile sind zusätzliche Griffzonen; keine
+        // gemeinsame Box über Zwischenraum oder transparente Vorschau legen.
+        const environment = F.CIF?.environmentState(root);
+        if (environment) for (const id of environment.selected) {
+          const group = environment.records.get(id)?.built.group;
+          if (!group?.visible) continue;
+          group.updateWorldMatrix(true, true);
+          this.bounds.setFromObject(group);
+          distance = Math.min(distance, this.bounds.distanceToPoint(this.position));
+        }
 
         if (distance < 0.12 && distance < bestDistance) {
           best = root;

@@ -117,7 +117,7 @@
       this.board.object3D.add(this.cursor);
       this.shellGeometry = new T.SphereGeometry(60, 24, 16);
       this.shellMaterial = new T.MeshBasicMaterial({color: "#ffffff", side: T.BackSide,
-        transparent: true, opacity: 0.82, depthWrite: false});
+        transparent: true, opacity: 0.91, depthTest: false, depthWrite: false});
       this.shell = new T.Mesh(this.shellGeometry, this.shellMaterial);
       this.shell.raycast = function () {};
       this.shell.renderOrder = 80;

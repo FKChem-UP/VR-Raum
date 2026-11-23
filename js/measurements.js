@@ -202,6 +202,7 @@
       this.syncLabels();
       this.line.visible = this.label.visible = false;
       if (this.points.length !== required) {
+        if (this.points.length) this.drawLabel(`${titles[this.measurementMode]} ${this.points.length}/${required}`);
         F.setStatus(titles[F.Measure.mode] + ": " + this.points.length + "/" + required + " Atome gewählt.");
         return;
       }
@@ -218,6 +219,10 @@
         text = result.toFixed(this.measurementMode === "distance" ? 3 : 1) +
           (this.measurementMode === "distance" ? " Å" : "°");
       } catch (error) { text = "Nicht definiert"; }
+      this.drawLabel(text);
+      this.resultText = text;
+    },
+    drawLabel: function (text) {
       const ctx = this.canvas.getContext("2d");
       ctx.font = "bold 52px Arial";
       this.labelWidth = Math.min(512, Math.max(96, Math.ceil(ctx.measureText(text).width) + 40));
@@ -232,7 +237,6 @@
       ctx.strokeText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       ctx.fillText(text, this.labelWidth / 2, 82, this.labelWidth - 24);
       this.texture.needsUpdate = true;
-      this.resultText = text;
     },
     updateShared: function (entries) {
       if (!this.sharedDisplays) this.sharedDisplays = new Map();
@@ -282,6 +286,9 @@
       if (!this.root) return;
       if (!this.el.camera || !this.meshes) return;
       const visible = !(F.Menu && F.Menu.opened);
+      const pending = this.points.length > 0 && this.points.length < counts[this.measurementMode];
+      this.haloMaterial.opacity = pending ? 0.55 : 0.16;
+      this.haloMaterial.depthTest = !pending;
       const positions = this.meshes.map(mesh => {
         mesh.updateWorldMatrix(true, false);
         const position = mesh.getWorldPosition(new T.Vector3());
@@ -292,7 +299,8 @@
         if (i >= positions.length) return;
         halo.position.copy(positions[i]);
         const scale = this.meshes[i].getWorldScale(new T.Vector3());
-        halo.scale.setScalar(Math.max(scale.x, scale.y, scale.z) * 1.2);
+        halo.renderOrder = pending ? 1080 : 1000;
+        halo.scale.setScalar(Math.max(scale.x, scale.y, scale.z) * (pending ? 1.55 : 1.2));
       });
       this.rods.forEach((rod, i) => {
         rod.visible = visible && i + 1 < positions.length;
@@ -307,8 +315,20 @@
         const radius = Math.max(scale.x, scale.y, scale.z) * 0.4;
         rod.scale.set(radius, length, radius);
       });
-      if (this.points.length !== counts[this.measurementMode]) {
-        this.line.visible = this.label.visible = false;
+      if (pending) {
+        const last = this.points.length - 1;
+        this.label.position.copy(positions[last]);
+        const head = this.el.camera.getWorldPosition(new T.Vector3());
+        const width = T.MathUtils.clamp(this.meshes[last].getWorldPosition(new T.Vector3()).distanceTo(head) * 0.19, 0.10, 0.5);
+        this.label.position.y += width * 0.36;
+        this.label.scale.set(width * this.labelWidth / 512, width / 4, 1);
+        this.label.renderOrder = 1110;
+        this.label.visible = visible;
+        this.line.visible = false;
+        return;
+      }
+      if (!this.points.length) {
+        this.label.visible = this.line.visible = false;
         return;
       }
       const attribute = this.geometry.attributes.position;

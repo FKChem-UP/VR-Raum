@@ -12,6 +12,12 @@ const B = F.Bragg, s = B.initial();
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-10);
 const g = B.geometry(B.angleFor(1)), other = B.geometry(B.angleFor(1.5));
 assert.ok(g.matched && !other.matched);
+for (const geometry of [g, other]) for (const front of [0, 0.7, 12.1]) {
+  for (const lower of [true, false]) for (const outgoing of [true, false]) {
+    const [x, y, z] = B.wavePoint(0, lower, outgoing, geometry, front, 0.13);
+    close(x, 0); close(y, lower ? -0.26 : 0); close(z, 0);
+  }
+}
 close(g.extra, 0.7107); close(other.extra, 1.5 * 0.7107);
 close(Math.cos(other.periods * 2 * Math.PI), -1);
 for (const geometry of [g, other]) {
