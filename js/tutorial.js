@@ -262,7 +262,8 @@
         if (F.Tutorial.active && this.phase === "bragg") {
           this.selectedAnimation = hit.el;
           const infoId = hit.mesh?.userData.braggInfo;
-          if (infoId && this.animation.toggleInfo(infoId) && infoId === "distance") this.distanceInfoOpened = true;
+          if (infoId && this.animation.toggleInfo(infoId) && infoId === "distance" && this.animationStep === 5 &&
+              F.Bragg.progress(5, true, true, false, this.animation.state, true) === 6) this.distanceInfoOpened = true;
         }
         return;
       }
@@ -283,7 +284,8 @@
       this.animation.dispose(); this.animation = null;
       this.phase = "mirror";
       this.previousDrawMode = F.Draw?.mode;
-      F.Draw?.setMode("paint");
+      F.Draw?.setMode("laser");
+      this.el.lastSelectedModel = this.el.lastSelectedTarget = null;
       this.mirror = F.MirrorTutorial.station(this.group);
       this.mirrorProgress = this.mirror.step;
       this.render();
@@ -357,7 +359,7 @@
         this.board.object3D.lookAt(this.head);
         const p = this.mirror.board.object3D.getWorldPosition(this.modelWorld);
         this.mirror.tick(tools?.source && tools.line.visible ? tools.hit : null, !!tools?.states.trigger,
-          Math.hypot(this.head.x-p.x,this.head.z-p.z)<1.85, F.HandMenu.opened);
+          Math.hypot(this.head.x-p.x,this.head.z-p.z)<1.85, F.HandMenu.opened, this.el.lastSelectedModel === this.mirror.root);
         if(this.mirrorProgress!==this.mirror.step){
           if(this.mirrorProgress===0)this.board.object3D.position.set(1.2,1.65,-3.1);
           this.mirrorProgress=this.mirror.step;this.render();

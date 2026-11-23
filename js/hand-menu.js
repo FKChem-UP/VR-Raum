@@ -24,7 +24,7 @@
   function selectedModel(scene) {
     const tutorial = scene.components?.["fkc-tutorial"];
     if (tutorial?.phase === "bragg") return tutorial.selectedAnimation;
-    if (tutorial?.phase === "mirror") return tutorial.mirror.root;
+    if (tutorial?.phase === "mirror" && scene.lastSelectedModel !== tutorial.mirror.root) return null;
     const model = scene.lastSelectedModel;
     return model && model.isConnected && model.modelReady &&
       model.classList.contains("interactable") ? model : null;
@@ -449,12 +449,8 @@
         });
         y += compactRow ? 85 : 100;
       };
-      if (chapter?.phase === "mirror") {
+      if (chapter?.phase === "mirror" && chapter.mirror.drawingMenu) {
         const mirror = chapter.mirror;
-        if (!mirror.drawingMenu) {
-          text("BF₃ · Werkzeuge für die Zeichentafel");
-          button("Zeichenmenü öffnen", () => mirror.menu(), false, "mirror:menu");
-        } else {
           text("Stiftfarbe · je Spiegel eine andere Farbe");
           row([["#ffcc33","Gelb"],["#ee5151","Rot"],["#507dff","Blau"],["#45d77e","Grün"]].map(([color,label])=>({label,kind:"color",color,
             selected:F.Draw.color===color,cueId:mirror.unused(color)?"mirror:color":null,action:()=>mirror.color(color)})));
@@ -465,7 +461,6 @@
           row([0.35,0.6,1].map(opacity=>({label:Math.round(opacity*100)+" %",kind:"opacity",
             selected:F.Draw.opacity===opacity,action:()=>{F.Draw.opacity=opacity;}})));
           button("Letzten Strich entfernen",()=>mirror.undo(),false,"mirror:undo");
-        }
         this.texture.needsUpdate=true;return;
       }
       if (animation) {
@@ -473,7 +468,7 @@
         const control = (id, title, selected = false) => button(title, () => {
           F.Bragg.command(state, id);
           if (id === "reset" && chapter.animationStep >= 3 && chapter.animationStep < F.Bragg.tasks.length) {
-            chapter.animationStep = 3; chapter.render();
+            chapter.distanceInfoOpened = false; chapter.animationStep = 3; chapter.render();
           }
         }, selected, id);
         control("play", state.running ? "Pause" : "Start", state.running);
@@ -635,7 +630,7 @@
             ctx.textAlign = "left";
             x += 58;
           }
-        } else text("GLB: keine verlässliche Elementzuordnung.");
+        } else text(chapter?.phase === "mirror" ? "BF₃ · B: Bor, F: Fluor" : "GLB: keine verlässliche Elementzuordnung.");
         y += 48;
         // Nur Kurzinfo auf derselben Fläche; ausführlicher bestehender Modelltext
         // bleibt im bisherigen Haupt-/Browsermenü verfügbar.
@@ -650,9 +645,16 @@
       ctx.fillRect(546, 14 + (modePressed ? 4 : 0), 106, 54);
       ctx.fillStyle = "#173527";
       ctx.font = "24px Arial";
-      ctx.fillText(painting ? "✎ Malen" : "↗ Laser", 551, 49 + (modePressed ? 4 : 0), 96);
+      if (chapter?.phase === "mirror") {
+        // Pinsel aus Canvas-Pfaden statt geräteabhängigem Emoji.
+        ctx.save(); ctx.translate(565, 47 + (modePressed ? 4 : 0));
+        ctx.strokeStyle = "#264a36"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-2,1); ctx.lineTo(13,-18); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-5,5,5,8,0.55,0,2*Math.PI); ctx.fill(); ctx.restore();
+        ctx.fillText("Pinsel",586,49,60); outlineCue("mirror:menu",546,14,106,54);
+      } else ctx.fillText(painting ? "✎ Malen" : "↗ Laser", 551, 49 + (modePressed ? 4 : 0), 96);
       this.buttons.push({x: 546, y: 14, w: 106, h: 58, label: "tool-mode", action: () => {
-        F.Draw.setMode(painting ? "laser" : "paint");
+        if (chapter?.phase === "mirror") chapter.mirror.menu();
+        else F.Draw.setMode(painting ? "laser" : "paint");
         this.page = "model";
       }});
       // Eigenständiger Headerbutton, kein zusätzlicher Platz in Werkzeugzeilen.

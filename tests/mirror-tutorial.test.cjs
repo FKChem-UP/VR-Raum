@@ -36,14 +36,17 @@ const ctx=new Proxy({}, {get:(o,k)=>o[k]||(()=>{})});
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../js/mirror-tutorial.js"),"utf8"),{window:{FKCVR:F},AFRAME:{THREE:T},document:{createElement:()=>({getContext:()=>ctx})}});
 F.create=()=>({object3D:new Obj(),dataset:{},setObject3D(){},setAttribute(){},remove(){}});
 const ink=[];
-F.Draw={color:"gold",sample(last){if(last)return last;const s={color:this.color};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){}};
+F.Draw={color:"gold",mode:"laser",setMode(mode){this.mode=mode;},sample(last){if(last)return last;const s={color:this.color};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){}};
 F.HandMenu={laserHand:()=>"right"};F.releaseModel=()=>{};
 const station=F.MirrorTutorial.station({});
 function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,false);}
 function line(i){paint(0,project(0,atoms[i]));paint(0,[0,0]);paint(0,[0,0],false);}
-station.tick(null,false,true,false);line(1);assert.equal(station.step,2);
-station.tick(null,false,true,true);assert.equal(station.cue(),"mirror:menu");station.menu();assert.equal(station.step,4);
-station.color("gold");assert.equal(station.step,4);station.color("blue");line(2);assert.equal(station.step,6);
+station.tick(null,false,true,false,false);line(1);assert.equal(station.step,1);assert.equal(ink.length,0);
+station.tick(null,false,true,true,false);assert.equal(station.step,1);
+station.tick(null,false,true,false,true);assert.equal(station.step,2);
+station.tick(null,false,true,true,true);assert.equal(station.cue(),"mirror:menu");station.menu();assert.equal(station.step,4);
+assert.equal(F.Draw.mode,"paint");line(1);assert.equal(station.step,5);
+station.color("gold");line(2);assert.equal(station.step,5);station.color("blue");line(2);assert.equal(station.step,6);
 line(3);assert.equal(station.step,6);station.color("red");line(3);assert.equal(station.step,7);
 paint(1,[0,0]);assert.equal(station.step,8);assert.equal(ink.length,4);
 station.undo();assert.equal(station.step,9);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);

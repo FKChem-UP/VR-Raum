@@ -78,15 +78,16 @@
     }
   }
   const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
-    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Vergleichswinkel einstellen", "Animation pausieren", "Info zum Ebenenabstand öffnen"];
+    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Info zum Ebenenabstand öffnen", "Vergleichswinkel einstellen", "Animation pausieren"];
   const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf die Netzebenen oder den Infotext darunter und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
-    "Wähle 0,5×. Die Wellenlänge bleibt gleich.", "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen.",
-    "Ziele auf das i neben d = 2,00 Å und drücke den Trigger."];
-  const cues = {3: "play", 4: "slow", 5: "compare", 6: "play"};
+    "Wähle Bragg-Stellung und 0,5×. Die Wellenlänge bleibt gleich.", "Bei Bragg und 0,5×: Öffne das i neben d = 2,00 Å.",
+    "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
+  const cues = {3: "play", 4: "slow", 6: "compare", 7: "play"};
+  const slowBragg = s => s.running && s.speed === 0.5 && geometry(s.angle, s.source).matched;
   function progress(step, near, selected, menu, s, infoOpened = false) {
-    return [near, selected, menu, s.running && s.time >= 4, s.running && s.speed === 0.5,
-      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7, !s.running, infoOpened][step] ? step + 1 : step;
+    return [near, selected, menu, s.running && s.time >= 4, slowBragg(s), slowBragg(s) && infoOpened,
+      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7, !s.running][step] ? step + 1 : step;
   }
 
   function station(parent) {

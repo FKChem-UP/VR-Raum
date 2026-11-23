@@ -36,12 +36,12 @@
     if (hits.includes(-1) || new Set(hits).size !== 4 || (view === 0 && !free && hits[1] !== 1)) return null;
     return solution(view, view === 0 ? hits.findIndex((j, i) => i > 0 && j === i) : 1);
   }
-  const tasks = ["Zur BF₃-Zeichentafel gehen", "Erste Spiegelebene zeichnen", "Handmenü öffnen",
-    "Zeichenmenü wählen", "Eine andere Farbe wählen", "Zweite Spiegelebene zeichnen",
+  const tasks = ["Zur BF₃-Zeichentafel gehen", "BF₃ mit dem Laser auswählen", "Modell-Handmenü öffnen",
+    "Pinsel im Modellmenü wählen", "Erste Spiegelebene zeichnen", "Neue Farbe und zweite Spiegelebene",
     "Neue Farbe und dritte Spiegelebene", "Rechts einen Punkt auf B setzen", "Letzten Strich im Handmenü entfernen"];
-  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Links: Trigger am goldenen F drücken und bis B ziehen.",
-    "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke den gelb umrahmten Knopf Zeichenmenü.",
-    "Wähle eine andere Stiftfarbe als für Ebene eins.", "Hand senken. Links vom neu markierten F bis B zeichnen.",
+  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Ziele auf das räumliche BF₃ neben der Tafel und drücke den Trigger.",
+    "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke oben rechts auf den gelb umrahmten Pinsel.",
+    "Links: vom goldenen F bis zum B zeichnen.", "Im Zeichenmenü neue Farbe wählen. Vom markierten F bis B ziehen.",
     "Im Zeichenmenü dritte Farbe wählen. Vom letzten F bis B ziehen.", "Rechts: B kurz antippen. Vergleiche die rosa Bilder mit den grünen F.",
     "Handfläche drehen und Letzten Strich entfernen drücken."];
   function station(parent) {
@@ -57,7 +57,8 @@
     const body = F.create("a-entity", {class: "manip-body"}, root);
     F.create("a-box", {class: "hitbox", width: 0.9, height: 0.28, depth: 0.9, visible: false}, body);
     root.setAttribute("fkc-manipulable", ""); root.modelReady = true;
-    const group = new T.Group(); body.object3D.add(group); group.scale.setScalar(0.40);
+    const visual = F.create("a-entity", {class: "model-visual"}, body);
+    const group = new T.Group(); visual.setObject3D("mesh",group); group.scale.setScalar(0.40);
     const make = (geometry, options) => { const m = new T.Mesh(keep(geometry), keep(new T.MeshBasicMaterial(options)));
       group.add(m); return m; };
     const plates = [], ghosts = [];
@@ -79,7 +80,7 @@
     function draw() {
       ctx.fillStyle = "#f6faf8"; ctx.fillRect(0,0,1024,640);
       ctx.font = "bold 36px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText("BF₃ · Symmetrie mit dem Stift untersuchen",24,58);
-      const target = [1,5,6].includes(step) ? strokes.length + 1 : -1;
+      const target = [4,5,6].includes(step) ? strokes.length + 1 : -1;
       for (const v of [0,1]) {
         const x = v ? 520 : 16; ctx.fillStyle = "white"; ctx.fillRect(x,90,486,364);
         ctx.fillStyle = "#193947"; ctx.font = "bold 24px Arial";
@@ -97,7 +98,7 @@
     }
     const move = n => { step=n; message=""; draw(); };
     function sample(hit) {
-      if (hit?.el !== board || !hit.uv || ![1,5,6,7].includes(step)) return;
+      if (hit?.el !== board || !hit.uv || ![4,5,6,7].includes(step)) return;
       const v = step === 7 ? 1 : 0;
       const p = [(hit.uv.x*1024-centers[v])/unit, (cy-(1-hit.uv.y)*640)/unit];
       if (Math.abs(p[0])>1.75 || Math.abs(p[1])>1.27) return;
@@ -119,20 +120,20 @@
       if (!m || Math.abs(dot(f,m.normal))>0.25) return;
       strokes.push({parts:active.parts,color:F.Draw.color});active=null;waitRelease=true;
       plate.position.set(0,0,0);plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...plane(0,...solution(0,strokes.length)).normal));
-      move(strokes.length===1?(drawingMenu?4:2):strokes.length===2?6:7);
+      move(4+strokes.length);
     }
     draw();
     return {board, root, get step(){return step;}, get drawingMenu(){return drawingMenu;}, unused(c){return !strokes.some(s=>s.color===c);},
-      cue(){return step===3?"mirror:menu":step===4||step===6 && strokes.some(s=>s.color===F.Draw.color)?"mirror:color":step===8?"mirror:undo":null;},
-      menu(){if(step<3)return;drawingMenu=true;if(step===3)move(4);},
-      color(c){F.Draw.color=c;if(step===4 && !strokes.some(s=>s.color===c))move(5);else {message="";draw();}},
+      cue(){return step===3?"mirror:menu":[5,6].includes(step) && strokes.some(s=>s.color===F.Draw.color)?"mirror:color":step===8?"mirror:undo":null;},
+      menu(){if(step<3)return;drawingMenu=true;F.Draw.setMode("paint");if(step===3)move(4);},
+      color(c){F.Draw.color=c;message="";draw();},
       undo(){
         if(dotStroke){F.Draw.remove(dotStroke);dotStroke=null;ghosts.forEach(g=>g.visible=false);move(9);return;}
         const last=strokes.pop();if(!last)return;
         last.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;
-        move([1,5,6][strokes.length]);
+        move(4+strokes.length);
       },
-      tick(hit,held,near,opened){if(step===0 && near)move(1); if(step===2 && opened)move(3);
+      tick(hit,held,near,opened,selected){if(step===0 && near)move(1); if(step===1 && selected)move(2); if(step===2 && opened && selected)move(3);
         if(!held)waitRelease=false;
         if(held && !opened && !waitRelease) sample(hit);
         if(active && (!held || opened || hit?.el!==board)){active.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;active=null;message="Noch einmal: vom markierten F bis zum B ziehen.";draw();}},
