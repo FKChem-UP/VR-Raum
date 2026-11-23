@@ -164,11 +164,27 @@ const paused = {el: {is: () => true}, phase: "training", step: 4,
   board: {object3D: {visible: true}}, cursor: {visible: true}, previous: {}};
 F.app.activeRoom = {};
 F.getRig = () => null;
-F.HandMenu = {readViewerHead: () => true};
+F.HandMenu = {readViewerHead: () => true, laserHand: () => "right"};
 F.Menu.opened = true;
 components["fkc-tutorial"].tick.call(paused);
 assert.equal(F.Menu.opened, true, "Hauptmenü bleibt im Tutorial geöffnet");
 assert.equal(paused.board.object3D.visible, false);
 assert.equal(paused.cursor.visible, false);
 assert.equal(paused.step, 4, "Tutorial pausiert beim Öffnen des Hauptmenüs");
+const drawn = [];
+const boardContext = {fillRect() {}, fillText(text) { drawn.push(text); }};
+const taskBoard = {phase: "training", canvas: {getContext: () => boardContext}, texture: {}};
+for (const [step, expected] of [
+  [4, "Modellmenü → Ansicht → Co-Koordinationsansicht"],
+  [5, "Messen → Distanz"], [6, "Messen → Winkel"],
+  [7, "Ansicht → Co-Komplex"], [8, "H-Atome"],
+  [9, "Nachbarn hinzufügen → Vorschau einschalten"],
+  [10, "Klicke mit dem Trigger auf ein transparentes Molekül"],
+  [11, "Nachbarn hinzufügen → Vorschau ausschalten"]
+]) {
+  taskBoard.step = step;
+  drawn.length = 0;
+  components["fkc-tutorial"].render.call(taskBoard);
+  assert.ok(drawn.some(text => text.includes(expected)), `Aufgabe ${step + 1}: ${expected}`);
+}
 console.log("Tutorialtest bestanden: Schildüberquerung, Trefferbuttons, Wiederherstellung und manueller Start.");

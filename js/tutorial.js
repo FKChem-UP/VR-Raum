@@ -7,20 +7,20 @@
   const boardWidth = 1.4, boardHeight = 0.875;
   const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
     "Modellmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen",
-    "Zum Molekül wechseln", "H-Atome ausblenden", "Umgebung bei 3 Å anzeigen",
-    "Ein transparentes Molekül anklicken", "Umgebung wieder ausblenden"];
+    "Zum Co-Komplex wechseln", "H-Atome ausblenden", "Nachbarmoleküle bei 3 Å zeigen",
+    "Ein transparentes Molekül übernehmen", "Vorschau ausschalten"];
   const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
     "Halte einen Grip und verschiebe das Modell mindestens 15 cm.",
     "Halte beide Grips und zieh die Hände auseinander (140 %).",
     "Lass beide Grips los. Dreh die Hand ohne Laser zu dir.",
-    "Wähle im Modellmenü unter Ansicht: Koordination.",
-    "Wähle Distanz und klicke zwei Atome oder eine Bindung an.",
-    "Wähle Winkel und klicke drei Atome an: Das zweite ist der Scheitel.",
-    "Wähle im Modellmenü unter Ansicht: Molekül.",
-    "Drücke im Modellmenü auf H-Atome, um sie auszublenden.",
-    "Wähle bei Umgebung den Button 3 (Ångström).",
+    "Modellmenü → Ansicht → Co-Koordinationsansicht.",
+    "Messen → Distanz. Wähle zwei Atome oder eine Bindung.",
+    "Messen → Winkel. Wähle drei Atome, den Scheitel als zweites.",
+    "Zurück zum Modellmenü → Ansicht → Co-Komplex.",
+    "Drücke die Kachel H-Atome. Sie zeigt danach „Ausgeblendet“.",
+    "Nachbarn hinzufügen → Vorschau einschalten. Mit −/+ Radius: 3 Å.",
     "Klicke mit dem Trigger auf ein transparentes Molekül, nicht auf ein einzelnes Ion.",
-    "Wähle bei Umgebung Aus. Das übernommene Molekül soll sichtbar bleiben."];
+    "Nachbarn hinzufügen → Vorschau ausschalten. Deine Auswahl bleibt."];
   const palm = hand => hand === "left" ? "rechte Handfläche" : "linke Handfläche";
   const taskWindow = (length, current) => Array.from({length:6},(_,slot)=>current+slot-2)
     .filter(index=>index>=0 && index<length);
