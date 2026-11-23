@@ -184,6 +184,15 @@ for (const [start, end] of contactDashes) {
 }
 assert.equal(F.CIF.hydrogenContactDashes(cell).length, 0);
 assert.equal(F.CIF.hydrogenContactDashes(coComplex).length, 0);
+// Eine Molekülprojektion verwendet das konkrete Akzeptorabbild, nicht das nächste
+// gleich beschriftete Atom in einer anderen Zelle. Keine Vorschau nötig.
+const donorH={id:"h",cifLabel:"H1",fractional:[0,0,0],positionAngstrom:[0,0,0]};
+const acceptor={id:"o",cifLabel:"O1",fractional:[0.25,0,0],positionAngstrom:[2,0,0]};
+const reference={atoms:[donorH,acceptor],hydrogenContacts:[{a:0,b:1,hydrogenLabel:"H1",acceptorLabel:"O1",deltaFractional:[0.25,0,0]}]};
+const projection={atoms:[donorH,acceptor],hydrogenCell:reference};
+assert.ok(F.CIF.environmentHydrogenDashes(projection,[]).length>0);
+assert.equal(F.CIF.environmentHydrogenDashes(projection,[],new Set(["o"])).length,0);
+assert.equal(F.CIF.environmentHydrogenDashes({...projection,atoms:[donorH,{...acceptor,fractional:[1.25,0,0]}]},[]).length,0);
 const contactOverlay = {visible: false, scale:{}, userData: {fkcHydrogenContacts: true}};
 const contactGroup = {userData: {fkcStructure: coCell}, traverse: visit => visit(contactOverlay)};
 const contactRoot = {querySelector: () => ({fkcStructure: coCell, getObject3D: () => contactGroup})};
@@ -195,7 +204,7 @@ F.CIF.setHydrogenThickness(contactRoot,2);
 assert.equal(contactOverlay.scale.x,0.048);
 contactGroup.userData.fkcHideHydrogen = true;
 F.CIF.applyStyle(contactGroup, "space-filling");
-assert.equal(contactOverlay.visible, false);
+assert.equal(contactOverlay.visible, true, "H-Brücken bleiben unabhängig von H-Kugeln sichtbar");
 contactGroup.userData.fkcHideHydrogen = false;
 F.CIF.applyStyle(contactGroup, "wires");
 assert.equal(contactOverlay.visible, true);

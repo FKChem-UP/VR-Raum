@@ -27,8 +27,8 @@ assert.equal(teamB.zones[0].models.length, 4);
 assert.ok(teamB.zones[0].models.slice(2).every(entry => !entry.model));
 assert.equal(teamB.zones[4].wall, "back");
 assert.equal(teamB.zones[4].along, 0);
-const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:78, HKUST_1_mitH:65, HKUST_1_ohneH:624,
-  Nebenprodukt_VUXBUL:60, YBa2Cu3O7_2016:13, YBa2Cu3O7_2026:13, YBa2Cu3O6_tetragonal_HT:12,
+const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:78, HKUST_1_ohneH:624,
+  Nebenprodukt_VUXBUL:60, YBa2Cu3O7_2026:13, YBa2Cu3O6_tetragonal_HT:12,
   Eu_Komplex2017:544, Verbindung1_cis_Co_Edukt:156, CoFe2O4:56, Nikotinsaeureamid_NICOAM05:60,
   AgHgI4_Tieftemperaturform:7, AgHgI4_Hochtemperaturform:8, Vanillin_YUHTEA:152};
 const referenced = [];
@@ -64,11 +64,16 @@ const activeModels = [...F.welcomeRoom.exhibits, ...F.rooms.filter(r=>r.zones).f
 const hkust = F.welcomeRoom.exhibits.find(entry=>entry.roomId==="team-a");
 assert.equal(hkust.cifMode,"cif-hkust:node");
 const teamHkust=activeModels.filter(entry=>entry.model?.includes("/HKUST-1_"));
-assert.equal(teamHkust.length,3);
+assert.equal(teamHkust.length,2);
 for(const entry of teamHkust){
   assert.equal(entry.variants[0].cifMode,entry.cifMode);
-  assert.equal(entry.cifMode,entry.model.includes("_mitH") ? "cif-excerpt:hkust:focus" : "cif-hkust:node");
+  assert.equal(entry.cifMode,"cif-hkust:node");
 }
+const teamA = F.rooms.find(room=>room.id==="team-a");
+const stationFiles = zone => Array.from(teamA.stations.filter(s=>s.zone===zone), s=>path.basename(s.model));
+assert.deepEqual(stationFiles(teamA.zones[1]), ["HKUST-1_ohneH.cif", "Nebenprodukt_VUXBUL.cif"]);
+assert.deepEqual(stationFiles(teamA.zones[2]), ["YBa2Cu3O7_2026.cif", "YBa2Cu3O6_tetragonal_HT.cif"]);
+assert.equal(F.welcomeRoom.exhibits.find(e=>e.roomId==="vorlesung-3").model, teamA.zones[2].models[0].model);
 const hkustSource=fs.readFileSync(path.join(root,hkust.model),"utf8");
 const node=F.CIF.createStructure(hkustSource,hkust.cifMode);
 assert.equal(node.contactDepth,0);
@@ -110,18 +115,6 @@ for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
       const expanded=F.CIF.contactStructure(structure,1);
       assert.ok(expanded.atoms.length>structure.atoms.length,v.title);
       assert.equal(new Set(expanded.atoms.map(a=>a.id)).size,expanded.atoms.length,v.title);
-    }
-    if(v.cifMode==="cif-excerpt:hkust:focus") {
-      assert.equal(structure.atoms.filter(a=>a.element==="Cu").length,2);
-      assert.equal(structure.atoms.filter(a=>a.element==="O").length,5);
-      assert.equal(F.CIF.contactStructure(structure,1).atoms.length,16);
-      assert.equal(F.CIF.contactStructure(structure,20).atoms.length,
-        F.CIF.contactStructure(structure,9).atoms.length);
-      const terminal=structure.atoms.find(a=>a.element==="O" &&
-        F.CIF.contactStructure(structure,1,new Set([a.id])).atoms.length>structure.atoms.length);
-      assert.ok(terminal);
-      const targeted=F.CIF.contactStructure(structure,1,new Set([terminal.id]));
-      assert.ok(targeted.atoms.length<F.CIF.contactStructure(structure,1).atoms.length);
     }
     assert.ok(structure.atoms.length && structure.atoms.every(a=> F.CIF.elements[a.element] && a.positionAngstrom.every(Number.isFinite)),v.title);
     assert.equal(new Set(structure.atoms.map(a=>a.id)).size,structure.atoms.length,v.title);
@@ -176,7 +169,19 @@ for(const view of [complex,coordination]) for(const bond of view.bonds){
   const a=view.atoms[bond.a].positionAngstrom,b=view.atoms[bond.b].positionAngstrom;
   assert.ok(Math.abs(Math.hypot(...a.map((v,i)=>v-b[i]))-bond.distanceAngstrom)<1e-7);
 }
-assert.deepEqual(referenced.sort(), fs.readdirSync(path.join(root,"assets/praktikum")).filter(file=>file.endsWith(".cif")).sort());
+const retainedWithoutStation = ["HKUST-1_mitH.cif", "YBa2Cu3O7_2016.cif"];
+assert.ok(retainedWithoutStation.every(file=>!referenced.includes(file)));
+assert.deepEqual([...referenced, ...retainedWithoutStation].sort(),
+  fs.readdirSync(path.join(root,"assets/praktikum")).filter(file=>file.endsWith(".cif")).sort());
+const waterSource = fs.readFileSync(path.join(root,"assets/praktikum",retainedWithoutStation[0]),"utf8");
+const waterNode = F.CIF.createStructure(waterSource,"cif-excerpt:hkust:focus");
+assert.equal(waterNode.atoms.filter(a=>a.element==="Cu").length,2);
+assert.equal(waterNode.atoms.filter(a=>a.element==="O").length,5);
+const waterExpanded = F.CIF.contactStructure(waterNode,1);
+assert.equal(waterExpanded.atoms.length,16);
+assert.equal(F.CIF.contactStructure(waterNode,20).atoms.length,F.CIF.contactStructure(waterNode,9).atoms.length);
+const targeted = waterNode.atoms.filter(a=>a.element==="O").map(a=>F.CIF.contactStructure(waterNode,1,new Set([a.id])));
+assert.ok(targeted.some(s=>s.atoms.length>waterNode.atoms.length && s.atoms.length<waterExpanded.atoms.length));
 const exhibit = F.welcomeRoom.exhibits.find(entry => entry.roomId === "team-b");
 assert.equal(exhibit.model, "assets/structures/Co-Produkt1.cif");
 assert.equal(exhibit.model, station.model);

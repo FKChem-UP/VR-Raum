@@ -378,6 +378,7 @@
     [shell("Ba","O",3.15,tetragonal?8:10),tetragonal?"Ba · O₈":"Ba · O₁₀"],
     ["cif-network:polyhedra:Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15","Zelle · Polyeder"]],
     "Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15");
+  const orthorhombicCuprate = cuprate(practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409"));
   const copperExcerpt = (record, kind) => {
     const all=[`cif-excerpt:${kind}:all`,"CIF-Ausschnitt","view-1"];
     const focus=[`cif-excerpt:${kind}:focus`,"Cu-Knoten · Umgebung","view-2"];
@@ -398,14 +399,11 @@
       molecular(practicalCif("Benzil · monoklin", "BENZIL03_monoklin.cif", "CSD BENZIL03")),
       molecular(practicalCif("Benzil · trigonal", "BENZIL04_trigonal.cif", "CSD BENZIL04"))]],
     ["HKUST-1", "#15766f", "#a8e3d3", [
-      copperExcerpt(practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", undefined,
-        "Cu₂-Schaufelrad: vier Carboxylat-O, ein axiales Wasser-O und das zweite Cu, soweit im Export vorhanden. Umgebung wächst nur innerhalb des Ausschnitts."),"hkust"),
       hkustFramework,
       copperExcerpt(practicalCif("Nebenprodukt VUXBUL · Ausschnitt", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL", undefined,
         "Cu–O- und Ligandenbindungen aus den exportierten Positionen. Umgebung wächst nur innerhalb des Ausschnitts."),"vuxbul")]],
     ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#f6c7b9", [
-      cuprate(practicalCif("YBa₂Cu₃O₇", "YBa2Cu3O7_2016.cif", "ICSD 196264")),
-      cuprate(practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409")),
+      orthorhombicCuprate,
       cuprate(practicalCif("YBa₂Cu₃O₆ · tetragonal", "YBa2Cu3O6_tetragonal_HT.cif", "ICSD 63269"),true)]],
     ["Tribolumineszenz · Eu-Komplex", "#75519b", "#e2cdf5", [
       views(practicalCif("Eu-Komplex · Referenz", "Eu-Komplex2017.cif", "CCDC 1430893", undefined,
@@ -503,7 +501,7 @@
     info:"C₆₀ aus CIF: Einzelmolekül und periodische Elementarzelle mit 240 C-Positionen. Die beiden Ansichten sind separat normalisiert."});
   welcome("vorlesung-2", views({model:"assets/structures/H2O.cif", info:"Quelle: H2O.cif · Eis. Gestrichelte Linien zeigen geometrisch abgeleitete mögliche Wasserstoffbrücken. Die 2×2-Zelle vergrößert den Blick entlang der Basalebene."},[
     ["cif-view:ice-cell","Elementarzelle"],["cif-view:ice-supercell","2×2-Zellen"],["cif-view:molecule","Wassermolekül"]]));
-  welcome("vorlesung-3", room("team-a").zones[2].models[1]);
+  welcome("vorlesung-3", orthorhombicCuprate);
   welcome("vorlesung-6", lattice({model:"assets/structures/Cu.cif", info:"Quelle: Cu.cif · kubisch dichteste Packung. Die zwölf Stäbe der Koordinationsansicht markieren nächste Nachbarn, keine kovalenten Bindungen."},
     [[shell("Cu","Cu",2.8,12),"12 nächste Nachbarn"],["cif-network:packing:Cu/Cu/2.8","Dichteste Packung"]],"Cu/Cu/2.8"));
   welcome("vorlesung-8", molecular({model:"assets/structures/S8.cif",info:"Quelle: S8.cif · elementarer Schwefel."}));

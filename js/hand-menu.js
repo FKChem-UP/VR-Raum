@@ -212,8 +212,6 @@
       }
       F.HandMenu.opened = true;
       if (!wasOpen) {
-        if(!["draw","plane","analysis"].includes(this.page) && !(this.page === "settings" && this.returnPage === "draw"))this.page = "model";
-        this.offset = 0;
         this.infoOffset = 0;
         F.Menu.blockDrawing();
         F.invalidateHits();
@@ -268,11 +266,11 @@
       if (performance.now() >= this.pressUntil) this.pressedIndex = -1;
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
-      if(this.page === "analysis" && !F.StructureAnalysis?.validate(model))this.page="model";
+      if(["analysis","starts"].includes(this.page) && !F.StructureAnalysis?.validate(model))this.page="model";
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
       const plane = F.AtomPlane?.get(model);
       const mirror = chapter?.phase === "mirror" ? chapter.mirror : null;
-      const cue = mirror ? mirror.cue() : this.page === "model" && F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
+      const cue = mirror ? mirror.cue() : F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
       const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
@@ -462,7 +460,7 @@
           const labelY = entry.swatch || entry.kind === "plain" && !entry.heading ? height/2+8 : compactRow ? 63 : 73;
           ctx.fillText((entry.swatch && selected ? "✓ " : "")+entry.label, x + w / 2, y + shift + labelY, w - 12);
           ctx.textAlign = "left";
-          if (locked && !entry.enabled) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
+          if (entry.disabled || locked && !entry.enabled) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
           else this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
         });
         y += height + 13;
@@ -483,7 +481,6 @@
           }else if(state.points.size>=3)row([tile(state.first?"Ring 2 auswerten":"Ring 1 übernehmen",()=>tool.acceptRing())],true);
         }else if(state.points.size){
           const actions=[];
-          if(structure?.contactExpansion)actions.push(tile("Kontakte erweitern",()=>tool.apply(false)));
           if(state.points.size===1)actions.push(tile("Koordinationshülle",()=>tool.apply(true)));
           actions.push(tile("Auswahl ausblenden",()=>tool.hideSelected()));
           if(actions.length)row(actions,true);
@@ -571,7 +568,7 @@
           row([0.5, 0.75, 1].map(factor => ({label: Math.round(factor * 100) + " %", kind: "bond-size", factor,
             selected: (model.fkcBondThickness || 1) === factor,
             action: () => F.CIF.setBondThickness(model, factor)})));
-          if(structure.hydrogenContacts?.length || structure.environmentCell?.hydrogenContacts?.length){
+          if(structure.hydrogenContacts?.length || (structure.environmentCell || structure.hydrogenCell || structure.contactExpansion?.cell)?.hydrogenContacts?.length){
             text("H-Brücken · Dicke");
             row([0.5,1,2].map(factor=>tile(`${factor*100} %`,()=>F.CIF.setHydrogenThickness(model,factor),
               (model.fkcHydrogenThickness || 1)===factor)),true);
@@ -610,93 +607,81 @@
           row([tile("Mittelpunkte entfernen",()=>F.AtomPlane.clearMidpoints(model))],true);
         }
       } else {
-        text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
-        const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
-        row(variants.slice(this.offset, this.offset + 4).map(variant => ({
-          label: /^cif-(view|network|excerpt|hkust):/.test(variant.cifMode) ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
-            "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle",
-            "co-precursor-molecule": "Komplexkation", "co-precursor-cell": "Zelle", "co-precursor-coordination": "Koordination"})[variant.cifMode] ||
-            (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
-          kind: "variant", cueId: "variant:" + variant.id, selected: variant.id === model.fkcVariantId, action: () => {
-            if (!model.fkcPendingVisual) F.switchVariant(model, variant.id);
+        const page=this.page || "model", tool=F.StructureAnalysis;
+        const go=p=>{if(page==="starts")tool?.cancel();this.page=p;};
+        const grid=entries=>{for(let i=0;i<entries.length;i+=2)row(entries.slice(i,i+2));};
+        const link=(label,p,target)=>tile(label,()=>go(p),false,target);
+        const variants=model.fkcVariants || [];
+        const styles=structure ? F.CIF.availableStyles(structure) : [];
+        const modes=F.AtomLabels.modes, labelMode=model.fkcAtomLabels || "hover";
+        const hasShell=!!structure?.contactExpansion, hasMolecules=!!structure?.environmentCell && structure.mode==="molecule";
+        const neighborPage=hasShell && hasMolecules ? "neighbors" : hasShell ? "shells" : "molecules";
+        const targetPage=cue?.startsWith("variant:")?"views":cue?.startsWith("measure:")?"measure":
+          cue?.startsWith("environment:")?"molecules":cue==="plane:start"?"tools":"model";
+        const contacts=structure?.hydrogenContacts?.length ? structure.hydrogenContacts :
+          (structure?.environmentCell || structure?.hydrogenCell || structure?.contactExpansion?.cell)?.hydrogenContacts;
+        if(page!=="model")row([{...link("‹ Modellmenü","model",page!==targetPage?cue:null),enabled:locked}]);
+        if(page==="views"){
+          text("Ansicht wählen");
+          grid(variants.map(v=>({...tile(v.title,()=>{if(!model.fkcPendingVisual){F.switchVariant(model,v.id);go("model");}},v.id===model.fkcVariantId,"variant:"+v.id),kind:"variant"})));
+          if(structure && ["cell","cell-complete"].includes(structure.mode) && (structure.canComplete || structure.name?.startsWith("Co-Produkt1")))
+            row([tile("Randmoleküle vervollständigen",()=>F.CIF.setCompleteCell(model,structure.mode!=="cell-complete"),structure.mode==="cell-complete")]);
+        }else if(page==="styles"){
+          text("Style wählen");grid(styles.map(s=>({...tile(s.title || s.id,()=>F.CIF.setStyle(model,s.id),s.id===(model.fkcStyle||"ball-stick")),kind:s.id})));
+        }else if(page==="measure"){
+          text("Messen · erneut drücken zum Beenden");
+          const ids=["distance","angle","torsion"];
+          if(F.AtomPlane?.get(model)?.normalAngstrom)ids.push("pointPlane");
+          grid(ids.map(id=>({...tile(F.Measure.titles[id],()=>F.Measure.toggleMode(id),F.Measure.enabled && F.Measure.mode===id,"measure:"+id),
+            kind:id==="pointPlane"?"plain":id,count:F.Measure.counts[id]})));
+          row([tile("Messungen zurücksetzen",()=>this.el.components["fkc-measurements"].reset())]);
+        }else if(page==="tools"){
+          text("Weitere Werkzeuge");
+          const active=F.AtomPlane?.active, pending=active?.root===model;
+          if(F.AtomPlane)grid([{...tile(pending && !active.midpoint?"Ebene abbrechen":"Ebene aus Punkten",()=>locked?chapter.mirror.startPlane():F.AtomPlane.begin(model),false,"plane:start"),enabled:locked && chapter.mirror.step>=14},
+            tile(pending && active.midpoint?"Mittelpunkt abbrechen":"Mittelpunkt aus zwei Punkten",()=>F.AtomPlane.begin(model,{midpoint:true}))]);
+          if(tool && !chapter?.phase)row([tile("Auswahl, Polyeder und Ringe",()=>{tool.begin(model);go("analysis");})]);
+          row([tile("Modell zurücksetzen",()=>F.resetTarget(model))]);
+        }else if(page==="neighbors"){
+          text("Nachbarn hinzufügen");row([link("Kontakten folgen","shells"),link("Nachbarmoleküle zeigen","molecules",cue)]);
+        }else if(page==="shells" || page==="starts"){
+          text("Kontakten folgen");
+          if(page==="starts"){
+            const count=tool?.state?.points.size || 0;
+            text(`Trigger: Startpunkte markieren (${count})`,false);
+            row([{...tile("Auswahl erweitern",()=>tool.apply(false)),disabled:!count},link("Auswahl beenden","shells")]);
+          }else if(hasShell){
+            const depth=structure.contactDepth;
+            text(`Gesamter Ausschnitt · ${depth} zusätzliche Schalen`);
+            row([{...tile("− Eine Schale",()=>F.CIF.setContactDepth(model,depth-1)),disabled:depth<=0},
+              {...tile("+ Eine Schale",()=>F.CIF.setContactDepth(model,depth+1)),disabled:depth>=F.CIF.maxContactDepth}]);
+            if(tool)row([tile("Startpunkte wählen",()=>{tool.begin(model);go("starts");}),tile("Erweiterungen zurücksetzen",()=>F.CIF.resetSelectionGeometry(model))]);
           }
-        })));
-        if (!variants.length) text("Für dieses Modell nur eine Ansicht.");
-        if (variants.length > 4) button("Weitere Ansichten", () => {
-          this.offset = this.offset + 4 < variants.length ? this.offset + 4 : 0;
-        });
-        if (structure || locked) {
-          text("Styles");
-          const available = locked ? F.CIF.styles : F.CIF.availableStyles(structure);
-          const activeStyle = available.some(style => style.id === model.fkcStyle) ? model.fkcStyle : "ball-stick";
-          row(available.map(style => ({
-            label: {"ball-stick": "Kugel–Stab", "space-filling": "Raumfüllend",
-              wires: "Wires", "capped-sticks": "Sticks", polyhedral: "Polyeder"}[style.id],
-            kind: style.id,
-            selected: activeStyle === style.id,
-            action: () => F.CIF.setStyle(model, style.id)
-          })));
-        }
-        const mode = model.fkcAtomLabels || "hover";
-        const labelModes = F.AtomLabels.modes;
-        const order=Object.keys(labelModes);
-        const display = [{heading:"Atomlabels",label:labelModes[mode],kind:"plain",
-          action:()=>F.AtomLabels.setMode(model,order[(order.indexOf(mode)+1)%order.length])}];
-        if(structure && !chapter?.phase && F.StructureAnalysis)display.push(tile("Struktur analysieren",()=>{
-          F.StructureAnalysis.begin(model);this.page="analysis";
-        }));
-        if(locked || structure) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
-          kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
-        if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
-          const active=F.AtomPlane.active?.root===model ? F.AtomPlane.active : null;
-          const pending=!!active && !active.midpoint;
-          display.push({...tile(pending?`${F.AtomPlane.active.points.length}/3 · Abbrechen`:"Ebene aus Punkten",
-            ()=>locked?chapter.mirror.startPlane():F.AtomPlane.begin(model),pending,"plane:start"),enabled:true});
-          if(structure && !locked) display.push({kind:"plain",heading:"Mittelpunkt",
-            label:active?.midpoint?`${active.points.length}/2 · Abbrechen`:"Aus zwei Punkten",selected:!!active?.midpoint,
-            action:()=>F.AtomPlane.begin(model,{midpoint:true})});
-        }
-        row(display);
-        if (structure && ["cell", "cell-complete"].includes(structure.mode) && (structure.canComplete || structure.name?.startsWith("Co-Produkt1"))) {
-          button(structure.mode === "cell-complete" ? "Elementarzelle normal" : "Elementarzelle erweitern",
-            () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
-        }
-        const hydrogen = structure?.hydrogenContacts?.length ? structure.hydrogenContacts : structure?.environmentCell?.hydrogenContacts;
-        if (hydrogen?.length) {
-          const enabled = !!model.fkcShowHydrogenContacts;
-          button((hydrogen.some(contact=>contact.inferred) ? "Mögliche H-Brücken: " : "H-Brücken: ") +
-            (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
-            () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
-        }
-        const hasPlane = !!F.AtomPlane?.get(model)?.normalAngstrom;
-        if (locked || structure) {
-          text("Messen · aktiven Knopf erneut drücken: Aus");
-          const modes=["distance", "angle", "torsion"];
-          if(hasPlane && !locked)modes.push("pointPlane");
-          row(modes.map(mode => ({
-            label: F.Measure.titles[mode], kind: mode === "pointPlane" ? "plain" : mode, count: F.Measure.counts[mode], cueId: "measure:" + mode,
-            selected: F.Measure.enabled && F.Measure.mode === mode,
-            action: () => F.Measure.toggleMode(mode)
-          })));
-          row([tile("Messungen zurücksetzen", () => this.el.components["fkc-measurements"].reset()),
-            tile("Modell zurücksetzen", () => F.resetTarget(model))], true);
-        } else button("Modell zurücksetzen", () => F.resetTarget(model));
-        if (structure?.contactExpansion) {
-          const depth = structure.contactDepth;
-          text(`Kontaktschalen · ${depth} von ${F.CIF.maxContactDepth} zusätzlich`);
-          row([{label: "− Weniger", change: -1}, {label: "+ Mehr", change: 1}].map(({label, change}) => ({
-            label, kind: "plain", action: () => F.CIF.setContactDepth(model, depth + change)
-          })),true);
-        }
-        if (locked || structure && structure.environmentCell) {
-          const state = locked ? {selected:[],enabled:false} : F.CIF.environmentState(model);
-          text(locked ? "Umgebung (Å)" : "Umgebung (Å) · " + state.selected.size + " übernommen");
-          row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","), kind: "environment", radius,
-            cueId: "environment:" + (radius ?? "off"),
-            selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
-            action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
-          button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
-        }
+        }else if(page==="molecules" && hasMolecules){
+          const state=F.CIF.environmentState(model), radii=[1.5,2,2.5,3,4,5];
+          text("Nachbarmoleküle zeigen");text(`Radius: ${String(state.radius).replace(".",",")} Å · ${state.selected.size} übernommen`,false);
+          const radiusCue=cue==="environment:3"?cue:null;
+          row([-1,1].map(delta=>{const next=radii[radii.indexOf(state.radius)+delta];return {
+            ...tile(delta<0?"− Radius":"+ Radius",()=>F.CIF.setEnvironment(model,true,next),false,
+              (3-state.radius)*delta>0?radiusCue:null),disabled:next===undefined};}));
+          row([tile(state.enabled?"Vorschau ausschalten":"Vorschau einschalten",()=>F.CIF.setEnvironment(model,!state.enabled),state.enabled,
+            state.enabled?"environment:off":state.radius===3?radiusCue:null),tile("Übernahme zurücksetzen",()=>F.CIF.resetEnvironment(model))]);
+          text("Transparentes Molekül anklicken, um es zu behalten.",false);
+        }else{
+          const hasCif=!!structure;
+          const nav=(heading,label,p,enabled,route=p)=>({...link(label,p,targetPage===route?cue:null),heading,disabled:!enabled});
+          row([nav("Ansicht",variants.find(v=>v.id===model.fkcVariantId)?.title || variants[0]?.title || "Einzelansicht","views",variants.length || structure?.canComplete),
+            nav("Style",styles.find(s=>s.id===(model.fkcStyle||"ball-stick"))?.title || "Kugel–Stab","styles",hasCif)]);
+          const overlay=model.querySelector(".model-visual")?.getObject3D?.("mesh");
+          const show=!!model.fkcShowHydrogenContacts;
+          const drawn=overlay?.userData.fkcHasVisibleHBridge;
+          row([{...tile(model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen),false,"hide-hydrogen"),heading:"H-Atome",disabled:!hasCif},
+            {...tile(!contacts?.length?(show?"An · keine Daten":"Aus · keine Daten"):show?(drawn?"An":"An · 0 im Ausschnitt"):"Aus",()=>F.CIF.setHydrogenContacts(model,!show),show),
+              heading:contacts?.some(c=>c.inferred)?"Mögliche H-Brücken":"H-Brücken",disabled:!hasCif}]);
+          row([nav("Nachbarn hinzufügen",hasShell||hasMolecules?"Ausschnitt erweitern":"Nicht verfügbar",neighborPage,hasShell||hasMolecules,"molecules"),
+            nav("Messen",F.Measure.enabled?F.Measure.titles[F.Measure.mode]:"Distanz · Winkel · Torsion","measure",hasCif)]);
+          row([{...tile(modes[labelMode],()=>{const keys=Object.keys(modes);F.AtomLabels.setMode(model,keys[(keys.indexOf(labelMode)+1)%keys.length]);}),heading:"Atomlabels",disabled:!hasCif},
+            {...nav("Weitere Werkzeuge","Ebenen · Punkte · Analyse","tools",true),enabled:locked && chapter.mirror.step>=14}]);
         text(structure?.atoms.some(atom=>atom.siteOccupants) ? "Mischplatz: zwei Farben, Anteile am Label" : "Legende: Atomsorten");
         if (structure) {
           const colors = new Map();
@@ -737,6 +722,7 @@
         if (structure) text(structure.atoms[0]?.cellWeight !== undefined
           ? `${structure.atoms.length} sichtbar · ${structure.cellAtomCount} pro Zelle`
           : structure.spaceGroup.name + " · " + structure.atoms.length + " Atome", false);
+        }
       }
       const modeIndex = this.buttons.length;
       const modePressed = this.pressedIndex === modeIndex;
@@ -753,7 +739,8 @@
         ctx.fillText("Pinsel",586,49,60); outlineCue("mirror:menu",546,14,106,54);
       } else ctx.fillText("Modell", 552, 49 + (modePressed ? 4 : 0), 91);
       if(!roomDrawing)this.buttons.push({x: 546, y: 14, w: 106, h: 58, label: "tool-mode", action: () => {
-        if (chapter?.phase === "mirror") chapter.mirror.menu();
+        if(this.page==="starts")F.StructureAnalysis?.cancel();
+        if (chapter?.phase === "mirror") {this.page="model";chapter.mirror.menu();}
         else if(drawing){F.Draw.setMode("laser");this.page="model";}
         else this.page="draw";
       }});
@@ -766,7 +753,10 @@
       ctx.font = "38px Arial";
       ctx.fillText("⚙", 681, 55 + (gearPressed ? 4 : 0));
       if (locked) {ctx.fillStyle="rgba(185,185,185,0.68)";ctx.fillRect(664,14,76,58);}
-      else this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.returnPage=drawing?"draw":"model";this.page = "settings"; }});
+      else this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => {
+        if(this.page==="starts")F.StructureAnalysis?.cancel();
+        this.returnPage=drawing?"draw":this.page==="starts"?"shells":this.page || "model";this.page = "settings";
+      }});
       this.texture.needsUpdate = true;
     },
 

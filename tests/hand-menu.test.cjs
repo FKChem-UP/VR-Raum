@@ -106,40 +106,20 @@ const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "P
 menu.render(structure);
 const inkOf = title => drawnTexts.findLast(entry => entry.text === title)?.ink;
 assert.equal(inkOf("Modellmenü"),"#203f30");
-assert.equal(inkOf("Styles"),"#203f30");
-assert.equal(inkOf("Distanz"),"#191919");
-assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
-const labelTile=menu.buttons.find(b=>b.label==="Beim Anvisieren"), hydrogenTile=menu.buttons.find(b=>b.label==="Sichtbar");
-assert.equal(labelTile.y,hydrogenTile.y);assert.ok(labelTile.h>=70 && labelTile.x+labelTile.w < hydrogenTile.x);
-assert.equal(menu.buttons.length, 16, "Werkzeuge einschließlich H-Sichtbarkeit, Modus und Zahnrad");
-const distanceButton = menu.buttons[9];
-const angleButton = menu.buttons[10];
-distanceButton.action();
-assert.equal(enabled, true);
-assert.equal(mode, "distance");
-angleButton.action();
-assert.equal(mode, "angle");
-assert.equal(enabled, true);
-angleButton.action();
-assert.equal(enabled, false);
-const uv = {x: (distanceButton.x + distanceButton.w / 2) / 768,
-  y: 1 - (distanceButton.y + distanceButton.h / 2) / 900};
-assert.equal(menu.buttonIndex(uv), 9);
-assert.equal(menu.buttonIndex({x: 0, y: 0}), -1);
-menu.hoverIndex = 8;
-menu.pressedIndex = 8;
-menu.render(structure);
-assert.equal(menu.buttons.length, 16, "Hover/Druck verändert Trefferbereiche nicht");
-menu.render({mode: "coordination", atoms: new Array(7), polyhedra: [{}], spaceGroup: {name: "P -1"}});
-assert.equal(menu.buttons.length, 17, "Koordinationsansicht bietet fünf Styles, Messungen, H-Aus, Modus und Zahnrad");
-assert.ok(menu.buttons.every(button => button.y + button.h <= 900));
-menu.buttons[7].action(); // Polyhedral-Style direkt erreichbar.
-for (const entry of drawnTexts.filter(entry => /^(Styles|Messen|Legende)/.test(entry.text))) {
-  assert.ok(drawnRectangles.filter(rectangle => rectangle.y >= entry.y)
-    .every(rectangle => rectangle.y >= entry.y + 10),
-    "Überschrift inklusive Unterlängen mit Abstand zur nächsten Fläche: " + entry.text);
-}
-assert.ok(drawnTexts.every(entry => entry.y <= 890), "Auch Legende und Kurzinfo passen auf die Menüfläche");
+const press=label=>{const b=menu.buttons.find(entry=>entry.label===label);assert.ok(b,label);b.action();};
+assert.equal(inkOf("H-Atome"),"#191919");
+const h=menu.buttons.find(b=>b.label==="Sichtbar"),hb=menu.buttons.find(b=>b.label==="Aus · keine Daten");
+assert.equal(h.y,hb.y);assert.ok(h.w>=340 && h.h>=72);
+press("Distanz · Winkel · Torsion");menu.render(structure);
+press("Distanz");assert.equal(mode,"distance");assert.ok(enabled);
+press("Winkel");assert.equal(mode,"angle");press("Winkel");assert.ok(!enabled);
+const b=menu.buttons.find(b=>b.label==="Winkel");
+assert.equal(menu.buttons[menu.buttonIndex({x:(b.x+b.w/2)/768,y:1-(b.y+b.h/2)/900})],b);
+press("‹ Modellmenü");menu.render(structure);press("Kugel–Stab");
+menu.render({...structure,polyhedra:[{}]});
+assert.ok(menu.buttons.some(b=>b.kind==="polyhedral"));
+assert.ok(menu.buttons.filter(b=>b.y>=115).every(b=>b.w>=340 && b.y+b.h<=900));
+press("‹ Modellmenü");menu.render(structure);
 F.invalidateHits = () => {};
 let menuScale = 1;
 menu.root = {object3D: {scale: {setScalar(value) { menuScale = value; }}, updateWorldMatrix() {}}};
@@ -180,13 +160,12 @@ assert.equal(menu.page, "model");
 menu.render({...structure, environmentCell: {}});
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Umgebungsbuttons passen auf Werkzeugseite");
 assert.ok(drawnTexts.at(-1).y <= 890, "Kurzinfo bleibt innerhalb der Fläche");
-const environmentButtons = menu.buttons.filter(button => button.kind === "environment");
-environmentButtons[0].action();
-assert.equal(environmentActions.at(-1)[1], false);
-environmentButtons[6].action();
-assert.equal(environmentActions.at(-1)[2], 5);
-environmentButtons[3].action();
-assert.equal(environmentActions.at(-1)[2], 2.5);
+press("Ausschnitt erweitern");
+menu.render({...structure,environmentCell:{}});
+press("Vorschau einschalten"); assert.equal(environmentActions.at(-1)[1],true);
+press("− Radius"); assert.equal(environmentActions.at(-1)[2],2.5);
+press("+ Radius"); assert.equal(environmentActions.at(-1)[2],4);
+press("‹ Modellmenü");
 const originalQuery = model.querySelector;
 model.querySelector = () => ({object3D: {traverse(callback) {
   ["Co", "N", "O", "Cl", "C", "H"].forEach(element => callback({userData: {fkcAtom: {element}},
@@ -210,6 +189,16 @@ assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "H-Schalter 
 menu.buttons.find(button => button.label === "Ausgeblendet").action();
 assert.deepEqual(atomOptions.at(-1), [model, false], "H nach der Erweiterung wieder einblendbar");
 delete model.fkcHideHydrogen;
+press("Ausschnitt erweitern");menu.render(knot);
+const depths=[]; F.CIF.setContactDepth=(_,d)=>depths.push(d);
+press("+ Eine Schale");assert.deepEqual(depths,[1]);
+assert.ok(!menu.buttons.some(b=>b.label==="− Eine Schale"),"Keine negative Schalentiefe");
+F.StructureAnalysis={begin(root){this.state={root,points:new Map()};},apply(poly){assert.equal(poly,false);},cancel(){this.state=null;}};
+menu.render(knot);press("Startpunkte wählen");menu.render(knot);
+assert.ok(!menu.buttons.some(b=>b.label==="Auswahl erweitern"));
+F.StructureAnalysis.state.points.set({},{});menu.render(knot);press("Auswahl erweitern");
+press("Auswahl beenden");assert.equal(F.StructureAnalysis.state,null);
+menu.render(knot);press("‹ Modellmenü");menu.render(knot);
 menu.buttons.find(button => button.label === "tool-mode").action();
 assert.equal(F.Draw.mode, "laser", "Pinsel öffnet das Zeichenmenü, ohne gleich zu malen");
 menu.render(structure);
@@ -245,8 +234,8 @@ menu.page = "model";
 menu.el.components["fkc-tutorial"] = {phase:"mirror", mirror:{drawingMenu:false}};
 for (const method of ["save","restore","translate","ellipse"]) ctx[method]=()=>{};
 drawnTexts.length=0;menu.render(null,"mirror:menu",4);
-assert.ok(drawnTexts.some(entry=>entry.text==="Distanz"));
-assert.ok(drawnTexts.some(entry=>entry.text==="Winkel"));
+assert.ok(drawnTexts.some(entry=>entry.text==="Messen"));
+assert.ok(drawnTexts.some(entry=>entry.text==="Weitere Werkzeuge"));
 assert.deepEqual(Array.from(menu.buttons,b=>b.label),["tool-mode"],"Nur der Pinsel ist im Tutorial-Modellmenü anwählbar");
 menu.el.components["fkc-tutorial"] = {phase:"bragg",selectedAnimation:model,
   animation:{state:{angle:30,speed:1,source:"mo",running:false}}};
@@ -256,5 +245,5 @@ assert.equal(inkOf("Animationsmenü"),"#782a2a");
 assert.equal(inkOf("Abspieltempo"),"#782a2a");
 assert.equal(inkOf("Start"),"#191919");
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
-console.log("Direktmenütest bestanden: Buttonlayout und exklusive Messmodusumschaltung ohne Untermenü.");
+console.log("Modellmenütest bestanden: Kacheln, Messmodi, Nachbarmoleküle und gezielte Kontakterweiterung.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

@@ -381,7 +381,7 @@
       originAngstrom:[0,0,0],polyhedra:[{center,neighbors}]};
     const indexes = [center,...neighbors];
     const origin = atoms[center].positionAngstrom;
-    return {...cell, mode, hydrogenContacts:[], polyhedra:[{center:0,neighbors:neighbors.map((_,i)=>i+1)}],
+    return {...cell, mode, hydrogenContacts:[], hydrogenCell:cell, polyhedra:[{center:0,neighbors:neighbors.map((_,i)=>i+1)}],
       atoms:indexes.map((index,i)=>({...atoms[index],modelNumber:i+1,
         positionAngstrom:atoms[index].positionAngstrom.map((value,axis)=>value-origin[axis])})),
       bonds:bonds.filter(bond=>bond.a===center || bond.b===center)

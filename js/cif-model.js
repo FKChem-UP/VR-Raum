@@ -608,31 +608,32 @@
   }
 
   function environmentHydrogenDashes(base, records, hidden) {
-    const cell=base.environmentCell;
+    const cell=base.environmentCell || base.hydrogenCell || base.contactExpansion?.cell;
     const contacts=cell?.hydrogenContacts || [];
     const key=(label,f)=>`${label}:${f.map(v=>Math.round(v*1e6)).join(",")}`;
     const atoms=new Map();
-    const neighbors=new Set();
+    if(!contacts.length)return [];
+    const original=base.mode==="cell" ? new Set(cell.atoms.map(a=>a.id)) : null;
     for(const atom of base.atoms)if(!hidden?.has(atom.id))atoms.set(key(atom.cifLabel,atom.fractional),{atom,alpha:1});
     for(const {candidate,alpha} of records)for(const atom of candidate.atoms){
       if(hidden?.has(atom.id))continue;
       const id=key(atom.cifLabel,atom.fractional);
-      if(!atoms.has(id)){atoms.set(id,{atom,alpha});neighbors.add(id);}
+      if(!atoms.has(id))atoms.set(id,{atom,alpha});
     }
     const result=[];
-    for(const [id,{atom,alpha}] of atoms)for(const contact of contacts){
+    for(const {atom,alpha} of atoms.values())for(const contact of contacts){
       if(atom.cifLabel!==contact.hydrogenLabel)continue;
       const f=atom.fractional;
       const src=cell.atoms[contact.a].fractional;
       if(f.some((v,i)=>Math.abs(v-src[i]-Math.round(v-src[i]))>1e-6))continue;
       const endKey=key(contact.acceptorLabel,f.map((v,i)=>v+contact.deltaFractional[i]));
       const target=atoms.get(endKey);
-      if(!target || (!neighbors.has(id)&&!neighbors.has(endKey)))continue;
+      if(!target || (original?.has(atom.id) && original.has(target.atom.id)))continue;
       const start=atom.positionAngstrom,end=target.atom.positionAngstrom;
       const length=Math.hypot(...end.map((v,i)=>v-start[i]));
       if(length<EPS)continue;
       const point=d=>start.map((v,i)=>v+(end[i]-v)*d/length);
-      for(let d=0;d<length;d+=0.34)result.push({start:point(d),end:point(Math.min(d+0.20,length)),alpha:Math.min(alpha,target.alpha)});
+      for(let d=0;d<length;d+=0.34)result.push({start:point(d),end:point(Math.min(d+0.20,length)),alpha:Math.min(alpha,target.alpha), sites:[atom.id,target.atom.id]});
     }
     return result;
   }
@@ -867,10 +868,12 @@
     const hidden = group.userData.fkcHiddenSites;
     const atoms = group.userData.fkcStructure?.atoms || [];
     const isHidden = index => hidden?.has(atoms[index]?.id);
+    group.userData.fkcHasVisibleHBridge=false;
     group.traverse(mesh => {
       if (mesh.userData.fkcHydrogenContacts) {
-        mesh.visible = !!group.userData.fkcShowHydrogenContacts && !group.userData.fkcHideHydrogen &&
+        mesh.visible = !!group.userData.fkcShowHydrogenContacts &&
           !mesh.userData.fkcContactSites?.some(id=>hidden?.has(id));
+        if(mesh.visible)group.userData.fkcHasVisibleHBridge=true;
         mesh.scale.x=mesh.scale.z=0.024*(group.userData.fkcHydrogenThickness || 1);
       } else if (mesh.userData.fkcAtom) {
         mesh.visible = !hidden?.has(mesh.userData.fkcAtom.id) &&
@@ -1000,7 +1003,7 @@
     setHydrogenContacts(root, enabled) {
       const visual = root && root.querySelector(".model-visual");
       const mesh = visual && visual.getObject3D("mesh");
-      if (!mesh || !(visual.fkcStructure?.hydrogenContacts?.length || visual.fkcStructure?.environmentCell?.hydrogenContacts?.length) || root.fkcPendingVisual) return false;
+      if (!mesh || !visual.fkcStructure || root.fkcPendingVisual) return false;
       root.fkcShowHydrogenContacts = !!enabled;
       mesh.userData.fkcShowHydrogenContacts = root.fkcShowHydrogenContacts;
       applyStyle(mesh, mesh.userData.fkcStyle || "ball-stick");
@@ -1077,7 +1080,7 @@
     setEnvironment(root, enabled, radius) {
       const visual = root && root.querySelector(".model-visual");
       const group = visual && visual.getObject3D("mesh");
-      if (!group || !visual.fkcStructure.environmentCell || root.fkcPendingVisual) return false;
+      if (!group?.userData.fkcEnvironment || !visual.fkcStructure.environmentCell || root.fkcPendingVisual) return false;
       if (radius !== undefined && ![1.5, 2, 2.5, 3, 4, 5].includes(radius)) return false;
       const state = group.userData.fkcEnvironment;
       state.radius = radius === undefined ? state.radius : radius;
@@ -1197,7 +1200,7 @@
     const group = new T.Group();
     group.name = (structure.name || "C60") + "-from-CIF-" + structure.mode;
     group.userData.fkcStructure = structure;
-    if (structure.environmentCell) group.userData.fkcEnvironment = {
+    if (structure.environmentCell && structure.mode === "molecule") group.userData.fkcEnvironment = {
       enabled: false, radius: 3, selected: new Set(), records: new Map(), available: new Set()
     };
     const polyhedronGeometries = [];
@@ -1411,18 +1414,23 @@
       hydrogenContactDashes({...structure,hydrogenContacts:[contact]}).forEach(([a,b])=>addDash(a,b,hydrogenRed,sites));
     }
     const env=group.userData.fkcEnvironment;
+    if(!env && (structure.hydrogenCell || structure.environmentCell || structure.contactExpansion?.cell.hydrogenContacts?.length)) {
+      for(const d of environmentHydrogenDashes(structure,[]))addDash(d.start,d.end,hydrogenRed,d.sites);
+    }
     if(env){
       let meshes=[];
       env.rebuildHydrogen=()=>{
         meshes.forEach(mesh=>mesh.removeFromParent());meshes=[];
-        if(!group.userData.fkcShowHydrogenContacts || group.userData.fkcHideHydrogen)return;
+        group.userData.fkcHasVisibleHBridge=false;
+        if(!group.userData.fkcShowHydrogenContacts)return;
         const visible=[...env.records].filter(([id,r])=>r.built.group.visible)
           .map(([id,r])=>({candidate:r.candidate,alpha:env.selected.has(id)?1:0.25}));
         meshes=environmentHydrogenDashes(structure,visible,group.userData.fkcHiddenSites).flatMap(d=>{
-          const mesh=addDash(d.start,d.end,d.alpha===1?hydrogenRed:hydrogenPreview);
+          const mesh=addDash(d.start,d.end,d.alpha===1?hydrogenRed:hydrogenPreview,d.sites);
           if(!mesh)return [];
           mesh.visible=true;return [mesh];
         });
+        group.userData.fkcHasVisibleHBridge=meshes.length>0;
       };
     }
     return {
@@ -1537,6 +1545,7 @@
         built.group.userData.fkcAtomScale = root && root.fkcAtomScale || 1;
         built.group.userData.fkcHydrogenThickness = root?.fkcHydrogenThickness || 1;
         applyStyle(built.group, structure.defaultStyle || (root && root.fkcStyle) || "ball-stick");
+        F.CIF.updateEnvironment(built.group);
 
         this.built = built;
         this.el.fkcStructure = structure;
