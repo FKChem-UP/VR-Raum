@@ -94,7 +94,8 @@
     const lengths = ["a", "b", "c"].map(axis => numeric(parsed.values["_cell_length_" + axis]));
     const angles = ["alpha", "beta", "gamma"].map(axis => numeric(parsed.values["_cell_angle_" + axis]));
     const matrix = cellMatrix(lengths, angles);
-    const operations = rows("_space_group_symop_operation_xyz").map(row => row._space_group_symop_operation_xyz);
+    const operations = [...rows("_space_group_symop_operation_xyz"),...rows("_symmetry_equiv_pos_as_xyz")]
+      .map(row => row._space_group_symop_operation_xyz || row._symmetry_equiv_pos_as_xyz);
     if (!operations.length) throw new Error("Symmetrieoperationen fehlen.");
     const adps = new Map(rows("_atom_site_aniso_label").map(row => [row._atom_site_aniso_label,
       ["11", "22", "33", "23", "13", "12"].map(key => numeric(row["_atom_site_aniso_u_" + key]))]));
@@ -138,7 +139,7 @@
     }));
     const volume = matrix[0][0] * matrix[1][1] * matrix[2][2];
     return {atoms, bonds, hydrogenContacts, operations, lengths, angles, matrix, volume,
-      spaceGroup: parsed.values["_space_group_name_h-m_alt"], parsed};
+      spaceGroup: parsed.values["_space_group_name_h-m_alt"] || parsed.values["_symmetry_space_group_name_h-m"], parsed};
   }
   function reconstructCoHeavy(structure, includeHydrogen = false) {
     if (structure.operations.length !== 2 ||
@@ -469,5 +470,5 @@
     }
     return candidates.sort((a,b) => a.minimumDistanceAngstrom - b.minimumDistanceAngstrom);
   }
-  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, createBondedStructure, environmentCandidates, completeCell};
+  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, createBondedStructure, cellComponents, environmentCandidates, completeCell};
 })(window.FKCVR = window.FKCVR || {});

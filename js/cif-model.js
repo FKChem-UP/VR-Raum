@@ -608,6 +608,31 @@
   }
 
   function createStructure(source, mode = "molecule") {
+    if (mode.startsWith("cif-view:")) {
+      const [,view,center,ligand,cutoff,count,label] = mode.split(":");
+      if(view === "bonded") {
+        const structure=F.CIFStructure.createBondedStructure(source,ligand,center);
+        return structure.mode === "cell" ? {...structure,bondSegments:cellBondSegments(structure)} : structure;
+      }
+      const reader = F.StructureCell;
+      let cell = {...reader.read(source,{maxPositions:600}),measurePositions:true};
+      if (view === "molecular-cell" || view === "molecule" || view === "packing") {
+        cell = reader.molecularCell(cell);
+        if(view === "molecule") return reader.molecule(cell);
+        if(view === "packing") return F.CIFStructure.completeCell(cell);
+        return {...cell,bondSegments:cellBondSegments(cell)};
+      }
+      if(view === "sites" || view === "shell") {
+        cell=reader.occupiedSites(cell);
+        if(view === "sites") return cell;
+        return reader.coordination(cell,center,ligand,Number(cutoff),Number(count),label);
+      }
+      if(view === "closed") {
+        cell=reader.occupiedSites(cell);
+        return {...cell,atoms:reader.closedImages(cell)};
+      }
+      throw new Error("Unbekannte CIF-Ansicht: " + view);
+    }
     if (["co-precursor-molecule", "co-precursor-cell", "co-precursor-coordination"].includes(mode)) {
       const structure = F.CIFStructure.createBondedStructure(source, mode.slice("co-precursor-".length), "Co");
       if (structure.mode === "cell") structure.bondSegments = cellBondSegments(structure);
@@ -615,8 +640,9 @@
     }
     if (mode === "library-cell") return F.StructureCell.read(source);
     if (mode === "practical-cell" || mode === "practical-sites") {
-      return {...F.StructureCell.read(source,{explicit:mode === "practical-sites",maxPositions:600}),
-        measurePositions:true};
+      const explicit=mode === "practical-sites";
+      const cell=F.StructureCell.read(source,{explicit,maxPositions:600});
+      return explicit ? {...cell,mode:"sites",measurePositions:true} : F.StructureCell.occupiedSites(cell);
     }
     if (/^[ \t]*data_ZnS[ \t\r]*$/im.test(source)) {
       const structure = F.ZnSStructure.createStructure(source, mode);
@@ -991,9 +1017,11 @@
     const cylinder = new T.CylinderGeometry(1, 1, 1, 12);
 
     const atomMaterials = new Map();
+    const mixedMaterial = structure.atoms.some(atom=>atom.siteOccupants) ?
+      new T.MeshStandardMaterial({color:"#7d8490",roughness:0.6}) : null;
     const partialMaterials = new Map();
     function partialMaterial(atom, source) {
-      const key = `${atom.element}:${atom.occupancy}`;
+      const key = `${atom.siteOccupants ? "mixed" : atom.element}:${atom.occupancy}`;
       if (!partialMaterials.has(key)) {
         const material = source.clone();
         material.transparent = true;
@@ -1023,7 +1051,7 @@
         atomMaterials.set(atom.element, new T.MeshStandardMaterial({name: "CIF-" + atom.element,
           color: elements[atom.element].color, roughness: 0.45, metalness: 0}));
       }
-      const atomMaterial = atomMaterials.get(atom.element);
+      const atomMaterial = atom.siteOccupants ? mixedMaterial : atomMaterials.get(atom.element);
       const mesh = new T.Mesh(sphere, atom.occupancy < 1 ? partialMaterial(atom, atomMaterial) : atomMaterial);
 
       mesh.name = atom.id;
@@ -1161,6 +1189,7 @@
         sphere.dispose();
         cylinder.dispose();
         atomMaterials.forEach(material => material.dispose());
+        mixedMaterial?.dispose();
         partialMaterials.forEach(material => material.dispose());
         bondMaterial.dispose();
         frameMaterial.dispose();

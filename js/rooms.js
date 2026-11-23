@@ -362,6 +362,15 @@
     title, model: "assets/praktikum/" + file, cifMode,
     info: `Quelle: ${source}.\n${note || "CIF-Zellpositionen mit Zellrahmen; keine automatisch ergänzten Bindungen. Messungen beziehen sich auf die ausgewählten angezeigten Positionen."}`
   });
+  const views = (record, entries) => ({...record, cifMode:entries[0][0], variantAlignment:"individual",
+    variants:entries.map(([cifMode,title],i)=>({id:`view-${i+1}`,title,model:record.model,cifMode}))});
+  const shell = (center,ligand,cutoff,count,label="") => `cif-view:shell:${center}:${ligand}:${cutoff}:${count}:${label}`;
+  const molecular = record => views({...record,info:record.info.split("\n")[0]+"\nBindungen geometrisch aus kovalenten Radien abgeleitet. Packung zeigt vollständige Randmoleküle."}, [
+    ["cif-view:molecule","Molekül"],["cif-view:molecular-cell","Elementarzelle"],["cif-view:packing","Packung"]]);
+  const lattice = (record, extras=[]) => views(record,[["cif-view:sites","Elementarzelle"],["cif-view:closed","Zelle mit Rändern"],...extras]);
+  const cuprate = (record,tetragonal=false) => lattice(record,[
+    [shell("Cu","O",2.4,tetragonal?2:4,"Cu1"),tetragonal?"Cu1 · O₂":"Cu1 · O₄"],
+    [shell("Cu","O",2.6,5,"Cu2"),"Cu2 · O₅"]]);
   const coPrecursor = practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15",
     "co-precursor-molecule", "Die Komplexansicht zeigt das einkernige Kation. Am Co koordinieren zwei N- und zwei O-Atome der Pyridinmethanol-Liganden sowie zwei O-Atome aus gebundenem Wasser. Die Chlorid-Gegenionen und die CIF-Wasserstoffbrücken sind in der Elementarzelle sichtbar.");
   coPrecursor.variantAlignment = "individual";
@@ -370,32 +379,39 @@
 
   practicalStations("team-a", [
     ["Benzil", "#41628f", "#c3d9f8", [
-      practicalCif("Benzil · monoklin", "BENZIL03_monoklin.cif", "CSD BENZIL03"),
-      practicalCif("Benzil · trigonal", "BENZIL04_trigonal.cif", "CSD BENZIL04")]],
+      molecular(practicalCif("Benzil · monoklin", "BENZIL03_monoklin.cif", "CSD BENZIL03")),
+      molecular(practicalCif("Benzil · trigonal", "BENZIL04_trigonal.cif", "CSD BENZIL04"))]],
     ["HKUST-1", "#15766f", "#a8e3d3", [
       practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
       practicalCif("HKUST-1 · Referenzausschnitt", "HKUST-1_ohneH.cif", "CSD FIQCEN", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
-      practicalCif("Nebenprodukt VUXBUL", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL")]],
+      practicalCif("Nebenprodukt VUXBUL · Ausschnitt", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL", "practical-sites",
+        "Explizit exportierte Positionen. Eine vollständige Zellbelegung aus diesem Export ist noch nicht verifiziert.")]],
     ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#f6c7b9", [
-      practicalCif("YBa₂Cu₃O₇", "YBa2Cu3O7_2016.cif", "ICSD 196264"),
-      practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409"),
-      practicalCif("YBa₂Cu₃O₆ · tetragonal", "YBa2Cu3O6_tetragonal_HT.cif", "ICSD 63269")]],
+      cuprate(practicalCif("YBa₂Cu₃O₇", "YBa2Cu3O7_2016.cif", "ICSD 196264")),
+      cuprate(practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409")),
+      cuprate(practicalCif("YBa₂Cu₃O₆ · tetragonal", "YBa2Cu3O6_tetragonal_HT.cif", "ICSD 63269"),true)]],
     ["Tribolumineszenz · Eu-Komplex", "#75519b", "#e2cdf5", [
-      practicalCif("Eu-Komplex · Referenz", "Eu-Komplex2017.cif", "CCDC 1430893")]]
+      views(practicalCif("Eu-Komplex · Referenz", "Eu-Komplex2017.cif", "CCDC 1430893", undefined,
+        "Bindungen aus der CIF. Die Komplexansicht zeigt das Eu-Anion; das Triethylammonium-Gegenion ist in der Elementarzelle enthalten."),[
+        ["cif-view:bonded:Eu:molecule","Eu-Komplex"],["cif-view:bonded:Eu:cell","Elementarzelle"],
+        ["cif-view:bonded:Eu:coordination","EuO₈-Nachbarschaft"]])]]
   ]);
   practicalStations("team-b", [
     ["Co-Einkristalltransformation", "#654c99", "#d9c8f3", [
       coPrecursor,
       {...coModel, title: "Verbindung 2 · Produkt", info: "Quelle: Praktikumsdatensatz P3_14.\n" + coModel.info},
       {title: "Verbindung 3 · reserviert"}, {title: "Verbindung 4 · reserviert"}]],
-    ["Cobaltferrit", "#974339", "#efbbb0", [practicalCif("Cobaltferrit", "CoFe2O4.cif", "ICSD 33181", undefined,
-      "CIF-Zellpositionen. Co und Fe teilen sich teilweise dieselben mittleren Gitterplätze; überlagerte Positionen sind keine zwei gleichzeitig vorhandenen Ionen.")]],
-    ["Nicotinamid", "#206c80", "#b7dfec", [practicalCif("Nicotinamid", "Nikotinsaeureamid_NICOAM05.cif", "CSD NICOAM05")]],
+    ["Cobaltferrit", "#974339", "#efbbb0", [lattice(practicalCif("Cobaltferrit", "CoFe2O4.cif", "ICSD 33181", undefined,
+      "Co und Fe teilen sich kristallographische Plätze. Das Label zeigt die mittlere Besetzung, nicht zwei gleichzeitig vorhandene Ionen."),[
+      [shell("Co","O",2.0,4,"Co1"),"Tetraederplatz"],[shell("Co","O",2.2,6,"Co2"),"Oktaederplatz"]])]],
+    ["Nicotinamid", "#206c80", "#b7dfec", [molecular(practicalCif("Nicotinamid", "Nikotinsaeureamid_NICOAM05.cif", "CSD NICOAM05"))]],
     ["Thermochromie · Ag₂[HgI₄]", "#a65913", "#ffdbad", [
-      practicalCif("Ag₂[HgI₄] · Tieftemperaturform", "AgHgI4-Tieftemperaturform.cif", "ICSD 30264"),
-      practicalCif("Ag₂[HgI₄] · Hochtemperaturform", "AgHgI4-Hochtemperaturform.cif", "ICSD 38178", undefined,
-        "CIF-Zellpositionen. Ag und Hg teilen sich mittlere Gitterplätze; Teilbesetzungen sind statistisch zu verstehen.")]],
-    ["Vanillin", "#48763e", "#cceab8", [practicalCif("Vanillin", "Vanillin_YUHTEA.cif", "CSD YUHTEA")]]
+      lattice(practicalCif("Ag₂[HgI₄] · Tieftemperaturform", "AgHgI4-Tieftemperaturform.cif", "ICSD 30264"),[
+        [shell("Hg","I",3,4),"HgI₄-Nachbarschaft"],[shell("Ag","I",3,4),"AgI₄-Nachbarschaft"]]),
+      lattice(practicalCif("Ag₂[HgI₄] · Hochtemperaturform", "AgHgI4-Hochtemperaturform.cif", "ICSD 38178", undefined,
+        "Ag und Hg teilen sich mittlere Gitterplätze. Die Labels zeigen die statistischen Anteile; die Restbesetzung ist leer."),[
+        [shell("Hg","I",2.9,4,"Hg1"),"Mischplatz · I₄"]])]],
+    ["Vanillin", "#48763e", "#cceab8", [molecular(practicalCif("Vanillin", "Vanillin_YUHTEA.cif", "CSD YUHTEA"))]]
   ]);
   Object.assign(F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "team-b"), coModel,
     {info: "Vorschau für Team B.\n\n" + coModel.info});
@@ -464,7 +480,17 @@
     ]
   });
 
-  
+  const welcome = (id, entry) => Object.assign(F.welcomeRoom.exhibits.find(exhibit=>exhibit.roomId===id), entry);
+  const fulleren = v1.stations[2];
+  welcome("vorlesung-1", {...fulleren, model:fulleren.variants[1].model,cifMode:"molecule",variants:fulleren.variants.slice(1),
+    info:"C₆₀ aus CIF: Einzelmolekül und periodische Elementarzelle mit 240 C-Positionen. Die beiden Ansichten sind separat normalisiert."});
+  welcome("vorlesung-2", molecular({model:"assets/structures/H2O.cif", info:"Quelle: H2O.cif · Eis. Molekül, Zellbelegung und Packung; Wasserstoffbrücken werden hier nicht automatisch ergänzt."}));
+  welcome("vorlesung-3", room("team-a").zones[2].models[1]);
+  welcome("vorlesung-6", lattice({model:"assets/structures/Cu.cif", info:"Quelle: Cu.cif · kubisch dichteste Packung. Die zwölf Stäbe der Koordinationsansicht markieren nächste Nachbarn, keine kovalenten Bindungen."},
+    [[shell("Cu","Cu",2.8,12),"12 nächste Nachbarn"]]));
+  welcome("vorlesung-8", molecular({model:"assets/structures/S8.cif",info:"Quelle: S8.cif · elementarer Schwefel."}));
+  welcome("team-a", room("team-a").zones[1].models[0]);
+
   Object.assign(v1.stations[4], {
     title: "Eis",
     model: "assets/models/Eis2.glb",

@@ -17,7 +17,7 @@ const F = {getScene: () => ({addEventListener() {}, querySelectorAll: () => []})
   }}};
 const context = {window: {FKCVR: F}, THREE: {}, AFRAME: {THREE: {}, registerComponent() {}},
   document: {getElementById: id => nodes.get(id)}, console: {info() {}}};
-for (const name of ["cif-structure", "structure-cell", "cif-model", "rooms", "vr-tools"]) {
+for (const name of ["cif-structure", "structure-cell", "zns-structure", "cif-model", "rooms", "vr-tools"]) {
   vm.runInNewContext(fs.readFileSync(path.join(root, "js", name + ".js"), "utf8"), context);
 }
 const index = F.rooms.findIndex(room => room.id === "team-b");
@@ -27,10 +27,10 @@ assert.equal(teamB.zones[0].models.length, 4);
 assert.ok(teamB.zones[0].models.slice(2).every(entry => !entry.model));
 assert.equal(teamB.zones[4].wall, "back");
 assert.equal(teamB.zones[4].along, 0);
-const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:156, HKUST_1_mitH:65, HKUST_1_ohneH:57,
-  Nebenprodukt_VUXBUL:240, YBa2Cu3O7_2016:13, YBa2Cu3O7_2026:13, YBa2Cu3O6_tetragonal_HT:12,
-  Eu_Komplex2017:544, Verbindung1_cis_Co_Edukt:156, CoFe2O4:80, Nikotinsaeureamid_NICOAM05:300,
-  AgHgI4_Tieftemperaturform:7, AgHgI4_Hochtemperaturform:12, Vanillin_YUHTEA:152};
+const counts = {BENZIL03_monoklin:156, BENZIL04_trigonal:78, HKUST_1_mitH:65, HKUST_1_ohneH:57,
+  Nebenprodukt_VUXBUL:60, YBa2Cu3O7_2016:13, YBa2Cu3O7_2026:13, YBa2Cu3O6_tetragonal_HT:12,
+  Eu_Komplex2017:544, Verbindung1_cis_Co_Edukt:156, CoFe2O4:56, Nikotinsaeureamid_NICOAM05:60,
+  AgHgI4_Tieftemperaturform:7, AgHgI4_Hochtemperaturform:8, Vanillin_YUHTEA:152};
 const referenced = [];
 for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
   const team = F.rooms.find(room => room.id === id);
@@ -53,11 +53,37 @@ for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
     referenced.push(file);
     assert.match(s.info, /^Quelle:/);
     const source = fs.readFileSync(path.join(root,s.model), "utf8");
-    const structure = F.CIF.createStructure(source, s.variants?.find(v => v.cifMode.endsWith("-cell"))?.cifMode || s.cifMode);
+    const structure = F.CIF.createStructure(source, s.variants?.find(v => /(?:-cell|:cell|:sites)$/.test(v.cifMode))?.cifMode || s.cifMode);
     assert.equal(structure.atoms.length, counts[file.replace(/\.cif$/, "").replaceAll("-", "_")], file);
     assert.ok(structure.measurePositions);
     assert.ok(structure.atoms.every(atom => F.CIF.elements[atom.element] && atom.positionAngstrom.every(Number.isFinite)),file);
   }
+}
+const activeModels = [...F.welcomeRoom.exhibits, ...F.rooms.filter(r=>r.zones).flatMap(r=>r.stations)];
+const molecules = {H2O:3,S8:8,BENZIL03_monoklin:26,BENZIL04_trigonal:26,Vanillin_YUHTEA:19,Nikotinsaeureamid_NICOAM05:15};
+for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
+  for(const v of s.variants || [s]) {
+    const structure=F.CIF.createStructure(fs.readFileSync(path.join(root,v.model),"utf8"),v.cifMode);
+    assert.ok(structure.atoms.length && structure.atoms.every(a=> F.CIF.elements[a.element] && a.positionAngstrom.every(Number.isFinite)),v.title);
+    assert.equal(new Set(structure.atoms.map(a=>a.id)).size,structure.atoms.length,v.title);
+    if(v.cifMode==="cif-view:molecule")assert.equal(structure.atoms.length,molecules[path.basename(v.model,".cif")]);
+    for(const polyhedron of structure.polyhedra || []) {
+      assert.ok(F.CIF.polyhedronTriangles(polyhedron.neighbors.map(i=>structure.atoms[i].positionAngstrom)).length >= 4,v.title);
+    }
+    for(const b of structure.bonds) {
+      assert.ok(structure.atoms[b.a] && structure.atoms[b.b] && b.distanceAngstrom>0,v.title);
+      if(structure.mode!=="cell") {
+        const a=structure.atoms[b.a].positionAngstrom,z=structure.atoms[b.b].positionAngstrom;
+        assert.ok(Math.abs(Math.hypot(...a.map((p,i)=>p-z[i]))-b.distanceAngstrom)<0.03,v.title);
+      }
+    }
+  }
+}
+const mixed = F.CIF.createStructure(fs.readFileSync(path.join(root,"assets/praktikum/AgHgI4-Hochtemperaturform.cif"),"utf8"),"cif-view:sites");
+assert.equal(mixed.atoms.filter(a=>a.siteOccupants?.length===2 && a.occupancy===0.75).length,4);
+assert.ok(mixed.atoms.some(a=>a.displayLabel==="Hg 25 % / Ag 50 % / leer 25 %"));
+for(const id of ["vorlesung-1","vorlesung-2","vorlesung-3","vorlesung-6","vorlesung-7","vorlesung-8","team-a","team-b"]){
+  assert.match(F.welcomeRoom.exhibits.find(e=>e.roomId===id).model,/\.cif$/);
 }
 const precursor = teamB.stations[0];
 const educt = fs.readFileSync(path.join(root, precursor.model), "utf8");

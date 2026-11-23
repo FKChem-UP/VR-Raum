@@ -1,5 +1,13 @@
 # Fortsetzungsstand vor Compact
 
+## Neuer Stand: CIF-Ausbau für Praktikum und Begrüßung
+
+- Team A und Team B haben vier bzw. fünf durchgängige Farbzonen mit separaten Podesten. Vanillin steht gegenüber der Tür, Co 3 und 4 sind reserviert. Die Tafeln tragen nur Versuchstitel. 15 zusätzliche CIFs liegen unverändert unter `assets/praktikum`; Co-Produkt bleibt unter `assets/structures`.
+- Begrüßung: C₆₀, Eis, der Supraleiter, Cu, S₈ und HKUST-1 öffnen nun standardmäßig aus CIF. ZnS und Co waren bereits angebunden. Beugungsaufbau und Bravaisgitter bleiben Lehrmodelle; die GLB-Dateien wurden nicht gelöscht.
+- `structure-cell.js` bietet wiederverwendbare Zell-, Molekül-, Packungs- und Koordinationsbausteine. Benzil, Nicotinamid, Vanillin, Eis und S₈ nutzen vorsichtige geometrische Bindungsregeln; doppelt exportierte gleichartige Symmetriepositionen werden vor der Rekonstruktion entfernt. Co und Eu verwenden CIF-Bindungsdaten. Cu, Cuprate, Cobaltferrit und Ag₂[HgI₄] nutzen konfigurierte periodische Nachbarschaften. Mischplätze werden als eine neutrale Kugel mit Besetzungslabel dargestellt. Zellmessungen verwenden die konkret ausgewählten Abbilder in Å; kein automatisches Umklappen ins distanzkürzeste Bild.
+- HKUST-1 und VUXBUL bleiben messbare Exportausschnitte ohne nachgewiesene vollständige Poren/Zellen. Ein sauberer HKUST-1-Datensatz mit asymmetrischer Einheit und Besetzungen ist dafür der nächste Schritt. Der allgemeine Import ist noch kein automatischer Katalog für beliebige CIFs. Neue Ansichten werden in `rooms.js` konfiguriert; der Strukturraum-Katalog bleibt unverändert.
+- Automatisiert sind alle konfigurierten Ansichten auf Datenebene prüfbar. Auf Pico zuerst Benzil-Molekül/Packung, Edukt und Produkt, Mischplatzlabels und Zellmessungen prüfen. Insbesondere ist die Laufzeit der großen Packungsansichten auf der Pico noch offen.
+
 **Codebezug:** `16f32ba` (`Spiegelebene`), lokal auf `main` und `origin/main`; Arbeitsbaum vor dieser Doku-Etappe sauber. Remote, Pages-Deployment und Render-Verfügbarkeit wurden dabei nicht abgefragt. Frühere Abschnitte in `PROJECT_CONTEXT.md`, `Ideen.txt` und `VR_REDESIGN_PLAN.md` sind Verlauf bzw. Backlog, keine Garantie für den aktuellen Code. Vor Änderungen die betroffenen Dateien vollständig lesen und `.clinerules/01-project.md` beachten. Keine Löschungen, Commits, Pushes, neuen Pakete oder Deployments ohne die jeweils nötige Freigabe. Nutzer bei nötigem Commit ausdrücklich auf GitHub Desktop hinweisen. Pico hat Vorrang; vorhandene PC-Funktionalität erhalten.
 
 ## Tutorial: drei Kapitel in derselben Trainingsumgebung

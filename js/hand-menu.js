@@ -580,7 +580,7 @@
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
-          label: ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
+          label: variant.cifMode?.startsWith("cif-view:") ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
             "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle",
             "co-precursor-molecule": "Komplexkation", "co-precursor-cell": "Zelle", "co-precursor-coordination": "Koordination"})[variant.cifMode] ||
             (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
@@ -631,8 +631,7 @@
             () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }
         const hasPlane = !!F.AtomPlane?.get(model)?.normalAngstrom;
-        const hasMidpoints = !!F.AtomPlane?.midpointCount?.(model);
-        if (locked || structure && (structure.measurePositions || hasPlane || hasMidpoints || ["molecule", "coordination"].includes(structure.mode))) {
+        if (locked || structure) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           const modes=["distance", "angle", "torsion"];
           if(hasPlane && !locked)modes.push("pointPlane");
@@ -660,17 +659,18 @@
             action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
         }
-        text("Legende: Atomsorten");
+        text(structure?.atoms.some(atom=>atom.siteOccupants) ? "Legende · Mischplatz (M): Anteile am Label" : "Legende: Atomsorten");
         if (structure) {
           const colors = new Map();
           const visual = model.querySelector(".model-visual");
           visual.object3D.traverse(mesh => {
             const atom = mesh.userData && mesh.userData.fkcAtom;
-            if (atom && !colors.has(atom.element)) {
+            const symbol = atom?.siteOccupants ? "M" : atom?.element;
+            if (symbol && !colors.has(symbol)) {
               const labels = this.el.components["fkc-atom-labels"];
               const material = labels && labels.active && labels.active.mesh === mesh
                 ? labels.originalMaterial : mesh.material;
-              colors.set(atom.element, "#" + material.color.getHexString());
+              colors.set(symbol, "#" + material.color.getHexString());
             }
           });
           // Kompakte Legende; für viele Elemente wird eine eigene Seite nötig.

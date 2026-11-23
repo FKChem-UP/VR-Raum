@@ -27,7 +27,7 @@
   F.AtomLabels = {
     modes,
     atomFromHit,
-    text: atom => atom.cifLabel,
+    text: atom => atom.displayLabel || atom.cifLabel,
     labelWidth: measuredWidth => Math.min(768, Math.max(72, Math.ceil(measuredWidth) + 48)),
     setMode(root, mode) {
       if (!root || !Object.hasOwn(modes,mode)) return;
@@ -180,7 +180,8 @@
           const canvas = document.createElement("canvas");
           let ctx = canvas.getContext("2d");
           ctx.font = "bold 56px Arial";
-          canvas.width = F.AtomLabels.labelWidth(ctx.measureText(atom.cifLabel).width);
+          const text = F.AtomLabels.text(atom);
+          canvas.width = F.AtomLabels.labelWidth(ctx.measureText(text).width);
           canvas.height = 128;
           ctx = canvas.getContext("2d");
           ctx.clearRect(0, 0, canvas.width, 128);
@@ -191,8 +192,8 @@
           ctx.font = "bold 56px Arial";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.strokeText(atom.cifLabel, canvas.width / 2, 64);
-          ctx.fillText(atom.cifLabel, canvas.width / 2, 64);
+          ctx.strokeText(text, canvas.width / 2, 64, canvas.width - 20);
+          ctx.fillText(text, canvas.width / 2, 64, canvas.width - 20);
           const texture = new T.CanvasTexture(canvas);
           const material = new T.SpriteMaterial({map: texture, depthTest: false, depthWrite: false});
           const sprite = new T.Sprite(material);

@@ -57,8 +57,7 @@
         cached.set(entry.model, {root, visual, structure, points, meshes});
       }
       const {root, visual, structure, points, meshes} = cached.get(entry.model);
-      if (entry.variant !== (root.fkcVariantId || structure.mode) ||
-          (entry.mode !== "pin" && !["molecule", "coordination"].includes(structure.mode))) continue;
+      if (entry.variant !== (root.fkcVariantId || structure.mode)) continue;
       if (!entry.atoms.every(id => points.has(id) && meshes.has(id))) continue;
       resolved.set(JSON.stringify(entry), {root, visual, measurementMode: entry.mode,
         points: entry.atoms.map(id => points.get(id)), meshes: entry.atoms.map(id => meshes.get(id))});
