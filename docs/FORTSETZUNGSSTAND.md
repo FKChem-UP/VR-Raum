@@ -1,8 +1,10 @@
 # Fortsetzungsstand vor Compact
 
-**Arbeitsbasis:** `main` und lokal bekanntes `origin/main`: `13f13a6` („Avatare“). HKUST-1 ist als lokale Änderung vorhanden (`index.html`, `js/cif-model.js`, `js/hand-menu.js`, `js/rooms.js`, `js/structure-cell.js`, `tests/welcome-co.test.cjs`, neu `js/hkust-structure.js`). Kein Fetch, Commit, Push oder Deployment bei dieser Übergabe. Vor Fortsetzung Git und Quellcode prüfen; diese Dokumentation ist kein Ersatz für den Code. Bei nötiger Veröffentlichung ausdrücklich auf GitHub Desktop hinweisen. Pico hat Testpriorität; PC-Funktionen erhalten.
+**Arbeitsbasis:** `main` und lokal bekanntes `origin/main` standen vor der Änderung der HKUST-1-Startansicht auf `30a1d8d` („HKUST-1“). Kein Fetch, Commit, Push oder Deployment durch den Agenten. Vor Fortsetzung Git und Quellcode prüfen; diese Dokumentation ist kein Ersatz für den Code. Bei nötiger Veröffentlichung ausdrücklich auf GitHub Desktop hinweisen. Pico hat Testpriorität; PC-Funktionen erhalten.
 
 ## HKUST-1: periodisches Gerüst und Porenausschnitt
+
+- Startansicht in Begrüßungsraum und Team A ist der Cu-Knoten mit sieben Positionen statt der großen Pore. Das periodische Modell erlaubt bis zu 20 zusätzliche Kontaktschalen; der KAZWER-Knoten wächst nur innerhalb des Exports. Für andere Ansichten mit Kontaktschalen gilt ebenfalls die Menüobergrenze 20; ihre Positionslimits bleiben erhalten. Pico-Nachtest: Raumstart sowie Wachstum ab Schale vier prüfen und Leistung der großen Schalen beobachten.
 
 - Im Begrüßungsraum am Team-A-Podest und bei Team A im HKUST-1-Bereich steht das periodische Gerüst aus dem vorhandenen FIQCEN-Export. `hkust-structure.js` expandiert die geprüften Ausgangsplätze und führt Rundungsdubletten innerhalb von 0,005 Å zusammen. Das Cu–BTC-Gerüst enthält je konventioneller Zelle 48 Cu-, 288 C-, 192 O- und 96 H-Positionen sowie 24 Cu–Cu-Paare. Die Zellansicht zeigt zusätzliche Kopien an den Zellrändern.
 - „Große Pore“ zeigt einen um den Ursprung zentrierten Ausschnitt aus angrenzenden Zellen, nicht die gesamte Porentopologie. Kontaktschalen und gezielte Kontakterweiterung arbeiten am periodischen Gerüst. Messwerte sind Abstände zwischen Atomzentren, keine freien Porendurchmesser oder zugänglichen Volumina.

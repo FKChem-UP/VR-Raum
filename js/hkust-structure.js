@@ -7,7 +7,7 @@
     const S=F.StructureCell;
     // O2 bildet die Carboxylatgruppen. O1 ist der axiale O-Platz, O3 ein
     // zusätzlicher O-Platz ohne eindeutige Gastbesetzung im Export.
-    const axial=mode==="axial";
+    const axial=mode==="axial" || mode==="node";
     const labels=new Set(["Cu1","O2","C1","C2","C3","H1",...(axial?["O1"]:[])]);
     const cell=S.network(S.read(source,{labels,mergeTolerance:0.005,maxPositions:800}),[
       ["Cu","Cu",2.8],["Cu","O",2.3],["C","C",1.7],["C","O",1.5],["C","H",1.25]
@@ -21,6 +21,15 @@
       if(indices.length!==count || indices.some(i=>adjacency[i].sort().join("")!==neighbors)){
         throw new Error(`HKUST-1: Gerüstprüfung für ${label} fehlgeschlagen.`);
       }
+    }
+    if(mode==="node"){
+      const siteIndex=cell.atoms.findIndex(atom=>atom.element==="Cu");
+      const center=cell.atoms[siteIndex];
+      const origin=center.fractional;
+      const seed={...center,siteIndex,cellShift:[0,0,0],positionAngstrom:[0,0,0],modelNumber:1};
+      const core=S.expandContacts(cell,cell.bonds,[seed],1,origin,1400);
+      return {...cell,...core,mode:"sites",name:"HKUST-1 · Cu-Knoten",measurePositions:true,
+        contactDepth:0,contactExpansion:{cell,bonds:cell.bonds,origin,limit:1400}};
     }
     if(mode==="pore"){
       // Die große Kavität liegt um (0,0,0). Kopien aus angrenzenden Zellen

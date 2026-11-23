@@ -680,7 +680,7 @@
       if(center<0)throw new Error("Kein Cu-Zentrum im Ausschnitt.");
       const seed=S.expandable({...excerpt,atoms:[excerpt.atoms[center]],bonds:[]},excerpt);
       const core=contactStructure(seed,1);
-      return {...core,contactDepth:0,contactExpansion:{...seed.contactExpansion,initialDepth:1}};
+      return {...core,contactDepth:0};
     }
     if (mode.startsWith("cif-view:")) {
       const [,view,center,ligand,cutoff,count,label] = mode.split(":");
@@ -777,8 +777,8 @@
 
 
   function contactStructure(base, depth, selectedIds = null) {
-    const {cell,bonds,origin,limit,initialDepth=0}=base.contactExpansion;
-    const {atoms,bonds:visibleBonds} = F.StructureCell.expandContacts(cell,bonds,base.atoms,depth+(selectedIds ? 0 : initialDepth),origin,limit,selectedIds);
+    const {cell,bonds,origin,limit}=base.contactExpansion;
+    const {atoms,bonds:visibleBonds} = F.StructureCell.expandContacts(cell,bonds,base.atoms,depth,origin,limit,selectedIds);
     const bondSegments=base.mode==="cell" ? visibleBonds.flatMap(bond=>{
       const start=atoms[bond.a].positionAngstrom,end=atoms[bond.b].positionAngstrom;
       const mid=start.map((n,i)=>(n+end[i])/2);
@@ -907,7 +907,7 @@
 
   F.CIF = {
     createStructure, contactStructure, styles, availableStyles, polyhedronTriangles, cellAxisVectors, applyStyle, elements, hydrogenContactDashes, environmentHydrogenDashes,
-    maxContactDepth: 3,
+    maxContactDepth: 20,
     setHiddenSites(visual, ids, restore = false) {
       const group = visual.getObject3D("mesh");
       if (!group?.userData.fkcStructure) return;
@@ -928,6 +928,11 @@
       let structure, built;
       try {
         structure = depth === 0 ? base : contactStructure(base, depth);
+        if (depth > current.contactDepth && structure.atoms.length === current.atoms.length &&
+            structure.atoms.every((atom, index) => atom.id === current.atoms[index].id)) {
+          F.setStatus("Keine weiteren Kontaktpositionen in dieser Ansicht.");
+          return false;
+        }
         built = buildMesh(structure);
       } catch (error) {
         F.setStatus(error.message);

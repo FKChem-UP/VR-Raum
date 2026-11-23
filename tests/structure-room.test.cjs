@@ -37,6 +37,7 @@ for (const entry of F.StructureRoom.catalog) {
   }
 }
 const zns = F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "vorlesung-7");
+assert.equal(F.CIF.maxContactDepth,20);
 const znsChoices = F.StructureRoom.variants(F.StructureRoom.catalog.find(entry => entry[0] === "ZnS.cif"));
 assert.equal(zns.model, znsChoices[0].model);
 assert.equal(zns.cifMode, "zns-closed-cell");
@@ -52,7 +53,7 @@ for (const variant of [...zns.variants, ...znsChoices]) {
   if (zns.variants.includes(variant)) {
     assert.equal(model.contactDepth, 0);
     let previous = model;
-    for (let depth = 1; depth <= F.CIF.maxContactDepth; depth++) {
+    for (let depth = 1; depth <= 3; depth++) {
       const expanded = F.ZnSStructure.withContactDepth(model, depth);
       assert.equal(expanded.contactDepth, depth);
       assert.ok(expanded.atoms.length > previous.atoms.length);
@@ -77,6 +78,10 @@ for (const variant of [...zns.variants, ...znsChoices]) {
       if (model.mode === "cell") assert.equal(expanded.bondSegments.length, expanded.bonds.length * 2);
       previous = expanded;
     }
+    if (model.mode === "coordination") {
+      assert.ok(F.CIF.contactStructure(model,4).atoms.length>previous.atoms.length);
+    }
+    assert.throws(() => F.CIF.contactStructure(model,20), /Zu viele Positionen/);
   } else assert.equal(model.contactExpansion, undefined, "Tablet bleibt unverändert");
   for (const bond of model.bonds) {
     assert.equal(model.atoms[bond.a].element, centerElement);

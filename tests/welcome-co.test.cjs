@@ -62,8 +62,30 @@ for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
 }
 const activeModels = [...F.welcomeRoom.exhibits, ...F.rooms.filter(r=>r.zones).flatMap(r=>r.stations)];
 const hkust = F.welcomeRoom.exhibits.find(entry=>entry.roomId==="team-a");
-assert.equal(hkust.cifMode,"cif-hkust:pore");
+assert.equal(hkust.cifMode,"cif-hkust:node");
+const teamHkust=activeModels.filter(entry=>entry.model?.includes("/HKUST-1_"));
+assert.equal(teamHkust.length,3);
+for(const entry of teamHkust){
+  assert.equal(entry.variants[0].cifMode,entry.cifMode);
+  assert.equal(entry.cifMode,entry.model.includes("_mitH") ? "cif-excerpt:hkust:focus" : "cif-hkust:node");
+}
 const hkustSource=fs.readFileSync(path.join(root,hkust.model),"utf8");
+const node=F.CIF.createStructure(hkustSource,hkust.cifMode);
+assert.equal(node.contactDepth,0);
+assert.equal(node.atoms.length,7);
+assert.equal(node.bonds.length,6);
+assert.equal(node.atoms.filter(a=>a.element==="Cu").length,2);
+assert.equal(node.atoms.filter(a=>a.element==="O").length,5);
+let previous=node;
+for(let depth=1;depth<=20;depth++){
+  const expanded=F.CIF.contactStructure(node,depth);
+  assert.equal(expanded.contactDepth,depth);
+  assert.ok(expanded.atoms.length>previous.atoms.length);
+  assert.ok(expanded.atoms.length<=node.contactExpansion.limit);
+  assert.equal(new Set(expanded.atoms.map(a=>a.id)).size,expanded.atoms.length);
+  previous=expanded;
+}
+assert.equal(previous.atoms.length,1308);
 const framework=F.CIF.createStructure(hkustSource,"cif-hkust:cell").contactExpansion.cell;
 assert.equal(framework.atoms.length,624);
 assert.equal(framework.bonds.length,792);
@@ -92,6 +114,9 @@ for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
     if(v.cifMode==="cif-excerpt:hkust:focus") {
       assert.equal(structure.atoms.filter(a=>a.element==="Cu").length,2);
       assert.equal(structure.atoms.filter(a=>a.element==="O").length,5);
+      assert.equal(F.CIF.contactStructure(structure,1).atoms.length,16);
+      assert.equal(F.CIF.contactStructure(structure,20).atoms.length,
+        F.CIF.contactStructure(structure,9).atoms.length);
       const terminal=structure.atoms.find(a=>a.element==="O" &&
         F.CIF.contactStructure(structure,1,new Set([a.id])).atoms.length>structure.atoms.length);
       assert.ok(terminal);

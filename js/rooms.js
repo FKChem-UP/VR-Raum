@@ -363,7 +363,7 @@
     info: `Quelle: ${source}.\n${note || "CIF-Zellpositionen mit Zellrahmen; keine automatisch ergänzten Bindungen. Messungen beziehen sich auf die ausgewählten angezeigten Positionen."}`
   });
   const views = (record, entries) => ({...record, cifMode:entries[0][0], variantAlignment:"individual",
-    variants:entries.map(([cifMode,title],i)=>({id:`view-${i+1}`,title,model:record.model,cifMode}))});
+    variants:entries.map(([cifMode,title,id],i)=>({id:id || `view-${i+1}`,title,model:record.model,cifMode}))});
   const shell = (center,ligand,cutoff,count,label="") => `cif-view:shell:${center}:${ligand}:${cutoff}:${count}:${label}`;
   const molecular = record => views({...record,info:record.info.split("\n")[0]+"\nBindungen geometrisch aus kovalenten Radien abgeleitet. 'Elementarzelle erweitern' ergänzt vollständige Randmoleküle. Gestrichelte H-Brücken sind geometrische Kandidaten."}, [
     ["cif-view:molecule","Molekül"],["cif-view:molecular-cell","Elementarzelle"],["cif-view:independent","Unabhängige Moleküle"]]);
@@ -378,12 +378,15 @@
     [shell("Ba","O",3.15,tetragonal?8:10),tetragonal?"Ba · O₈":"Ba · O₁₀"],
     ["cif-network:polyhedra:Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15","Zelle · Polyeder"]],
     "Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15");
-  const copperExcerpt = (record, kind) => views(record,[[`cif-excerpt:${kind}:all`,"CIF-Ausschnitt"],
-    [`cif-excerpt:${kind}:focus`,"Cu-Knoten · Umgebung"]]);
+  const copperExcerpt = (record, kind) => {
+    const all=[`cif-excerpt:${kind}:all`,"CIF-Ausschnitt","view-1"];
+    const focus=[`cif-excerpt:${kind}:focus`,"Cu-Knoten · Umgebung","view-2"];
+    return views(record,kind==="hkust"?[focus,all]:[all,focus]);
+  };
   const hkustFramework = views(practicalCif("HKUST-1 · Gerüst und Pore", "HKUST-1_ohneH.cif", "CSD FIQCEN", undefined,
     "Periodisches Cu–BTC-Gerüst aus geprüften Symmetrieplätzen. Die große Pore ist aus Nachbarzellen um den Ursprung zusammengesetzt. Axiale O-Plätze separat; ihre Besetzung und die Porengäste sind im Export nicht eindeutig belegt. Messung zwischen Atomzentren, nicht freie Porenweite."),[
-    ["cif-hkust:pore","Große Pore"],["cif-hkust:cell","Elementarzelle · Gerüst"],
-    ["cif-hkust:axial","Zelle · axiale O-Plätze"],["cif-excerpt:hkust:focus","Cu-Knoten"]]);
+    ["cif-hkust:node","Cu-Knoten","view-4"],["cif-hkust:pore","Große Pore","view-1"],
+    ["cif-hkust:cell","Elementarzelle · Gerüst","view-2"],["cif-hkust:axial","Zelle · axiale O-Plätze","view-3"]]);
   const coPrecursor = practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15",
     "co-precursor-molecule", "Die Komplexansicht zeigt das einkernige Kation. Am Co koordinieren zwei N- und zwei O-Atome der Pyridinmethanol-Liganden sowie zwei O-Atome aus gebundenem Wasser. Die Chlorid-Gegenionen und die CIF-Wasserstoffbrücken sind in der Elementarzelle sichtbar.");
   coPrecursor.variantAlignment = "individual";
