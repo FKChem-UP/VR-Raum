@@ -217,8 +217,12 @@
     if(handMenuOpen)hit=hits.find(candidate=>lookup.get(candidate.object).el.dataset.fkcHandMenu === "true") || hit;
     const foremost = lookup.get(hit.object);
     if(foremost.type === "model") {
-      hit = hits.find(candidate => candidate.object.isSprite && candidate.object.userData.fkcConstruction &&
-        lookup.get(candidate.object).el === foremost.el) || hit;
+      const labels = hits.filter(candidate => candidate.object.isSprite && candidate.object.userData.fkcConstruction &&
+        lookup.get(candidate.object).el === foremost.el);
+      // Beim zweiten Klick in „Punkt–Ebene“ ist E das Ziel; ansonsten
+      // gewinnt ein überlappendes X-Label vor dem Ebenenlabel.
+      const wantsPlane = measurement === "pointPlane" && F.Measure.wantsPlane?.(foremost.el);
+      hit = labels.find(candidate => candidate.object.userData.fkcConstruction.midpoint === !wantsPlane) || labels[0] || hit;
     }
     // Wenn ein Stab direkt am Atom beginnt, bevorzuge den nahen Atomtreffer.
     // In der Stabmitte bleibt die direkte Distanzmessung per Bindung erhalten.
@@ -1214,7 +1218,7 @@
       const model = this.getSelectedModel();
 
       const titles = {
-        home: "FKC-VR · Menü",
+        home: "Hauptmenü",
         settings: "Allgemeine Einstellungen",
         model: "Ausgewähltes 3D-Modell",
         "laser-drawing": "Laser und Zeichnen",
@@ -1241,7 +1245,7 @@
       ctx.fillStyle = "#263f33";
       ctx.font = "bold 43px Arial";
       ctx.fillText(
-        titles[this.page] || "FKC-VR · Menü",
+        titles[this.page] || "Hauptmenü",
         55, 75, 914
       );
 

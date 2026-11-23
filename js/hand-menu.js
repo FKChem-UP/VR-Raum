@@ -328,8 +328,9 @@
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
       const locked = chapter?.phase === "mirror" && !chapter.mirror.drawingMenu;
-      ctx.fillText(animation ? "Animationssteuerung" : this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
-        drawing ? "Zeichenmenü" : "Modellwerkzeuge", 28, 48, 510);
+      const menuName = animation ? "Animationsmenü" : drawing || this.page === "settings" && this.returnPage === "draw" ||
+        chapter?.phase === "mirror" && chapter.mirror.drawingMenu ? "Zeichenmenü" : "Modellmenü";
+      ctx.fillText(menuName, 28, 48, 510);
       ctx.font = "28px Arial";
       ctx.fillText(model.dataset.title || (roomDrawing ? "Raum" : "3D-Modell"), 28, 88, 710);
       let y = 115;
@@ -561,6 +562,8 @@
           row([tile("Nächste Ebene",()=>F.AtomPlane.nextPlane(model)),
             tile(plane.visible?"Ebene ausblenden":"Ebene einblenden",()=>style({visible:!plane.visible})),
             tile("Ebene entfernen",()=>F.AtomPlane.clear(model))],true);
+          row([tile("Ebene vergrößern",()=>style({displaySize:Math.max(plane.displaySize || 1,plane.fitSize || 1)*1.5})),
+            tile("Größe zurücksetzen",()=>style({displaySize:1,fitSize:1}))],true);
         }else{
           text("Stiftfarbe"); paintColors(color=>{F.Draw.color=color;});
           text("Strichdicke"); row([2,4,8,16].map(mm=>tile(`${mm*2} mm`,()=>{F.Settings.strokeRadius=mm/1000;},F.Settings.strokeRadius===mm/1000)),true);

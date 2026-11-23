@@ -28,7 +28,7 @@
     ctx.strokeText(record.name,64,48,116); ctx.fillText(record.name,64,48,116);
     const texture = new T.CanvasTexture(canvas);
     const sprite = new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:false,depthWrite:false}));
-    const size = 0.055 / record.baseScale;
+    const size = (record.midpoint ? 0.075 : 0.055) / record.baseScale;
     sprite.scale.set(2*size,size,1); sprite.position.copy(record.mesh.position); sprite.position.y += size;
     sprite.renderOrder = 1100; sprite.userData.fkcConstruction = record;
     sprite.raycast = function(raycaster,hits){
@@ -50,6 +50,10 @@
   }
   F.AtomPlane = {
     normal, active:null,
+    fitPlane(record, foot) {
+      const required = 2.2 * foot.distanceTo(record.mesh.position) / record.size;
+      if(required > (record.fitSize || 1)) this.style(record,{fitSize:required});
+    },
     get(root) { return this.active?.root===root && !this.active.midpoint ? this.active : records.get(visualOf(root)); },
     midpointCount(root) { return midpoints.get(visualOf(root))?.length || 0; },
     nextPlane(root) {
@@ -142,6 +146,7 @@
       if(!n){F.setStatus(`Ebene: ${pts.length}/3 Punkte ausgewählt.`);return true;}
       const points=r.points.map(p=>p.center);
       const size=Math.max(points[0].distanceTo(points[1]),points[1].distanceTo(points[2]),points[2].distanceTo(points[0]))*1.5;
+      r.size=size;
       r.mesh=add(new T.BoxGeometry(size,size,1),new T.MeshBasicMaterial({transparent:true,depthWrite:false}));
       r.mesh.position.copy(points[0]).add(points[1]).add(points[2]).multiplyScalar(1/3);
       r.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...n));
@@ -168,6 +173,7 @@
     style(r, change) {
       if(!r?.mesh)return;
       Object.assign(r,change);r.mesh.material.color.set(r.color);r.mesh.material.opacity=r.opacity;
+      r.mesh.scale.x=r.mesh.scale.y=Math.max(r.displaySize || 1,r.fitSize || 1);
       r.mesh.scale.z=r.thickness/r.baseScale;r.mesh.visible=r.visible;
       if(r.label)r.label.visible=r.visible;
     }

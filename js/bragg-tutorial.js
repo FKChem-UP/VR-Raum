@@ -78,7 +78,7 @@
       case "plus": s.angle = Math.min(maxAngle, s.angle + 1); break;
     }
   }
-  const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
+  const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Animationsmenü öffnen",
     "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Info zum Ebenenabstand öffnen", "Vergleichswinkel einstellen", "Mo-Winkellauf: nächsten Reflex beobachten", "Animation pausieren"];
   const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf die Netzebenen oder den Infotext darunter und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
@@ -87,7 +87,7 @@
   const cues = {3: "play", 4: "slow", 6: "compare", 7: "sweep", 8: "play"};
   const slowBragg = s => s.running && s.speed === 0.5 && geometry(s.angle, s.source).matched;
   function progress(step, near, selected, menu, s, infoOpened = false) {
-    return [near, selected, menu, s.running && s.time >= 4, slowBragg(s), slowBragg(s) && infoOpened,
+    return [near, selected, menu, s.running && s.time >= 4, slowBragg(s), infoOpened,
       Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7,
       s.running && s.source === "mo" && s.sweep && s.sweepHold > 0 && geometry(s.angle,s.source).periods >= 1.999999 && geometry(s.angle,s.source).matched,
       !s.running][step] ? step + 1 : step;

@@ -36,11 +36,11 @@
     if (hits.includes(-1) || new Set(hits).size !== 4 || (view === 0 && !free && hits[1] !== 1)) return null;
     return solution(view, view === 0 ? hits.findIndex((j, i) => i > 0 && j === i) : 1);
   }
-  const tasks = ["Zur BF₃-Zeichentafel gehen", "BF₃ verkleinern und neben der Zeichenfläche platzieren", "Erste Ebene mit dem Laser zeichnen", "Erste Spiegelebene testen", "BF₃ mit dem Laser auswählen", "Modell-Handmenü öffnen",
+  const tasks = ["Zur BF₃-Tafel gehen", "BF₃ verkleinern und neben die Tafel stellen", "Erste Ebene mit dem Laser zeichnen", "Erste Spiegelebene testen", "BF₃ mit dem Laser auswählen", "Modellmenü öffnen",
     "Pinsel im Modellmenü wählen", "Neue Farbe und zweite Spiegelebene",
-    "Neue Farbe und dritte Spiegelebene", "Spiegelebenen ausblenden", "Zeichne einen Punkt auf das B des rechten Bildes", "Inversionszentrum testen", "Letzten Strich im Handmenü entfernen",
+    "Neue Farbe und dritte Spiegelebene", "Spiegelebenen ausblenden", "Zeichne einen Punkt auf das B des rechten Bildes", "Inversionszentrum testen", "Letzten Strich im Zeichenmenü entfernen",
     "Zum Modellmenü zurückkehren", "Ebene aus Punkten starten", "Die drei Fluoratome auswählen"];
-  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Beide Grips halten, Hände zusammenführen; BF₃ neben der Tafel absetzen.", "Zieh vom F durch B und beobachte dabei, wie neben der Tafel die Ebene entsteht.", "Drücke auf der Zeichentafel ‚Erste Spiegelebene testen‘ und beobachte das Modell.", "Ziele auf das räumliche BF₃ neben der Tafel und drücke den Trigger.",
+  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "BF₃ zu weit weg? Anvisieren und Grip halten. Zum Verkleinern beide Grips nutzen.", "Zieh vom F durch B und beobachte dabei, wie neben der Tafel die Ebene entsteht.", "Drücke auf der Tafel ‚Erste Spiegelebene testen‘ und beobachte das Modell.", "Ziele auf das räumliche BF₃ neben der Tafel und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke oben rechts auf den gelb umrahmten Pinsel.",
     "Im Zeichenmenü neue Farbe wählen. Vom markierten F durch B ziehen.",
     "Im Zeichenmenü dritte Farbe wählen. Vom letzten F bis B ziehen.", "Wähle auf der Zeichentafel ‚Spiegelebenen ausblenden‘.", "Rechts: Setze einen Punkt auf B, um das mögliche Zentrum zu markieren.",
@@ -146,7 +146,7 @@
         part.material.opacity = part.opacity * (step >= 10 ? 0.38 : 1);
       }
       ctx.fillStyle = "#f6faf8"; ctx.fillRect(0,0,1024,640);
-      ctx.font = "bold 36px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText("BF₃ · Symmetrie mit dem Stift untersuchen",24,58);
+      ctx.font = "bold 36px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText("Tafel · Symmetrie von BF₃",24,58);
       const target = [2,7,8].includes(step) ? strokes.length + 1 : -1;
       for (const v of [0,1]) {
         const x = v ? 520 : 16; ctx.fillStyle = "white"; ctx.fillRect(x,90,486,364);

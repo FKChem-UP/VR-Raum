@@ -5,24 +5,25 @@
   const source = "assets/structures/Co-Produkt1.cif";
   const modelPosition = [-0.65, 1.3, 3.5];
   const boardWidth = 1.4, boardHeight = 0.875;
-  const tasksPerPage = 6;
   const tasks = ["Bewegen und drehen", "Greifen und bewegen", "Mit zwei Grips vergrößern",
-    "Handmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen",
+    "Modellmenü öffnen", "Koordinationsansicht wählen", "Eine Distanz messen", "Einen Winkel messen",
     "Zum Molekül wechseln", "H-Atome ausblenden", "Umgebung bei 3 Å anzeigen",
     "Ein transparentes Molekül anklicken", "Umgebung wieder ausblenden"];
   const hints = ["Links bewegen, rechts drehen. Geh zum Co-Modell.",
     "Halte einen Grip und verschiebe das Modell mindestens 15 cm.",
     "Halte beide Grips und zieh die Hände auseinander (140 %).",
     "Lass beide Grips los. Dreh die Hand ohne Laser zu dir.",
-    "Wähle im Handmenü unter Ansicht: Koordination.",
+    "Wähle im Modellmenü unter Ansicht: Koordination.",
     "Wähle Distanz und klicke zwei Atome oder eine Bindung an.",
     "Wähle Winkel und klicke drei Atome an: Das zweite ist der Scheitel.",
-    "Wähle im Handmenü unter Ansicht: Molekül.",
-    "Drücke im Handmenü auf H-Atome, um sie auszublenden.",
+    "Wähle im Modellmenü unter Ansicht: Molekül.",
+    "Drücke im Modellmenü auf H-Atome, um sie auszublenden.",
     "Wähle bei Umgebung den Button 3 (Ångström).",
     "Klicke mit dem Trigger auf ein transparentes Molekül, nicht auf ein einzelnes Ion.",
     "Wähle bei Umgebung Aus. Das übernommene Molekül soll sichtbar bleiben."];
   const palm = hand => hand === "left" ? "rechte Handfläche" : "linke Handfläche";
+  const taskWindow = (length, current) => Array.from({length:6},(_,slot)=>current+slot-2)
+    .filter(index=>index>=0 && index<length);
   const menuTargets = {4: "variant:tutorial-coordination", 5: "measure:distance", 6: "measure:angle",
     7: "variant:tutorial-complex", 8: "hide-hydrogen", 9: "environment:3", 11: "environment:off"};
   function hasSelectedMolecule(environment) {
@@ -36,8 +37,9 @@
       Math.abs(previous.y + t * (current.y - previous.y)) <= height / 2;
   }
   F.Tutorial = {
-    active: false, crossed, hasSelectedMolecule, palm,
+    active: false, crossed, hasSelectedMolecule, palm, taskWindow,
     allowsModel(root) { return !!root && ["tutorial-co-model", "tutorial-bf3-model"].includes(root.id) && this.active && root.object3D.visible; },
+    allowsPull(root) { return root?.id === "tutorial-bf3-model" && this.allowsModel(root); },
     measurementTarget(mesh, mode) {
       const data = mesh.userData;
       return !data.fkcEnvironmentId && (!!data.fkcAtom || (mode === "distance" &&
@@ -209,48 +211,46 @@
       const training = this.phase === "training";
       const mirror = this.phase === "mirror";
       const mirrorDone = mirror && this.mirror.step === F.MirrorTutorial.tasks.length;
-      const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : mirror ? Math.floor(this.mirror.step/tasksPerPage)*tasksPerPage : 0;
       const animation = this.phase === "bragg";
       const structurePractice = this.phase === "structure-practice";
       const animationPractice = animation && this.animationStep === F.Bragg.tasks.length;
-      ctx.fillText(this.phase === "question" ? "Tutorial?" : structurePractice ? "Strukturteil geschafft!" :
-        mirror ? (mirrorDone ? "Zeichenteil geschafft!" : `Zeichnen · ${this.mirror.step+1} / ${F.MirrorTutorial.tasks.length}`) : animationPractice ? "Animationsteil geschafft!" :
-        animation ? `Animation · ${this.animationStep + 1} / ${F.Bragg.tasks.length}` :
-        `Tutorial · ${this.step + 1} / ${tasks.length}`, 50, 100);
+      const current = mirror ? this.mirror.step : animation ? this.animationStep : this.step;
+      const total = mirror ? F.MirrorTutorial.tasks.length : animation ? F.Bragg.tasks.length : tasks.length;
+      const part = mirror ? 3 : animation ? 2 : 1;
+      const done = mirrorDone || animationPractice || structurePractice;
+      ctx.fillText(this.phase === "question" ? "Tutorial?" : done ? `Tutorial · Teil ${part}/3 geschafft` :
+        `Tutorial · Teil ${part}/3 · Aufgabe ${current+1}/${total}`, 50, 100, 924);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        mirror ? (mirrorDone ? ["BF₃ hat vier Spiegelebenen.", "Greife es und vergleiche die drei senkrechten Ebenen mit der Molekülebene."] : F.MirrorTutorial.tasks.slice(first, first+tasksPerPage)) : structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
-        animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Oder starte Teil 3: Zeichne den Spiegel."] :
-        animation ? F.Bragg.tasks :
-          tasks.slice(first, first + tasksPerPage);
-      const menuPalm = training ? palm(F.HandMenu.laserHand()) : "";
+        mirrorDone ? ["Du bist am Ende des Tutorials angekommen.", "Du kannst weiter üben oder das Tutorial beenden."] :
+        structurePractice ? ["Als Nächstes: Teil 2 · Animation.", "Du kannst weiter üben oder unten Teil 2 starten."] :
+        animationPractice ? ["Als Nächstes: Teil 3 · Zeichnen.", "Du kannst weiter üben oder unten Teil 3 starten."] : null;
+      const menuPalm = palm(F.HandMenu?.laserHand());
       this.renderedPalm = menuPalm;
-      lines.forEach((line, i) => {
-        const index = first + i;
-        if (training && index === 3) line += ` (${menuPalm} drehen)`;
-        const current = mirror ? this.mirror.step : animation ? this.animationStep : this.step;
-        const numbered = training || (animation && !animationPractice) || (mirror && !mirrorDone);
-        ctx.fillStyle = numbered ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line,
-          50, numbered ? 148 + i * (animation ? 32 : 41) : 180 + i * 55, 924);
-      });
-      if (mirror && !mirrorDone) {
-        ctx.font = "30px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText(F.MirrorTutorial.hints[this.mirror.step],50,451,924);
-      } else if (animation && !animationPractice) {
+      if(lines){
+        ctx.fillStyle="#203f30";lines.forEach((line,i)=>ctx.fillText(line,50,180+i*55,924));
+      }else{
+        const list=mirror ? F.MirrorTutorial.tasks : animation ? F.Bragg.tasks : tasks;
+        const handStep=mirror ? 5 : animation ? 2 : 3;
+        ctx.fillStyle="#fff0c9";ctx.fillRect(34,235,956,56);
+        taskWindow(list.length,current).forEach(index=>{
+          const line=list[index]+(index===handStep ? ` (${menuPalm} angucken)` : "");
+          ctx.fillStyle=index<current ? "#397c40" : index===current ? "#9a391a" : "#65717b";
+          ctx.font=index===current ? "bold 37px Arial" : "31px Arial";
+          ctx.fillText(`${index<current ? "✓" : index+1} · ${line}`,50,275+(index-current)*43,924);
+        });
         ctx.font = "30px Arial"; ctx.fillStyle = "#203f30";
-        ctx.fillText(F.Bragg.hints[this.animationStep], 50, 451, 924);
-      } else if (training) {
-        ctx.font = "30px Arial";
-        ctx.fillStyle = "#203f30";
-        ctx.fillText(this.step === 3 ? `Lass beide Grips los und dreh die ${menuPalm} zum Kopf.` : hints[this.step], 50, 451, 924);
+        const hint=(mirror ? F.MirrorTutorial.hints : animation ? F.Bragg.hints : hints)[current];
+        ctx.fillText(current===handStep ? `Grips loslassen und die ${menuPalm} zum Gesicht drehen.` : hint,50,451,924);
       }
+      ctx.font="36px Arial";
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
         (training || structurePractice) ? [{x: 80, w: 490, title: training ? "Überspringen → Teil 2" : "Teil 2: Bragg-Animation", action: () => { this.beginAnimation(); this.render(); }},
           {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
         animation ? [{x: 80, w: 490, title: animationPractice ? "Teil 3: Zeichne den Spiegel" : "Überspringen → Teil 3", action: () => this.beginMirror()},
-          {x: 600, w: 340, title: "Zum Begrüßungsraum", action: () => this.close()}] :
+          {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
         [{x: 80, w: 860, title: "Tutorial beenden", action: () => this.close()}];
       for (const button of this.buttons) {
         ctx.fillStyle = "#b9dcc4"; ctx.fillRect(button.x, 480, button.w, 100);
@@ -267,8 +267,7 @@
         if (F.Tutorial.active && this.phase === "bragg") {
           this.selectedAnimation = hit.el;
           const infoId = hit.mesh?.userData.braggInfo;
-          if (infoId && this.animation.toggleInfo(infoId) && infoId === "distance" && this.animationStep === 5 &&
-              F.Bragg.progress(5, true, true, false, this.animation.state, true) === 6) this.distanceInfoOpened = true;
+          if (infoId && this.animation.toggleInfo(infoId) && infoId === "distance" && this.animationStep === 5) this.distanceInfoOpened = true;
         }
         return;
       }
@@ -353,7 +352,7 @@
         this.previous = null;
         return;
       }
-      if (this.phase === "training" && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
+      if (["training","bragg","mirror"].includes(this.phase) && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
       const menu = this.el.components["fkc-hand-menu"];
       if (menu && this.phase !== "bragg" && this.phase !== "mirror" && this.phase !== "structure-practice" &&
           (this.phase !== "training" || this.step < 3)) menu.hide();

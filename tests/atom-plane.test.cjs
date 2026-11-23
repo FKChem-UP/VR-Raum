@@ -11,7 +11,7 @@ class V {
 }
 class Resource {constructor(...args){this.args=args;} dispose(){this.disposed=true;}}
 class Material extends Resource {constructor(){super();this.color={set:value=>{this.value=value;}};}}
-class Mesh {constructor(geometry,material){Object.assign(this,{geometry,material,userData:{},position:new V(),scale:new V(1,1,1),
+class Mesh {constructor(geometry,material){Object.assign(this,{geometry,material,visible:true,userData:{},position:new V(),scale:new V(1,1,1),
   quaternion:{setFromUnitVectors(){}},removeFromParent(){}});}}
 const F={Draw:{mode:"laser",color:"#507dff",opacity:0.35,setMode(mode){this.mode=mode;}},Settings:{strokeRadius:0.004},
   setStatus(){},Measure:{setEnabled(){}}};
@@ -43,6 +43,11 @@ assert.equal(plane.mesh.scale.z,0.008);assert.equal(plane.mesh.material.opacity,
 assert.equal(plane.mesh.material.value,"#ffffff");
 assert.equal(plane.name,"E1");assert.equal(plane.label.visible,false);
 assert.equal(plane.normalAngstrom[2],1);
+const thickness=plane.mesh.scale.z;
+tool.fitPlane(plane,new V(10,0,0));
+assert.ok(plane.mesh.scale.x * plane.size / 2 > 9.7,"Messlot trifft die vergrößerte Platte");
+assert.equal(plane.mesh.scale.x,plane.mesh.scale.y);
+assert.equal(plane.mesh.scale.z,thickness,"Dicke bleibt unverändert");
 tool.style(plane,{visible:true});
 const hits=[];
 plane.mesh.raycast({camera:{}},hits);
@@ -60,6 +65,8 @@ const midpoint=tool.active;tool.click(b);
 assert.deepEqual(midpoint.mesh.position.toArray(),[0.5,0,0]);
 assert.equal(midpoint.name,"X1");assert.equal(Array.from(midpoint.positionAngstrom).join(),"1,0,0");
 assert.equal(midpoint.mesh.userData.fkcConstruction,midpoint);
+const labelHits=[];midpoint.label.raycast({camera:{}},labelHits);
+assert.equal(labelHits[0].userData.fkcConstruction,midpoint);
 assert.equal(tool.get(root),plane,"Mittelpunkt verändert die Ebene nicht");
 tool.begin(root,{midpoint:true});tool.click(a);tool.click(site(0,2,0));
 assert.equal(tool.midpointCount(root),2);

@@ -320,6 +320,7 @@
         const point=visual.worldToLocal(this.meshes[0].getWorldPosition(new T.Vector3()));
         const normal=new T.Vector3(...plane.normalLocal);
         point.addScaledVector(normal,-point.clone().sub(plane.mesh.position).dot(normal));
+        if(visible)F.AtomPlane?.fitPlane(plane,point);
         positions[1]=this.el.object3D.worldToLocal(visual.localToWorld(point));
       }
       this.halos.forEach((halo, i) => {

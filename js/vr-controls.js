@@ -661,8 +661,8 @@ window.FKCVR = window.FKCVR || {};
           tools.updateRay();
           const hit = F.findHit(tools.raycaster, true);
           if (hit && hit.type === "model" && hit.el.modelReady &&
-              !(F.Tutorial && F.Tutorial.active) &&
-              hit.el.components["fkc-manipulable"].hands.length === 0) {
+              (!F.Tutorial?.active || F.Tutorial.allowsPull(hit.el)) &&
+              hit.el.components["fkc-manipulable"]?.hands.length === 0) {
             if (multiplayer?.grab(hit.el, this, true)) return;
             this.pulling = hit.el;
             this.pullTime = 0;
