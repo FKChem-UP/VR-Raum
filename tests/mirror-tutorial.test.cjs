@@ -5,8 +5,10 @@ const path = require("node:path");
 const vm = require("node:vm");
 const F = {};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/mirror-tutorial.js"), "utf8"), {window: {FKCVR: F}});
-const {atoms, project, plane, reflect, solution, check} = F.MirrorTutorial;
+const {atoms, project, plane, reflect, invert, solution, check} = F.MirrorTutorial;
 const near = (a, b) => Math.hypot(...a.map((p, k) => p - b[k])) < 1e-8;
+assert.ok(near(invert(atoms[0]), atoms[0]));
+for(const p of atoms.slice(1)){assert.ok(near(invert(invert(p)),p));assert.ok(!atoms.some(a=>near(invert(p),a)));}
 assert.equal(new Set(atoms.map(p => project(1, p)[0])).size, 4, "Getrennte Atomzentren in der Seitenansicht");
 for (const view of [0, 1]) {
   const line = solution(view), m = plane(view, ...line);
@@ -26,7 +28,8 @@ for (const f of [2, 3]) {
   assert.ok(check(0, solution(0, f), true), "Weitere Spiegelebenen im freien Modus");
 }
 // Geführte Eingaben ohne XR-Renderer: echte Stationslogik mit kleinen Zeichen-/Mesh-Doubles.
-class Vec { set() {return this;} fromArray(){return this;} multiplyScalar(){return this;} copy(){return this;} }
+class Vec { set(x=0,y=0,z=0){this.xyz=[x,y,z];return this;} fromArray(p){return this.set(...p);} multiplyScalar(){return this;} copy(){return this;}
+  clone(){return new Vec().fromArray(this.xyz||[0,0,0]);} distanceTo(other){return Math.hypot(...(this.xyz||[0,0,0]).map((n,i)=>n-other.xyz[i]));} }
 class Obj { constructor(){this.position=new Vec();this.scale={setScalar(){}};this.quaternion={setFromUnitVectors(){},copy(){}};this.visible=true;}
   add(){} dispose(){} }
 class Mesh extends Obj {constructor(g,m){super();this.material=m;} }
@@ -42,22 +45,26 @@ F.HandMenu={laserHand:()=>"right"};F.releaseModel=()=>{};
 const station=F.MirrorTutorial.station({});
 function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,station.drawingMenu);}
 function line(i){paint(0,project(0,atoms[i]));paint(0,[0,0]);paint(0,[0,0],false);}
-station.tick(null,false,true,false,false);paint(0,project(0,atoms[1]));paint(0,[0,0]);assert.equal(station.step,1);
+station.tick(null,false,true,false,false);assert.equal(station.step,1);
+station.root.object3D.position.set(0.2,0,0);station.tick(null,false,true,false,false);assert.equal(station.step,2);
+paint(0,project(0,atoms[1]));paint(0,[0,0]);assert.equal(station.step,2);
 const atB=samples;paint(0,[-0.45,-0.12]);assert.equal(samples,atB+1);paint(0,[0,0],false);
-assert.equal(station.step,2);assert.equal(ink.length,1);assert.equal(F.Draw.mode,"laser");
+assert.equal(station.step,3);assert.equal(ink.length,1);assert.equal(F.Draw.mode,"laser");
 const clickTile=x=>station.click({x:x/1024,y:1-590/640});
-clickTile(120);station.tick(null,false,true,false,false,0.5);assert.equal(station.step,2);
-station.tick(null,false,true,false,false,1.4);assert.equal(station.step,3);
-station.tick(null,false,true,true,false);assert.equal(station.step,3);
-station.tick(null,false,true,false,true);assert.equal(station.step,4);
-station.tick(null,false,true,true,true);assert.equal(station.cue(),"mirror:menu");station.menu();assert.equal(station.step,6);
+clickTile(120);station.tick(null,false,true,false,false,0.5);assert.equal(station.step,3);
+station.tick(null,false,true,false,false,1.4);assert.equal(station.step,4);
+station.tick(null,false,true,true,false);assert.equal(station.step,4);
+station.tick(null,false,true,false,true);assert.equal(station.step,5);
+station.tick(null,false,true,true,true);assert.equal(station.cue(),"mirror:menu");station.menu();assert.equal(station.step,7);
 assert.equal(F.Draw.mode,"paint");
-station.color("gold");line(2);assert.equal(station.step,6);station.color("blue");line(2);assert.equal(station.step,7);
-line(3);assert.equal(station.step,7);station.color("red");line(3);assert.equal(station.step,8);
-paint(1,[0,0]);assert.equal(ink.length,3);clickTile(900);assert.equal(station.step,9);paint(1,[0,0],false);
-paint(1,[0,0]);assert.equal(station.step,10);assert.equal(ink.length,4);
-station.undo();assert.equal(station.step,11);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
-station.clear();assert.equal(station.step,1);assert.equal(ink.length,0);assert.equal(station.drawingMenu,true);
-paint(0,[0,0],false);line(1);assert.equal(station.step,2,"Nach Zurücksetzen erneut zeichnen und testen");
+station.color("gold");line(2);assert.equal(station.step,7);station.color("blue");line(2);assert.equal(station.step,8);
+line(3);assert.equal(station.step,8);station.color("red");line(3);assert.equal(station.step,9);
+paint(1,[0,0]);assert.equal(ink.length,3);clickTile(900);assert.equal(station.step,10);paint(1,[0,0],false);
+paint(1,[0,0]);assert.equal(station.step,11);assert.equal(ink.length,4);
+clickTile(900);station.tick(null,false,true,false,true,0.9);assert.equal(station.step,11);
+station.tick(null,false,true,false,true,0.9);assert.equal(station.step,12);
+station.undo();assert.equal(station.step,13);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
+station.clear();assert.equal(station.step,2);assert.equal(ink.length,0);assert.equal(station.drawingMenu,true);
+paint(0,[0,0],false);line(1);assert.equal(station.step,3,"Nach Zurücksetzen erneut zeichnen und testen");
 station.dispose();
 console.log("BF₃: Laserstrich über B hinaus, Modellmenü und anschließende Zeichenaufgaben geprüft.");

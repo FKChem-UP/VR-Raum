@@ -4,6 +4,8 @@
   const T = AFRAME.THREE;
   const WIDTH = 768;
   const HEIGHT = 900;
+  const inkPalette = [["#ffcc33","Gelb"],["#ee5151","Rot"],["#507dff","Blau"],["#45d77e","Grün"],
+    ["#ffffff","Weiß"],["#000000","Schwarz"],["#9950ca","Lila"],["#ff922b","Orange"]];
 
   function laserHand() {
     return F.Settings.laserHand === "left" ? "left" : "right";
@@ -314,7 +316,7 @@
       this.buttons = [];
       const chapter = this.el.components["fkc-tutorial"];
       const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
-      ctx.fillStyle = animation ? "#fbe7e5" : painting ? "#fff5cd" : "#edf4ee";
+      ctx.fillStyle = animation ? "#fbe7e5" : painting ? "#faf5e7" : "#edf4ee";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
@@ -379,7 +381,7 @@
           const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
           ctx.fillRect(x, y + 5, w, height + 5);
-          ctx.fillStyle = pressed ? "#e99d9d" : selected ? (animation?"#e8918b":painting?"#ffd665":"#f3bcbc") : hovered ? "#fff0b8" : animation ? "#f2ccca" : painting ? "#ffedac" : "#d5e2d9";
+          ctx.fillStyle = entry.swatch ? entry.color : pressed ? "#e99d9d" : selected ? (animation?"#e8918b":painting?"#edd8a1":"#f3bcbc") : hovered ? "#fff0b8" : animation ? "#f2ccca" : painting ? "#eee7d7" : "#d5e2d9";
           ctx.fillRect(x, y + shift, w, height);
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
@@ -420,7 +422,7 @@
             }
             ctx.globalAlpha = 1;
           }
-          if (entry.kind === "color") {
+          if (entry.kind === "color" && !entry.swatch) {
             ctx.fillStyle = entry.color;
             ctx.fillRect(x + w / 2 - 14, y + shift + 10, 28, 20);
           }
@@ -442,12 +444,12 @@
             ctx.lineTo(x + w / 2, y + shift + 38);
             ctx.stroke();
           }
-          ctx.fillStyle = "#173527";
+          ctx.fillStyle = entry.swatch ? F.HandMenu.legendInk(entry.color) : "#173527";
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
           if(entry.heading) ctx.fillText(entry.heading,x+w/2,y+shift+29,w-12);
-          const labelY = entry.kind === "plain" && !entry.heading ? height/2+8 : compactRow ? 63 : 73;
-          ctx.fillText(entry.label, x + w / 2, y + shift + labelY, w - 12);
+          const labelY = entry.swatch || entry.kind === "plain" && !entry.heading ? height/2+8 : compactRow ? 63 : 73;
+          ctx.fillText((entry.swatch && selected ? "✓ " : "")+entry.label, x + w / 2, y + shift + labelY, w - 12);
           ctx.textAlign = "left";
           if (locked) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
           else this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
@@ -458,11 +460,15 @@
       const drawingActions = (undo, clear, cueId=null) => row([
         tile("Letzten Strich entfernen",undo,false,cueId), tile("Alle Zeichnungen zurücksetzen",clear)
       ]);
+      const paintColors = (select, cueFor=()=>null) => {
+        for(let i=0;i<inkPalette.length;i+=4)row(inkPalette.slice(i,i+4).map(([color,label])=>({
+          label,kind:"color",swatch:true,color,selected:F.Draw.color===color,cueId:cueFor(color),action:()=>select(color)
+        })),true);
+      };
       if (chapter?.phase === "mirror" && chapter.mirror.drawingMenu) {
         const mirror = chapter.mirror;
           text("Stiftfarbe · je Spiegel eine andere Farbe");
-          row([["#ffcc33","Gelb"],["#ee5151","Rot"],["#507dff","Blau"],["#45d77e","Grün"]].map(([color,label])=>({label,kind:"color",color,
-            selected:F.Draw.color===color,cueId:mirror.unused(color)?"mirror:color":null,action:()=>mirror.color(color)})));
+          paintColors(color=>mirror.color(color),color=>mirror.unused(color)?"mirror:color":null);
           text("Strichdicke");
           row([0.002,0.004,0.008].map(radius=>({label:radius*2000+" mm",kind:"bond-size",factor:radius/0.008,
             selected:F.Settings.strokeRadius===radius,action:()=>{F.Settings.strokeRadius=radius;}})));
@@ -501,9 +507,7 @@
           ([size,title])=>tile(title,()=>F.HandMenu.setSize(size),F.HandMenu.size===size)));
         if (painting) {
           text("Malfarbe · unabhängig von der Laserfarbe");
-          row([["#ffcc33", "Gelb"], ["#ee5151", "Rot"], ["#507dff", "Blau"], ["#45d77e", "Grün"]].map(([color, label]) => ({
-            label, kind: "color", color, selected: F.Draw.color === color, action: () => { F.Draw.color = color; }
-          })));
+          paintColors(color=>{F.Draw.color=color;});
           text("Strichdicke");
           row([0.002, 0.004, 0.008, 0.016].map(radius => ({label: radius * 2000 + " mm", kind: "bond-size", factor: radius / 0.008,
             selected: F.Settings.strokeRadius === radius, action: () => { F.Settings.strokeRadius = radius; }})));
