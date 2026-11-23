@@ -259,7 +259,10 @@
       this.texture.needsUpdate = true;
     },
     click: function (hit) {
-      if (this.phase === "mirror" && hit.el !== this.board) return;
+      if (this.phase === "mirror" && hit.el !== this.board) {
+        if(hit.el===this.mirror.board && !F.Menu.opened)this.mirror.click(hit.uv);
+        return;
+      }
       if (this.animation && hit.el === this.animation.el) {
         if (F.Tutorial.active && this.phase === "bragg") {
           this.selectedAnimation = hit.el;
@@ -361,7 +364,8 @@
         this.board.object3D.lookAt(this.head);
         const p = this.mirror.board.object3D.getWorldPosition(this.modelWorld);
         this.mirror.tick(tools?.source && tools.line.visible ? tools.hit : null, !!tools?.states.trigger,
-          Math.hypot(this.head.x-p.x,this.head.z-p.z)<1.85, F.HandMenu.opened, this.el.lastSelectedModel === this.mirror.root);
+          Math.hypot(this.head.x-p.x,this.head.z-p.z)<1.85, F.HandMenu.opened, this.el.lastSelectedModel === this.mirror.root,
+          Math.min(delta || 0,100)/1000);
         if(this.mirrorProgress!==this.mirror.step){
           if(this.mirrorProgress===0)this.board.object3D.position.set(1.2,1.65,-3.1);
           this.mirrorProgress=this.mirror.step;this.render();
