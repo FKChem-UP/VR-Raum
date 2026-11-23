@@ -2580,15 +2580,10 @@
   function station(parent, s, index, c, obstacles) {
     const p = placement(s, c);
     if (s.zone) {
-      // Markierung, keine neue Kollision und keine Änderung der Laufwege.
-      const side = s.wall === "left" || s.wall === "right";
-      create("a-plane", {
-        position: {x: p.model.x, y: 0.022, z: p.model.z},
-        rotation: "-90 0 0",
-        width: side ? 5 : 5.4,
-        height: side ? 5.4 : 5,
-        material: {shader: "flat", color: s.zone.tint}
-      }, parent);
+      pedestal(parent, s, p, c);
+      obstacles.push({x: p.model.x, z: p.model.z, width: 0.9, depth: 0.9});
+      if (s.model || s.variants?.length) makeModel(parent, s, index, c, p.model, s.zone.accent);
+      return;
     }
 
     const frame = create("a-entity", {
@@ -2611,12 +2606,11 @@
       material: {
         shader: "flat",
         color: "#ffffff",
-        src: s.slide || (s.zone ? textBoard([s.title, ...(s.boardLines || ["Praktikumsbereich · Strukturaufgabe folgt"])],
-          s.zone.tint, "#202824") : textBoard([
+        src: s.slide || textBoard([
           s.title,
           "Vorlesungsfolie 16:9",
           "Hier kann eine eigene Folie erscheinen"
-        ], "#fbf8ee"))
+        ], "#fbf8ee")
       }
     }, frame);
 
@@ -2640,7 +2634,6 @@
       c.colors.goldLight
     );
 
-    if (s.zone && !s.model && !s.variants?.length) return;
     pedestal(parent, s, p, c);
 
     obstacles.push({
@@ -2653,6 +2646,34 @@
     makeModel(
       parent, s, index, c, p.model, "#79aa98"
     );
+  }
+
+  function buildPractical(parent, c) {
+    const obstacles = [];
+    const flat = {shader: "flat"};
+    c.zones.forEach(zone => {
+      const x = (zone.x0 + zone.x1) / 2, z = (zone.z0 + zone.z1) / 2;
+      const width = zone.x1 - zone.x0, depth = zone.z1 - zone.z0;
+      box(parent, x, -0.08, z, width, 0.16, depth, zone.tint, flat);
+      box(parent, x, c.height + 0.08, z, width, 0.16, depth, zone.tint, flat);
+      const wallX = side => box(parent, side * (c.width / 2 + 0.08), c.height / 2, z,
+        0.16, c.height, depth, zone.tint, flat);
+      const wallZ = side => box(parent, x, c.height / 2, side * (c.depth / 2 + 0.08),
+        width, c.height, 0.16, zone.tint, flat);
+      if (zone.x0 === -c.width / 2) wallX(-1);
+      if (zone.x1 === c.width / 2) wallX(1);
+      if (zone.z0 === -c.depth / 2) wallZ(-1);
+      if (zone.z1 === c.depth / 2) wallZ(1);
+      const p = placement(zone, c);
+      create("a-plane", {
+        position: p.poster, rotation: p.rotation, width: c.posterWidth, height: c.posterHeight,
+        material: {shader: "flat", src: zone.slide || textBoard([zone.title], zone.accent, "#ffffff")}
+      }, parent);
+    });
+    museumDoor(parent, c);
+    lighting(parent, false);
+    c.stations.forEach((s, index) => station(parent, s, index, c, obstacles));
+    return {spawn: c.spawn, isWalkable: makeWalkable(c, obstacles)};
   }
 
   function buildMuseum(parent, c) {
@@ -2715,7 +2736,7 @@
       if (config.kind === "structure-room") return F.StructureRoom.build(parent, makeModel);
       const result = config.kind === "welcome"
         ? buildWelcome(parent, config, rooms)
-        : buildMuseum(parent, config);
+        : config.zones ? buildPractical(parent, config) : buildMuseum(parent, config);
 
       /*
        * Der Hinweis wird zuletzt ergänzt und beim Raumwechsel

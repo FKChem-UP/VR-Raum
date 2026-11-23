@@ -631,7 +631,7 @@
         }
         const hasPlane = !!F.AtomPlane?.get(model)?.normalAngstrom;
         const hasMidpoints = !!F.AtomPlane?.midpointCount?.(model);
-        if (locked || structure && (hasPlane || hasMidpoints || ["molecule", "coordination"].includes(structure.mode))) {
+        if (locked || structure && (structure.measurePositions || hasPlane || hasMidpoints || ["molecule", "coordination"].includes(structure.mode))) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           const modes=["distance", "angle", "torsion"];
           if(hasPlane && !locked)modes.push("pointPlane");

@@ -176,7 +176,7 @@
       const construction = hit.mesh.userData.fkcConstruction;
       const point = hit.mesh.userData.fkcAtom || construction;
       const existingConstruction = this.root === hit.el && this.measurementMode === mode && this.points.some(p => p.name);
-      if (!structure || (!construction && !existingConstruction && mode !== "pointPlane" && !["molecule", "coordination"].includes(structure.mode))) {
+      if (!structure || (!structure.measurePositions && !construction && !existingConstruction && mode !== "pointPlane" && !["molecule", "coordination"].includes(structure.mode))) {
         F.setStatus("Messungen nur am CIF-Molekül oder der Koordinationsumgebung verfügbar.");
         return;
       }

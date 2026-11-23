@@ -1,7 +1,7 @@
 "use strict";
 
 (function (F) {
-  function read(source) {
+  function read(source, {explicit = false, maxPositions = 512} = {}) {
     const {parse, numeric, cellMatrix, cartesian, symmetryPoint} = F.CIFStructure;
     const {values, loops} = parse(source);
     const lengths = ["a", "b", "c"].map(axis => numeric(values["_cell_length_" + axis]));
@@ -10,7 +10,7 @@
     const sites = loops.find(loop => loop.names.includes("_atom_site_fract_x"));
     const symmetry = loops.find(loop => loop.names.includes("_symmetry_equiv_pos_as_xyz") ||
       loop.names.includes("_space_group_symop_operation_xyz"));
-    if (!sites?.rows.length || !symmetry?.rows.length) throw new Error("Atompositionen oder Symmetrie fehlen.");
+    if (!sites?.rows.length || (!explicit && !symmetry?.rows.length)) throw new Error("Atompositionen oder Symmetrie fehlen.");
     const wrap = n => { const x = n - Math.floor(n); return x > 1 - 1e-7 ? 0 : x; };
     const atoms = [];
     for (const site of sites.rows) {
@@ -20,18 +20,18 @@
       if (!label || !element || occupancy <= 0 || occupancy > 1) throw new Error("Ungültige Atomposition in der CIF.");
       const position = ["x", "y", "z"].map(axis => numeric(site["_atom_site_fract_" + axis]));
       const images = [];
-      for (const row of symmetry.rows) {
+      for (const row of explicit ? [{_space_group_symop_operation_xyz:"x,y,z"}] : symmetry.rows) {
         const operation = row._symmetry_equiv_pos_as_xyz || row._space_group_symop_operation_xyz;
         const point = symmetryPoint(position, operation);
         if (point.length !== 3) throw new Error("Ungültige Symmetrieoperation.");
-        const fractional = point.map(wrap);
+        const fractional = explicit ? point : point.map(wrap);
         if (images.some(other => other.every((value, axis) => {
           const difference = Math.abs(value - fractional[axis]);
           return Math.min(difference, 1 - difference) < 1e-7;
         }))) continue;
         images.push(fractional);
         const modelNumber = atoms.length + 1;
-        if (modelNumber > 512) throw new Error("Zu viele Positionen für den Strukturraum.");
+        if (modelNumber > maxPositions) throw new Error("Zu viele Positionen für die Zellansicht.");
         atoms.push({id: "site-" + modelNumber, modelNumber, cifLabel: label, element, occupancy, fractional,
           positionAngstrom: cartesian(fractional, matrix)});
       }

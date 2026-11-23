@@ -339,38 +339,59 @@
   };
   function practicalStations(roomId, experiments) {
     const team = room(roomId);
-    const positions = [0, 2, 4, 6, 13];
-    team.stations = experiments.map(([title, accent, tint], index) => ({
-      ...team.stations[positions[index]],
-      title: `${team.title.at(-1)}${index + 1} · ${title}`,
-      zone: {accent, tint}
-    }));
+    const back = experiments.length === 5 ? 7 : team.depth / 2;
+    const front = -team.depth / 2;
+    const split = (front + back) / 2;
+    team.zones = experiments.map(([name, accent, tint, models], index) => {
+      const rear = index === 4;
+      const left = index < 2;
+      const first = index % 2 === 0;
+      const title = `${team.title.at(-1)}${index + 1} · ${name}`;
+      const z0 = rear ? back : first ? front : split;
+      const z1 = rear ? team.depth / 2 : first ? split : back;
+      return {title, accent, tint, models, wall: rear ? "back" : left ? "left" : "right",
+        along: rear ? 0 : (z0 + z1) / 2,
+        x0: rear || left ? -team.width / 2 : 0, x1: rear || !left ? team.width / 2 : 0, z0, z1};
+    });
+    team.stations = team.zones.flatMap(zone => zone.models.map((model, index) => ({...model,
+      wall: zone.wall, along: zone.along + (index - (zone.models.length - 1) / 2) * 1.75, zone
+    })));
   }
 
+  const practicalCif = (title, file, source, cifMode = "practical-cell", note = "") => ({
+    title, model: "assets/praktikum/" + file, cifMode,
+    info: `Quelle: ${source}.\n${note || "CIF-Zellpositionen mit Zellrahmen; keine automatisch ergänzten Bindungen. Messungen beziehen sich auf die ausgewählten angezeigten Positionen."}`
+  });
+
   practicalStations("team-a", [
-    ["Benzil", "#41628f", "#e4edf9"],
-    ["HKUST-1", "#15766f", "#d9f1eb"],
-    ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#fae7e2"],
-    ["Tribolumineszenz · Eu-Komplex", "#75519b", "#eee5f7"]
+    ["Benzil", "#41628f", "#c3d9f8", [
+      practicalCif("Benzil · monoklin", "BENZIL03_monoklin.cif", "CSD BENZIL03"),
+      practicalCif("Benzil · trigonal", "BENZIL04_trigonal.cif", "CSD BENZIL04")]],
+    ["HKUST-1", "#15766f", "#a8e3d3", [
+      practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
+      practicalCif("HKUST-1 · Referenzausschnitt", "HKUST-1_ohneH.cif", "CSD FIQCEN", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
+      practicalCif("Nebenprodukt VUXBUL", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL")]],
+    ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#f6c7b9", [
+      practicalCif("YBa₂Cu₃O₇", "YBa2Cu3O7_2016.cif", "ICSD 196264"),
+      practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409"),
+      practicalCif("YBa₂Cu₃O₆ · tetragonal", "YBa2Cu3O6_tetragonal_HT.cif", "ICSD 63269")]],
+    ["Tribolumineszenz · Eu-Komplex", "#75519b", "#e2cdf5", [
+      practicalCif("Eu-Komplex · Referenz", "Eu-Komplex2017.cif", "CCDC 1430893")]]
   ]);
   practicalStations("team-b", [
-    ["Co-Einkristalltransformation", "#654c99", "#eee7f8"],
-    ["Cobaltferrit", "#974339", "#f7e3de"],
-    ["Nicotinamid", "#206c80", "#dff0f5"],
-    ["Thermochromie · Ag₂[HgI₄]", "#a65913", "#ffecd7"],
-    ["Vanillin", "#48763e", "#e7f2df"]
+    ["Co-Einkristalltransformation", "#654c99", "#d9c8f3", [
+      practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15"),
+      {...coModel, title: "Verbindung 2 · Produkt", info: "Quelle: Praktikumsdatensatz P3_14.\n" + coModel.info},
+      {title: "Verbindung 3 · reserviert"}, {title: "Verbindung 4 · reserviert"}]],
+    ["Cobaltferrit", "#974339", "#efbbb0", [practicalCif("Cobaltferrit", "CoFe2O4.cif", "ICSD 33181", undefined,
+      "CIF-Zellpositionen. Co und Fe teilen sich teilweise dieselben mittleren Gitterplätze; überlagerte Positionen sind keine zwei gleichzeitig vorhandenen Ionen.")]],
+    ["Nicotinamid", "#206c80", "#b7dfec", [practicalCif("Nicotinamid", "Nikotinsaeureamid_NICOAM05.cif", "CSD NICOAM05")]],
+    ["Thermochromie · Ag₂[HgI₄]", "#a65913", "#ffdbad", [
+      practicalCif("Ag₂[HgI₄] · Tieftemperaturform", "AgHgI4-Tieftemperaturform.cif", "ICSD 30264"),
+      practicalCif("Ag₂[HgI₄] · Hochtemperaturform", "AgHgI4-Hochtemperaturform.cif", "ICSD 38178", undefined,
+        "CIF-Zellpositionen. Ag und Hg teilen sich mittlere Gitterplätze; Teilbesetzungen sind statistisch zu verstehen.")]],
+    ["Vanillin", "#48763e", "#cceab8", [practicalCif("Vanillin", "Vanillin_YUHTEA.cif", "CSD YUHTEA")]]
   ]);
-
-  Object.assign(room("team-b").stations[0], coModel, {
-    boardLines: [
-      "Verbindung 2 · das chloridoverbrückte Produkt",
-      "1. Öffne die Koordinationsansicht. Welche sechs Atome umgeben ein Co-Zentrum? Miss je einen Co–N-, Co–O- und Co–Cl-Abstand.",
-      "2. Wechsle zum vollständigen Komplex. Drehe ihn so, dass du siehst, welche Chloride beide Co-Zentren verbinden.",
-      "3. Wechsle zur Elementarzelle. Unterscheide Brückenliganden, freie Chloridionen und Gitterwasser.",
-      "Vergleich am PC: Was ändert sich gegenüber Verbindung 1, und was bleibt gleich? In VR ist hier zunächst nur Verbindung 2 geladen."
-    ],
-    info: "Verbindung 2 · Produkt der Einkristalltransformation.\n\n" + coModel.info
-  });
   Object.assign(F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "team-b"), coModel,
     {info: "Vorschau für Team B.\n\n" + coModel.info});
 

@@ -608,7 +608,16 @@
   }
 
   function createStructure(source, mode = "molecule") {
+    if (["co-precursor-molecule", "co-precursor-cell", "co-precursor-coordination"].includes(mode)) {
+      const structure = F.CIFStructure.createBondedStructure(source, mode.slice("co-precursor-".length), "Co");
+      if (structure.mode === "cell") structure.bondSegments = cellBondSegments(structure);
+      return structure;
+    }
     if (mode === "library-cell") return F.StructureCell.read(source);
+    if (mode === "practical-cell" || mode === "practical-sites") {
+      return {...F.StructureCell.read(source,{explicit:mode === "practical-sites",maxPositions:600}),
+        measurePositions:true};
+    }
     if (/^[ \t]*data_ZnS[ \t\r]*$/im.test(source)) {
       const structure = F.ZnSStructure.createStructure(source, mode);
       if (mode === "cell") structure.bondSegments = cellBondSegments(structure);
@@ -661,7 +670,9 @@
     Cl: {color: "#35c935", vdw: 1.75},
     Co: {color: "#ed709b", vdw: 2.00}, Na: {color: "#8359dc", vdw: 2.27},
     Cu: {color: "#bd6539", vdw: 1.4}, S: {color: "#e4bc24", vdw: 1.8},
-    Y: {color: "#5a9bae", vdw: 2.32}, Ba: {color: "#79a446", vdw: 2.68}, Zn: {color: "#6976b1", vdw: 1.39}
+    Y: {color: "#5a9bae", vdw: 2.32}, Ba: {color: "#79a446", vdw: 2.68}, Zn: {color: "#6976b1", vdw: 1.39},
+    Fe: {color: "#c96132", vdw: 2.04}, Eu: {color: "#67b58f", vdw: 2.31},
+    Ag: {color: "#9fadb9", vdw: 1.72}, Hg: {color: "#b096ca", vdw: 1.55}, I: {color: "#6a367e", vdw: 1.98}
   };
 
   // Konvexe Hülle aus echten Nachbarpositionen; koplanare Flächen nur einmal
