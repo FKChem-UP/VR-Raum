@@ -281,7 +281,7 @@
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size, plane?.points.length, !!plane?.mesh,
-        plane?.color, plane?.thickness, plane?.opacity, plane?.visible,
+        plane?.name, plane?.color, plane?.thickness, plane?.opacity, plane?.visible,
         F.AtomPlane?.active?.root===model ? F.AtomPlane.active.points.length : null,
         F.AtomPlane?.active?.midpoint, F.AtomPlane?.midpointCount(model)].join("|");
       const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
@@ -544,10 +544,11 @@
         const plane=F.AtomPlane?.get(model);
         if(plane?.mesh){
           const style=change=>F.AtomPlane.style(plane,change);
-          text("Farbe der Ebene");paintColors(color=>style({color}),undefined,plane.color);
+          text(`${plane.name || "Ebene"} · Farbe`);paintColors(color=>style({color}),undefined,plane.color);
           text("Dicke der Ebene");row([0.004,0.008,0.016].map(thickness=>tile(thickness*1000+" mm",()=>style({thickness}),plane.thickness===thickness)),true);
           text("Deckkraft der Ebene");row([0.2,0.35,0.6,1].map(opacity=>tile(opacity*100+" %",()=>style({opacity}),plane.opacity===opacity)),true);
-          row([tile(plane.visible?"Ebene ausblenden":"Ebene einblenden",()=>style({visible:!plane.visible})),
+          row([tile("Nächste Ebene",()=>F.AtomPlane.nextPlane(model)),
+            tile(plane.visible?"Ebene ausblenden":"Ebene einblenden",()=>style({visible:!plane.visible})),
             tile("Ebene entfernen",()=>F.AtomPlane.clear(model))],true);
         }else{
           text("Trigger halten: Oberfläche markieren");
@@ -613,10 +614,14 @@
           button("H-Brücken: " + (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
             () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }
-        if (locked || structure && ["molecule", "coordination"].includes(structure.mode)) {
+        const hasPlane = !!F.AtomPlane?.get(model)?.normalAngstrom;
+        const hasMidpoints = !!F.AtomPlane?.midpointCount?.(model);
+        if (locked || structure && (hasPlane || hasMidpoints || ["molecule", "coordination"].includes(structure.mode))) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
-          row(["distance", "angle", "torsion"].map(mode => ({
-            label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode], cueId: "measure:" + mode,
+          const modes=["distance", "angle", "torsion"];
+          if(hasPlane && !locked)modes.push("pointPlane");
+          row(modes.map(mode => ({
+            label: F.Measure.titles[mode], kind: mode === "pointPlane" ? "plain" : mode, count: F.Measure.counts[mode], cueId: "measure:" + mode,
             selected: F.Measure.enabled && F.Measure.mode === mode,
             action: () => F.Measure.toggleMode(mode)
           })));

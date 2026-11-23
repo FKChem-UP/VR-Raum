@@ -23,15 +23,16 @@
     const w = unit(last.map((value, i) => value - dot(last, axis) * axis[i]));
     return Math.atan2(dot(cross(axis, v), w), dot(v, w)) * 180 / Math.PI;
   }
-  const counts = {distance: 2, angle: 3, torsion: 4};
-  const titles = {distance: "Distanz", angle: "Winkel", torsion: "Torsion"};
-  const colors = {distance: "#ffcc33", angle: "#ff5555", torsion: "#5599ff"};
+  const pointPlane = (point, origin, normal) => Math.abs(dot(sub(point,origin),unit(normal)));
+  const counts = {distance: 2, angle: 3, torsion: 4, pointPlane: 2};
+  const titles = {distance: "Distanz", angle: "Winkel", torsion: "Torsion", pointPlane: "Punkt–Ebene"};
+  const colors = {distance: "#ffcc33", angle: "#ff5555", torsion: "#5599ff", pointPlane: "#32dec8"};
   const displayFields = ["geometry", "material", "line", "canvas", "texture", "labelMaterial",
     "label", "haloGeometry", "haloMaterial", "halos", "rodGeometry", "rodMaterial", "rods",
     "guideGeometry", "guideMaterial", "guide", "planeGeometry", "planeMaterial", "planes",
     "points", "meshes", "root", "visual", "labelWidth", "measurementMode", "resultText"];
   F.Measure = {
-    distance, angle, torsion, counts, titles, colors,
+    distance, angle, torsion, pointPlane, counts, titles, colors,
     enabled: false,
     mode: "distance",
     toggleMode(mode) {
@@ -41,6 +42,7 @@
     },
     setMode(mode) {
       if (!counts[mode]) return;
+      F.AtomPlane?.cancel();
       this.mode = mode;
       this.setEnabled(true);
     },
@@ -55,6 +57,10 @@
       const component = F.getScene().components["fkc-measurements"];
       if (component) component.select(hit);
       return true;
+    },
+    wantsPlane(root) {
+      const selection = F.getScene().components["fkc-measurements"];
+      return this.mode === "pointPlane" && selection?.root === root && selection.points.length === 1;
     }
   };
   AFRAME.registerComponent("fkc-measurements", {
@@ -139,8 +145,9 @@
       if (!labels.measureLabels) labels.measureLabels = new Map();
       labels.measureLabels.clear();
       [...(this.saved || []), ...(this.sharedDisplays?.values() || []), this].forEach(record => {
-        (record.meshes || []).forEach((mesh, i) => labels.measureLabels.set(mesh,
-          {root: record.root, atom: record.points[i]}));
+        (record.meshes || []).forEach((mesh, i) => {
+          if (!mesh.userData?.fkcConstruction) labels.measureLabels.set(mesh,{root: record.root, atom: record.points[i]});
+        });
       });
     },
     reset: function (root) {
@@ -165,45 +172,55 @@
     select: function (hit) {
       const visual = hit.el.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
-      if (!structure || !["molecule", "coordination"].includes(structure.mode)) {
+      const mode = F.Measure.mode;
+      const construction = hit.mesh.userData.fkcConstruction;
+      const point = hit.mesh.userData.fkcAtom || construction;
+      const existingConstruction = this.root === hit.el && this.measurementMode === mode && this.points.some(p => p.name);
+      if (!structure || (!construction && !existingConstruction && mode !== "pointPlane" && !["molecule", "coordination"].includes(structure.mode))) {
         F.setStatus("Messungen nur am CIF-Molekül oder der Koordinationsumgebung verfügbar.");
         return;
       }
-      const required = counts[F.Measure.mode];
+      const required = counts[mode];
       const bond = hit.mesh.userData.fkcBond;
-      const atom = hit.mesh.userData.fkcAtom;
-      if (!atom && !(F.Measure.mode === "distance" && bond &&
-          Number.isInteger(bond.a) && Number.isInteger(bond.b))) return;
+      const directBond = mode === "distance" && !!bond && Number.isInteger(bond.a) && Number.isInteger(bond.b) &&
+        ["molecule", "coordination"].includes(structure.mode);
+      if (!point?.positionAngstrom && !directBond) return;
+      const plane = construction && !construction.midpoint;
+      if (plane && (mode !== "pointPlane" || !construction.normalAngstrom || this.root !== hit.el || this.points.length !== 1)) return;
+      if (mode === "pointPlane" && !plane && this.root === hit.el && this.points.length === 1 && this.points[0] !== point) {
+        F.setStatus("Wähle jetzt eine Ebene (E)."); return;
+      }
       // Abgeschlossene Anzeigen erhalten; nur Auswahl für neue Messung leeren.
       if (this.root && this.root !== hit.el) this.clearSelection();
       if (this.points.length === counts[this.measurementMode]) this.archive();
-      if (F.Measure.mode === "distance" && bond) this.clearSelection();
-      this.measurementMode = F.Measure.mode;
+      if (directBond) this.clearSelection();
+      this.measurementMode = mode;
       if (this.material) {
         [this.material, this.haloMaterial, this.rodMaterial, this.guideMaterial, this.planeMaterial]
           .forEach(material => material.color.set(colors[this.measurementMode]));
       }
       this.root = hit.el;
       this.visual = visual;
-      const meshes = new Map();
-      visual.object3D.traverse(mesh => {
-        if (mesh.userData.fkcAtom) meshes.set(mesh.userData.fkcAtom.id, mesh);
-      });
-      if (F.Measure.mode === "distance" && bond && Number.isInteger(bond.a) && Number.isInteger(bond.b)) {
+      if (directBond) {
+        const meshes = new Map();
+        visual.object3D.traverse(mesh => {
+          if (mesh.userData.fkcAtom) meshes.set(mesh.userData.fkcAtom.id, mesh);
+        });
         this.points = [structure.atoms[bond.a], structure.atoms[bond.b]];
-      } else if (hit.mesh.userData.fkcAtom) {
-        const index = this.points.findIndex(point => point.id === atom.id);
+        this.meshes = this.points.map(atom => meshes.get(atom.id));
+      } else {
+        const index = this.points.findIndex(other => other === point || (point.id != null && other.id === point.id));
         if (index !== -1) {
           this.points.splice(index, 1);
-          F.setStatus("Atomauswahl zurückgenommen.");
-        } else this.points.push(atom);
-      } else return;
-      this.meshes = this.points.map(atom => meshes.get(atom.id));
+          this.meshes.splice(index, 1);
+        } else { this.points.push(point); this.meshes.push(hit.mesh); }
+      }
       this.syncLabels();
       this.line.visible = this.label.visible = false;
       if (this.points.length !== required) {
         if (this.points.length) this.drawLabel(`${titles[this.measurementMode]} ${this.points.length}/${required}`);
-        F.setStatus(titles[F.Measure.mode] + ": " + this.points.length + "/" + required + " Atome gewählt.");
+        F.setStatus(mode === "pointPlane" && this.points.length ? "Wähle jetzt eine Ebene (E)." :
+          titles[mode] + ": " + this.points.length + "/" + required + " Punkte gewählt.");
         return;
       }
       this.renderResult();
@@ -215,9 +232,10 @@
       let text;
       try {
         const coordinates = this.points.map(point => point.positionAngstrom);
-        const result = F.Measure[this.measurementMode](...coordinates);
-        text = result.toFixed(this.measurementMode === "distance" ? 3 : 1) +
-          (this.measurementMode === "distance" ? " Å" : "°");
+        const length = ["distance","pointPlane"].includes(this.measurementMode);
+        const result = this.measurementMode === "pointPlane" ? pointPlane(...coordinates,this.points[1].normalAngstrom) :
+          F.Measure[this.measurementMode](...coordinates);
+        text = result.toFixed(length ? 3 : 1) + (length ? " Å" : "°");
       } catch (error) { text = "Nicht definiert"; }
       this.drawLabel(text);
       this.resultText = text;
@@ -280,12 +298,13 @@
       this.syncLabels();
     },
     validDisplay: function () {
-      return this.root && this.root.isConnected && this.root.querySelector(".model-visual") === this.visual;
+      return this.root && this.root.isConnected && this.root.querySelector(".model-visual") === this.visual &&
+        this.meshes.every(mesh=>mesh && (!mesh.userData.fkcConstruction || mesh.userData.fkcConstruction.mesh===mesh));
     },
     updateDisplay: function () {
       if (!this.root) return;
       if (!this.el.camera || !this.meshes) return;
-      const visible = !(F.Menu && F.Menu.opened);
+      const visible = !(F.Menu && F.Menu.opened) && this.meshes.every(mesh=>mesh.visible !== false);
       const pending = this.points.length > 0 && this.points.length < counts[this.measurementMode];
       this.haloMaterial.opacity = pending ? 0.55 : 0.16;
       this.haloMaterial.depthTest = !pending;
@@ -294,8 +313,15 @@
         const position = mesh.getWorldPosition(new T.Vector3());
         return this.el.object3D.worldToLocal(position);
       });
+      if(this.measurementMode === "pointPlane" && positions.length===2){
+        const plane=this.points[1], visual=this.visual.object3D;
+        const point=visual.worldToLocal(this.meshes[0].getWorldPosition(new T.Vector3()));
+        const normal=new T.Vector3(...plane.normalLocal);
+        point.addScaledVector(normal,-point.clone().sub(plane.mesh.position).dot(normal));
+        positions[1]=this.el.object3D.worldToLocal(visual.localToWorld(point));
+      }
       this.halos.forEach((halo, i) => {
-        halo.visible = visible && i < positions.length;
+        halo.visible = visible && i < positions.length && !(this.measurementMode === "pointPlane" && i===1);
         if (i >= positions.length) return;
         halo.position.copy(positions[i]);
         const scale = this.meshes[i].getWorldScale(new T.Vector3());

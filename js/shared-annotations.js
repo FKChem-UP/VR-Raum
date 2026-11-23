@@ -33,6 +33,7 @@
       }
     }
     for (const record of scene.components["fkc-measurements"]?.saved || []) {
+      if (record.meshes?.some(mesh => mesh?.userData?.fkcConstruction)) continue;
       add(record.root, record.visual, record.measurementMode, record.points.map(atom => atom.id));
     }
     return normalize(entries, room);
