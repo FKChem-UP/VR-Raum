@@ -37,6 +37,7 @@
     },
     setMode(mode) {
       if (!["laser", "paint"].includes(mode)) return;
+      if (mode === "paint") F.AtomPlane?.cancel();
       this.mode = mode;
       if (mode === "paint" && F.Measure && F.Measure.enabled) F.Measure.setEnabled(false);
       if (F.Menu) F.Menu.blockDrawing();

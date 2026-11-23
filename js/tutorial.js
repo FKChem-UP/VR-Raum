@@ -220,7 +220,7 @@
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        mirror ? (mirrorDone ? ["Die drei Spiegel bleiben am BF₃-Modell.", "Greife es und betrachte die Ebenen von allen Seiten."] : F.MirrorTutorial.tasks.slice(first, first+tasksPerPage)) : structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
+        mirror ? (mirrorDone ? ["BF₃ hat vier Spiegelebenen.", "Greife es und vergleiche die drei senkrechten Ebenen mit der Molekülebene."] : F.MirrorTutorial.tasks.slice(first, first+tasksPerPage)) : structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
         animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Oder starte Teil 3: Zeichne den Spiegel."] :
         animation ? F.Bragg.tasks :
           tasks.slice(first, first + tasksPerPage);

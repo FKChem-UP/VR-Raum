@@ -546,6 +546,7 @@
 
         if (!(F.Menu && F.Menu.opened) && this.hit.type === "model") {
           if (!(grabber && grabber.grabbed)) {
+            if (F.AtomPlane?.click(this.hit)) return;
             F.selectModel(this.hit.el);
             if (!F.Draw || F.Draw.mode !== "paint") {
               if (F.CIF && F.CIF.clickEnvironment(this.hit)) return;

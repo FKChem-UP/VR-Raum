@@ -36,14 +36,16 @@
     if (hits.includes(-1) || new Set(hits).size !== 4 || (view === 0 && !free && hits[1] !== 1)) return null;
     return solution(view, view === 0 ? hits.findIndex((j, i) => i > 0 && j === i) : 1);
   }
-  const tasks = ["Zur BF₃-Zeichentafel gehen", "BF₃ neben der Zeichenfläche platzieren", "Erste Ebene mit dem Laser zeichnen", "Erste Spiegelebene testen", "BF₃ mit dem Laser auswählen", "Modell-Handmenü öffnen",
+  const tasks = ["Zur BF₃-Zeichentafel gehen", "BF₃ verkleinern und neben der Zeichenfläche platzieren", "Erste Ebene mit dem Laser zeichnen", "Erste Spiegelebene testen", "BF₃ mit dem Laser auswählen", "Modell-Handmenü öffnen",
     "Pinsel im Modellmenü wählen", "Neue Farbe und zweite Spiegelebene",
-    "Neue Farbe und dritte Spiegelebene", "Spiegelebenen ausblenden", "Zeichne einen Punkt auf das B des rechten Bildes", "Inversionszentrum testen", "Letzten Strich im Handmenü entfernen"];
-  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Verschiebe BF₃ mit Grip: Tafel und Molekül sollen gleichzeitig im Blick sein.", "Zieh vom F durch B und beobachte dabei, wie neben der Tafel die Ebene entsteht.", "Drücke auf der Zeichentafel ‚Erste Spiegelebene testen‘ und beobachte das Modell.", "Ziele auf das räumliche BF₃ neben der Tafel und drücke den Trigger.",
+    "Neue Farbe und dritte Spiegelebene", "Spiegelebenen ausblenden", "Zeichne einen Punkt auf das B des rechten Bildes", "Inversionszentrum testen", "Letzten Strich im Handmenü entfernen",
+    "Zum Modellmenü zurückkehren", "Ebene aus 3 Atomen starten", "Die drei Fluoratome auswählen"];
+  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Beide Grips halten, Hände zusammenführen; BF₃ neben der Tafel absetzen.", "Zieh vom F durch B und beobachte dabei, wie neben der Tafel die Ebene entsteht.", "Drücke auf der Zeichentafel ‚Erste Spiegelebene testen‘ und beobachte das Modell.", "Ziele auf das räumliche BF₃ neben der Tafel und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke oben rechts auf den gelb umrahmten Pinsel.",
     "Im Zeichenmenü neue Farbe wählen. Vom markierten F durch B ziehen.",
     "Im Zeichenmenü dritte Farbe wählen. Vom letzten F bis B ziehen.", "Wähle auf der Zeichentafel ‚Spiegelebenen ausblenden‘.", "Rechts: Setze einen Punkt auf B, um das mögliche Zentrum zu markieren.",
-    "Drücke ‚Inversion testen‘. Beobachte, wo die rosa Atome landen.", "Handfläche drehen und Letzten Strich entfernen drücken."];
+    "Drücke ‚Inversion testen‘. Beobachte, wo die rosa Atome landen.", "Handfläche drehen und Letzten Strich entfernen drücken.",
+    "Drücke im Zeichenmenü ‚Zum Modellmenü‘.", "Wähle ‚Ebene aus 3 Atomen‘.", "Klicke die drei verschiedenen F-Atome am räumlichen Modell an. B zählt hier nicht."];
   const invert = (point, center = atoms[0]) => point.map((value,i)=>2*center[i]-value);
   function station(parent) {
     const T = AFRAME.THREE, resources = [], keep = r => (resources.push(r), r);
@@ -65,7 +67,8 @@
       group.add(m); return m; };
     const plates = [], ghosts = [], ghostBonds = [];
     atoms.forEach((p, i) => {
-      make(new T.SphereGeometry(i ? 0.16 : 0.20, 20, 12), {color: i ? 0x258365 : 0x975841}).position.fromArray(p);
+      const atom=make(new T.SphereGeometry(i ? 0.16 : 0.20, 20, 12), {color: i ? 0x258365 : 0x975841});
+      atom.position.fromArray(p);atom.userData.fkcAtom={id:`bf3-${i}`,element:i?"F":"B"};
       const ghost = make(new T.SphereGeometry(i ? 0.17 : 0.215, 12, 8), {color: 0xc93482, wireframe: true});
       ghost.visible = false; ghost.raycast=()=>{}; ghosts.push(ghost);
       if (!i) return;
@@ -102,9 +105,10 @@
       stopInversion();
       stopTest(); hidden=false;
       plates.forEach((plate,i)=>{plate.visible=i===index;});
-      const mirror=plane(0,...solution(0,index+1));
+      const mirror=index===3 ? {normal:[0,1,0],offset:0} : plane(0,...solution(0,index+1));
       preview={index,time:0,end:atoms.map(p=>reflect(p,mirror)),finished:false};
-      images.forEach((image,i)=>{image.position.fromArray(atoms[i]);image.material.color.set(strokes[index].color);image.visible=true;});
+      const color=index===3 ? F.AtomPlane.get(root).color : strokes[index].color;
+      images.forEach((image,i)=>{image.position.fromArray(atoms[i]);image.material.color.set(color);image.visible=true;});
       message="Die farbigen Umrisse zeigen die Abbildung – keine Bewegung der Atomkerne.";draw();
     }
     function animate(seconds){
@@ -120,7 +124,8 @@
       if(t===1 && !preview.finished){
         preview.finished=true;
         if(step===3 && preview.index===0)move(drawingMenu?7:4);
-        message="Deckungsgleich: B und ein F bleiben fest, die anderen beiden F tauschen ihre Plätze.";draw();
+        message=preview.index===3 ? "Deckungsgleich: Alle vier Atome bleiben an ihrem Platz." :
+          "Deckungsgleich: B und ein F bleiben fest, die anderen beiden F tauschen ihre Plätze.";draw();
       }
       if(preview.time>=3.3){stopTest();plates.forEach((p,i)=>{p.visible=!hidden && i<strokes.length;});}
     }
@@ -150,7 +155,9 @@
           ctx.fillStyle="rgba(245,248,246,0.64)";ctx.fillRect(x,90,486,364);
         }
       }
-      const notes = step >= 12 ? ["Punktspiegelung an B: Das zentrale Boratom bleibt an seinem Platz.",
+      const notes = step >= 13 ? ["Drei nicht kollineare F-Atome legen die Molekülebene fest.",
+        "Auch B liegt in dieser Ebene. Bei der Spiegelung bleibt jedes Atom an seinem Platz.",
+        "Die Molekülebene ist damit die vierte Spiegelebene von BF₃."] : step >= 12 ? ["Punktspiegelung an B: Das zentrale Boratom bleibt an seinem Platz.",
         "Gegenüber jedem F liegt eine Lücke. Das rosa Drahtmodell deckt sich nicht mit BF₃.",
         "BF₃ hat deshalb kein Inversionszentrum – trotz seiner Spiegelebenen."] : step >= 10 ? [
         "Markiere B als mögliches Inversionszentrum in der rechten Schrägansicht.",
@@ -167,6 +174,7 @@
         stopTest();hidden=!hidden;plates.forEach(p=>{p.visible=!hidden;}); if(hidden && step===9)move(10);else draw();
       }});
       if(dotStroke)buttons.push({label:"Inversion testen",cue:step===11,action:testInversion});
+      if(step===16 && F.AtomPlane?.get(root)?.mesh)buttons.push({label:"Molekülebene testen",action:()=>testMirror(3)});
       buttons.forEach((b,i)=>{const w=992/buttons.length;b.x=16+i*w;b.w=w-8;
         ctx.fillStyle=b.cue?"#ffdf73":"#c7e2d5";ctx.fillRect(b.x,560,b.w,68);
         ctx.font="bold 26px Arial";ctx.fillStyle="#193947";ctx.fillText(b.label,b.x+9,602,b.w-18);
@@ -205,9 +213,14 @@
     return {board, root, get step(){return step;}, get drawingMenu(){return drawingMenu;}, unused(c){return !strokes.some(s=>s.color===c);},
       click(uv){if(!uv || active)return;const x=uv.x*1024,y=(1-uv.y)*640;
         if(y>=560 && y<=628){const b=buttons.find(b=>x>=b.x && x<=b.x+b.w);if(b){waitRelease=true;b.action();}}},
-      cue(){return step===6?"mirror:menu":[7,8].includes(step) && strokes.some(s=>s.color===F.Draw.color)?"mirror:color":step===12?"mirror:undo":null;},
+      cue(){return step===6?"mirror:menu":[7,8].includes(step) && strokes.some(s=>s.color===F.Draw.color)?"mirror:color":({12:"mirror:undo",13:"mirror:model",14:"plane:start"})[step]||null;},
       menu(){if(step!==6)return;drawingMenu=true;F.Draw.setMode("paint");move(7);},
       color(c){F.Draw.color=c;message="";draw();},
+      modelMenu(){if(step!==13)return;drawingMenu=false;F.Draw.setMode("laser");move(14);},
+      startPlane(){if(step!==14 && step!==15)return;
+        if(F.AtomPlane.active?.root===root){F.AtomPlane.cancel();move(14);return;}
+        F.AtomPlane.begin(root,{accept:atom=>atom.element==="F",complete:()=>move(16)});move(15);
+      },
       undo(){
         stopTest(); stopInversion();hidden=false;plates.forEach((p,i)=>{p.visible=i<strokes.length;});
         if(dotStroke){F.Draw.remove(dotStroke);dotStroke=null;move(step===12?13:10);return;}
@@ -216,11 +229,11 @@
         move(strokes.length ? 6+strokes.length : 2);
       },
       clear(){
-        stopTest();stopInversion();hidden=false;F.Draw.clear(board); active=null; dotStroke=null; strokes=[]; waitRelease=true;
+        stopTest();stopInversion();F.AtomPlane?.clear(root);hidden=false;F.Draw.clear(board); active=null; dotStroke=null; strokes=[]; waitRelease=true;
         plates.forEach(p=>p.visible=false); move(2);
       },
       tick(hit,held,near,opened,selected,seconds=0){animate(seconds);if(step===0 && near)move(1);
-        if(step===1 && !root.components?.["fkc-manipulable"]?.hands.length && root.object3D.position.distanceTo(root.homePosition)>=0.12)move(2);
+        if(step===1 && !root.components?.["fkc-manipulable"]?.hands.length && body.object3D.scale.x<=0.88 && root.object3D.position.distanceTo(root.homePosition)>=0.12)move(2);
         if(step===4 && selected)move(5); if(step===5 && opened && selected)move(6);
         if(!held)waitRelease=false;
         if(held && !waitRelease) sample(hit);
@@ -228,7 +241,7 @@
           if(active.accepted){strokes.push({parts:active.parts,color:active.parts[0].color});active=null;waitRelease=held;
             move(strokes.length===1 ? 3 : 6+strokes.length);}
           else {active.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;active=null;message="Noch einmal: vom markierten F durch B ziehen.";draw();}}},
-      dispose(){ F.releaseModel(root); F.Draw.clear(board);board.remove();root.remove();resources.forEach(r=>r.dispose()); }
+      dispose(){ F.AtomPlane?.clear(root);F.releaseModel(root); F.Draw.clear(board);board.remove();root.remove();resources.forEach(r=>r.dispose()); }
     };
   }
   F.MirrorTutorial = {station, atoms, project, plane, reflect, invert, solution, check, tasks, hints};

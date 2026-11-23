@@ -268,6 +268,7 @@
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
+      const plane = F.AtomPlane?.get(model);
       const mirror = chapter?.phase === "mirror" ? chapter.mirror : null;
       const cue = mirror ? mirror.cue() : this.page === "model" && F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
@@ -279,7 +280,8 @@
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
-        environment && environment.selected.size].join("|");
+        environment && environment.selected.size, plane?.points.length, !!plane?.mesh,
+        plane?.color, plane?.thickness, plane?.opacity, plane?.visible].join("|");
       const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
       if (modeSignature !== this.signature) {
         this.signature = modeSignature;
@@ -451,7 +453,7 @@
           const labelY = entry.swatch || entry.kind === "plain" && !entry.heading ? height/2+8 : compactRow ? 63 : 73;
           ctx.fillText((entry.swatch && selected ? "✓ " : "")+entry.label, x + w / 2, y + shift + labelY, w - 12);
           ctx.textAlign = "left";
-          if (locked) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
+          if (locked && !entry.enabled) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
           else this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
         });
         y += height + 13;
@@ -460,9 +462,9 @@
       const drawingActions = (undo, clear, cueId=null) => row([
         tile("Letzten Strich entfernen",undo,false,cueId), tile("Alle Zeichnungen zurücksetzen",clear)
       ]);
-      const paintColors = (select, cueFor=()=>null) => {
+      const paintColors = (select, cueFor=()=>null, selectedColor=F.Draw?.color) => {
         for(let i=0;i<inkPalette.length;i+=4)row(inkPalette.slice(i,i+4).map(([color,label])=>({
-          label,kind:"color",swatch:true,color,selected:F.Draw.color===color,cueId:cueFor(color),action:()=>select(color)
+          label,kind:"color",swatch:true,color,selected:selectedColor===color,cueId:cueFor(color),action:()=>select(color)
         })),true);
       };
       if (chapter?.phase === "mirror" && chapter.mirror.drawingMenu) {
@@ -476,6 +478,7 @@
           row([0.35,0.6,1].map(opacity=>({label:Math.round(opacity*100)+" %",kind:"opacity",
             selected:F.Draw.opacity===opacity,action:()=>{F.Draw.opacity=opacity;}})));
           drawingActions(()=>mirror.undo(),()=>mirror.clear(),"mirror:undo");
+          if(mirror.step===13)row([tile("Zum Modellmenü",()=>mirror.modelMenu(),false,"mirror:model")],true);
         this.texture.needsUpdate=true;return;
       }
       if (animation) {
@@ -536,14 +539,24 @@
         return;
       }
       if (painting) {
-        text("Trigger halten: Oberfläche markieren");
-        text("Laser/Malstift oben wechselt zurück zur Atomauswahl.");
-        text("Farbe, Dicke und Deckkraft im Zahnrad einstellen.");
-        text("Zeichnungen am ausgewählten Modell");
-        drawingActions(() => {
-          const stroke = F.Draw.strokes.filter(s=>s.owner===model || model.contains(s.owner)).at(-1);
-          if (stroke) F.Draw.remove(stroke);
-        }, () => F.Draw.clear(model));
+        const plane=F.AtomPlane?.get(model);
+        if(plane?.mesh){
+          const style=change=>F.AtomPlane.style(plane,change);
+          text("Farbe der Ebene");paintColors(color=>style({color}),undefined,plane.color);
+          text("Dicke der Ebene");row([0.004,0.008,0.016].map(thickness=>tile(thickness*1000+" mm",()=>style({thickness}),plane.thickness===thickness)),true);
+          text("Deckkraft der Ebene");row([0.2,0.35,0.6,1].map(opacity=>tile(opacity*100+" %",()=>style({opacity}),plane.opacity===opacity)),true);
+          row([tile(plane.visible?"Ebene ausblenden":"Ebene einblenden",()=>style({visible:!plane.visible})),
+            tile("Ebene entfernen",()=>F.AtomPlane.clear(model))],true);
+        }else{
+          text("Trigger halten: Oberfläche markieren");
+          text("Laser/Malstift oben wechselt zurück zur Atomauswahl.");
+          text("Farbe, Dicke und Deckkraft im Zahnrad einstellen.");
+          text("Zeichnungen am ausgewählten Modell");
+          drawingActions(() => {
+            const stroke = F.Draw.strokes.filter(s=>s.owner===model || model.contains(s.owner)).at(-1);
+            if (stroke) F.Draw.remove(stroke);
+          }, () => F.Draw.clear(model));
+        }
       } else {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
@@ -576,6 +589,11 @@
           action:()=>F.AtomLabels.setMode(model,{hover:"all",all:"off",off:"hover"}[mode])}];
         if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
+        if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
+          const pending=F.AtomPlane.active?.root===model;
+          display.push({...tile(pending?`${F.AtomPlane.active.points.length}/3 · Abbrechen`:"Ebene aus 3 Atomen",
+            ()=>locked?chapter.mirror.startPlane():F.AtomPlane.begin(model),pending,"plane:start"),enabled:true});
+        }
         row(display);
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
