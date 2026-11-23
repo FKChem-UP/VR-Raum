@@ -33,7 +33,8 @@ class Vec { set(x=0,y=0,z=0){this.xyz=[x,y,z];return this;} fromArray(p){return 
 class Obj { constructor(){this.position=new Vec();this.scale={x:1,setScalar(n){this.x=n;}};this.quaternion={setFromUnitVectors(){},copy(){}};this.visible=true;}
   add(){} dispose(){} }
 class Mesh extends Obj {constructor(g,m){super();this.material=m;this.userData={};} }
-class Material extends Obj {constructor(){super();this.color={set(){}};} }
+const materialColors=[];
+class Material extends Obj {constructor(){super();this.color={set(value){materialColors.push(value);}};} }
 const T={Group:Obj,Vector3:Vec,Mesh,MeshBasicMaterial:Material,SphereGeometry:Obj,PlaneGeometry:Obj,BoxGeometry:Obj,CylinderGeometry:Obj,CanvasTexture:Obj};
 const ctx=new Proxy({}, {get:(o,k)=>o[k]||(()=>{})});
 const fills=[], texts=[];
@@ -66,8 +67,10 @@ assert.equal(F.Draw.mode,"paint");
 station.color("gold");line(2);assert.equal(station.step,7);station.color("blue");line(2);assert.equal(station.step,8);
 line(3);assert.equal(station.step,8);station.color("red");line(3);assert.equal(station.step,9);
 paint(1,[0,0]);assert.equal(ink.length,3);clickTile(900);assert.equal(station.step,10);paint(1,[0,0],false);
-paint(1,[0,0]);assert.equal(station.step,11);assert.equal(ink.length,4);
-clickTile(900);station.tick(null,false,true,false,true,0.9);assert.equal(station.step,11);
+station.color("#ff922b");paint(1,[0,0]);assert.equal(station.step,11);assert.equal(ink.length,4);
+station.color("#507dff");materialColors.length=0;
+clickTile(900);assert.deepEqual(materialColors,Array(7).fill("#ff922b"));
+station.tick(null,false,true,false,true,0.9);assert.equal(station.step,11);
 station.tick(null,false,true,false,true,0.9);assert.equal(station.step,12);
 station.undo();assert.equal(station.step,13);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
 station.modelMenu();assert.equal(station.step,14);assert.equal(F.Draw.mode,"laser");

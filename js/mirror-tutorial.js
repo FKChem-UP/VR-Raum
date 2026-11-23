@@ -44,7 +44,7 @@
     "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke oben rechts auf den gelb umrahmten Pinsel.",
     "Im Zeichenmenü neue Farbe wählen. Vom markierten F durch B ziehen.",
     "Im Zeichenmenü dritte Farbe wählen. Vom letzten F bis B ziehen.", "Wähle auf der Zeichentafel ‚Spiegelebenen ausblenden‘.", "Rechts: Setze einen Punkt auf B, um das mögliche Zentrum zu markieren.",
-    "Drücke ‚Inversion testen‘. Beobachte, wo die rosa Atome landen.", "Handfläche drehen und Letzten Strich entfernen drücken.",
+    "Drücke ‚Inversion testen‘. Beobachte, wo die farbigen Atomabbilder landen.", "Handfläche drehen und Letzten Strich entfernen drücken.",
     "Drücke im Zeichenmenü ‚Zum Modellmenü‘.", "Wähle ‚Ebene aus Punkten‘.", "Klicke die drei verschiedenen F-Atome am räumlichen Modell an. B zählt hier nicht."];
   const invert = (point, center = atoms[0]) => point.map((value,i)=>2*center[i]-value);
   function station(parent) {
@@ -69,12 +69,12 @@
     atoms.forEach((p, i) => {
       const atom=make(new T.SphereGeometry(i ? 0.16 : 0.20, 20, 12), {color: i ? 0x258365 : 0x975841});
       atom.position.fromArray(p);atom.userData.fkcAtom={id:`bf3-${i}`,element:i?"F":"B"};
-      const ghost = make(new T.SphereGeometry(i ? 0.17 : 0.215, 12, 8), {color: 0xc93482, wireframe: true});
+      const ghost = make(new T.SphereGeometry(i ? 0.17 : 0.215, 12, 8), {wireframe: true});
       ghost.visible = false; ghost.raycast=()=>{}; ghosts.push(ghost);
       if (!i) return;
       const bond = make(new T.CylinderGeometry(0.045, 0.045, 1, 12), {color: 0x81908d});
       bond.position.fromArray(p).multiplyScalar(0.5); bond.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), new T.Vector3(...p));
-      const ghostBond = make(new T.CylinderGeometry(0.048, 0.048, 1, 8), {color: 0xc93482, wireframe: true});
+      const ghostBond = make(new T.CylinderGeometry(0.048, 0.048, 1, 8), {wireframe: true});
       ghostBond.position.fromArray(p).multiplyScalar(-0.5); ghostBond.quaternion.copy(bond.quaternion);
       ghostBond.visible = false; ghostBond.raycast=()=>{}; ghostBonds.push(ghostBond);
       const plate = make(new T.BoxGeometry(2.65, 2.2, 1), {transparent: true, depthWrite: false});
@@ -90,9 +90,11 @@
     function stopTest(){ preview=null; images.forEach(image=>image.visible=false); }
     function stopInversion(){inversionTime=null; [...ghosts,...ghostBonds].forEach(mesh=>mesh.visible=false);}
     function testInversion(){
+      if(!dotStroke)return;
       stopTest(); hidden=true; plates.forEach(p=>p.visible=false);
+      [...ghosts,...ghostBonds].forEach(mesh=>mesh.material.color.set(dotStroke.color));
       inversionTime=0; poseInversion(0);
-      message="Die rosa Abbilder wandern zum jeweils gegenüberliegenden Punkt relativ zu B.";draw();
+      message="Die farbigen Abbilder wandern zum jeweils gegenüberliegenden Punkt relativ zu B.";draw();
     }
     function poseInversion(f){
       ghosts.forEach((ghost,i)=>{const p=atoms[i], end=invert(p);
@@ -170,7 +172,7 @@
       const notes = step >= 13 ? ["Drei nicht kollineare F-Atome legen die Molekülebene fest.",
         "Auch B liegt in dieser Ebene. Bei der Spiegelung bleibt jedes Atom an seinem Platz.",
         "Die Molekülebene ist damit die vierte Spiegelebene von BF₃."] : step >= 12 ? ["Punktspiegelung an B: Das zentrale Boratom bleibt an seinem Platz.",
-        "Gegenüber jedem F liegt eine Lücke. Das rosa Drahtmodell deckt sich nicht mit BF₃.",
+        "Gegenüber jedem F liegt eine Lücke. Das Drahtmodell deckt sich nicht mit BF₃.",
         "BF₃ hat deshalb kein Inversionszentrum – trotz seiner Spiegelebenen."] : step >= 10 ? [
         "Markiere B als mögliches Inversionszentrum in der rechten Schrägansicht.",
         "Zu jedem F müsste es auf der Gegenseite im gleichen Abstand ein F geben.",

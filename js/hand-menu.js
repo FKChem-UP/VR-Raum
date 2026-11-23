@@ -281,7 +281,9 @@
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size, plane?.points.length, !!plane?.mesh,
-        plane?.color, plane?.thickness, plane?.opacity, plane?.visible].join("|");
+        plane?.color, plane?.thickness, plane?.opacity, plane?.visible,
+        F.AtomPlane?.active?.root===model ? F.AtomPlane.active.points.length : null,
+        F.AtomPlane?.active?.midpoint, F.AtomPlane?.midpointCount(model)].join("|");
       const modeSignature = signature + "|" + (F.Draw && [F.Draw.mode, F.Draw.color, F.Draw.opacity].join("|")) + "|" + F.Settings.strokeRadius;
       if (modeSignature !== this.signature) {
         this.signature = modeSignature;
@@ -557,6 +559,9 @@
             if (stroke) F.Draw.remove(stroke);
           }, () => F.Draw.clear(model));
         }
+        if(F.AtomPlane?.midpointCount(model)){
+          row([tile("Mittelpunkte entfernen",()=>F.AtomPlane.clearMidpoints(model))],true);
+        }
       } else {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
@@ -590,9 +595,13 @@
         if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
         if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
-          const pending=F.AtomPlane.active?.root===model;
+          const active=F.AtomPlane.active?.root===model ? F.AtomPlane.active : null;
+          const pending=!!active && !active.midpoint;
           display.push({...tile(pending?`${F.AtomPlane.active.points.length}/3 · Abbrechen`:"Ebene aus Punkten",
             ()=>locked?chapter.mirror.startPlane():F.AtomPlane.begin(model),pending,"plane:start"),enabled:true});
+          if(structure && !locked) display.push({kind:"plain",heading:"Mittelpunkt",
+            label:active?.midpoint?`${active.points.length}/2 · Abbrechen`:"Aus zwei Punkten",selected:!!active?.midpoint,
+            action:()=>F.AtomPlane.begin(model,{midpoint:true})});
         }
         row(display);
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
