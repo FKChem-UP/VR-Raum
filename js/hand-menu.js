@@ -591,7 +591,7 @@
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
         if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
           const pending=F.AtomPlane.active?.root===model;
-          display.push({...tile(pending?`${F.AtomPlane.active.points.length}/3 · Abbrechen`:"Ebene aus 3 Atomen",
+          display.push({...tile(pending?`${F.AtomPlane.active.points.length}/3 · Abbrechen`:"Ebene aus Punkten",
             ()=>locked?chapter.mirror.startPlane():F.AtomPlane.begin(model),pending,"plane:start"),enabled:true});
         }
         row(display);

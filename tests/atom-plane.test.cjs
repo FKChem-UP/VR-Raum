@@ -8,7 +8,7 @@ class V {
   multiplyScalar(n){this.x*=n;this.y*=n;this.z*=n;return this;}
   distanceTo(v){return Math.hypot(this.x-v.x,this.y-v.y,this.z-v.z);}
 }
-class Resource {dispose(){this.disposed=true;}}
+class Resource {constructor(...args){this.args=args;} dispose(){this.disposed=true;}}
 class Material extends Resource {constructor(){super();this.color={set:value=>{this.value=value;}};}}
 class Mesh {constructor(geometry,material){Object.assign(this,{geometry,material,userData:{},position:new V(),scale:new V(1,1,1),
   quaternion:{setFromUnitVectors(){}},removeFromParent(){}});}}
@@ -30,6 +30,7 @@ tool.begin(root,{accept:a=>a.element==="F",complete(){finished++;}});
 const a=site(0,0,0), b=site(1,0,0);
 tool.click(site(1,1,0,"B"));tool.click(a);tool.click(a);tool.click(b);tool.click(site(2,0,0));
 assert.equal(tool.get(root).points.length,2);
+assert.equal(tool.get(root).marks[0].geometry.args[0],0.037500000000000006);
 tool.click(site(0,1,0)); const plane=tool.get(root);
 assert.equal(finished,1);assert.equal(tool.active,null);assert.equal(plane.mesh.scale.z,0.004);
 tool.style(plane,{thickness:0.016,opacity:0.6,color:"#ffffff",visible:false});

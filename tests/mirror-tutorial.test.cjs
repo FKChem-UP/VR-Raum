@@ -36,6 +36,9 @@ class Mesh extends Obj {constructor(g,m){super();this.material=m;this.userData={
 class Material extends Obj {constructor(){super();this.color={set(){}};} }
 const T={Group:Obj,Vector3:Vec,Mesh,MeshBasicMaterial:Material,SphereGeometry:Obj,PlaneGeometry:Obj,BoxGeometry:Obj,CylinderGeometry:Obj,CanvasTexture:Obj};
 const ctx=new Proxy({}, {get:(o,k)=>o[k]||(()=>{})});
+const fills=[], texts=[];
+ctx.fill=()=>fills.push(ctx.fillStyle);
+ctx.fillText=text=>texts.push(text);
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../js/mirror-tutorial.js"),"utf8"),{window:{FKCVR:F},AFRAME:{THREE:T},document:{createElement:()=>({getContext:()=>ctx})}});
 let manipBody;
 F.create=(tag,attrs)=>{const entity={object3D:new Obj(),dataset:{},setObject3D(){},setAttribute(){},remove(){}};
@@ -68,9 +71,16 @@ clickTile(900);station.tick(null,false,true,false,true,0.9);assert.equal(station
 station.tick(null,false,true,false,true,0.9);assert.equal(station.step,12);
 station.undo();assert.equal(station.step,13);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
 station.modelMenu();assert.equal(station.step,14);assert.equal(F.Draw.mode,"laser");
-let planeOptions;F.AtomPlane={begin(root,opts){assert.equal(root,station.root);planeOptions=opts;},get(){},clear(){}};
+let planeOptions, record;
+F.AtomPlane={begin(root,opts){assert.equal(root,station.root);planeOptions=opts;},get(){return record;},
+  style(target,change){Object.assign(target,change);},clear(){record=null;}};
 station.startPlane();assert.equal(station.step,15);assert.equal(planeOptions.accept({element:"B"}),false);
-assert.equal(planeOptions.accept({element:"F"}),true);planeOptions.complete();assert.equal(station.step,16);
+assert.equal(planeOptions.accept({element:"F"}),true);
+record={mesh:{},color:"#a840ff",visible:false};planeOptions.complete();assert.equal(station.step,16);
+assert.ok(fills.includes(record.color));assert.ok(texts.includes("Spiegelebene 4 testen"));
+clickTile(900);assert.equal(record.visible,true);
+station.tick(null,false,true,false,true,1.8);
+assert.ok(texts.includes("Deckungsgleich: Alle vier Atome bleiben an ihrem Platz."));
 station.clear();assert.equal(station.step,2);assert.equal(ink.length,0);assert.equal(station.drawingMenu,false);
 paint(0,[0,0],false);line(1);assert.equal(station.step,3,"Nach Zurücksetzen erneut zeichnen und testen");
 station.dispose();

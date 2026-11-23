@@ -35,7 +35,7 @@
       const record={visual,root,accept,complete,points:[],marks:[],mesh:null,color:F.Draw.color,
         thickness:2*F.Settings.strokeRadius,opacity:F.Draw.opacity,visible:true};
       records.set(visual,record);this.active=record;
-      F.setStatus("Ebene: Drei verschiedene Atome auswählen (0/3).");
+      F.setStatus("Ebene: Drei verschiedene Punkte auswählen (0/3).");
     },
     clear(root) {
       const record=this.get(root);if(!record)return;
@@ -55,7 +55,7 @@
       if(r.points.some(p=>p.center.distanceTo(center)<1e-8))return true;
       const pts=[...r.points.map(p=>p.center.toArray()),center.toArray()];
       const n=pts.length===3 ? normal(...pts) : null;
-      if(pts.length===3 && !n){F.setStatus("Die drei Atome liegen auf einer Geraden. Wähle ein anderes drittes Atom.");return true;}
+      if(pts.length===3 && !n){F.setStatus("Die drei Punkte liegen auf einer Geraden. Wähle einen anderen dritten Punkt.");return true;}
       r.points.push({mesh:hit.mesh,center});
       const add=(geometry,material)=>{
         const mesh=new T.Mesh(geometry,material);mesh.raycast=()=>{};mesh.userData.fkcDrawing=true;
@@ -63,10 +63,10 @@
       };
       const scale=r.visual.object3D.getWorldScale(new T.Vector3()).x;
       const atomRadius=hit.mesh.getWorldScale(new T.Vector3()).x;
-      const mark=add(new T.SphereGeometry(Math.max(0.018,atomRadius*1.3)/scale,14,10),
+      const mark=add(new T.SphereGeometry(Math.max(0.003,atomRadius*0.75)/scale,14,10),
         new T.MeshBasicMaterial({color:0xffbb22,wireframe:true,depthTest:false,depthWrite:false,transparent:true}));
       mark.position.copy(center);mark.renderOrder=1080;r.marks.push(mark);
-      if(!n){F.setStatus(`Ebene: ${pts.length}/3 Atome ausgewählt.`);return true;}
+      if(!n){F.setStatus(`Ebene: ${pts.length}/3 Punkte ausgewählt.`);return true;}
       const points=r.points.map(p=>p.center);
       const size=Math.max(points[0].distanceTo(points[1]),points[1].distanceTo(points[2]),points[2].distanceTo(points[0]))*1.5;
       r.mesh=add(new T.BoxGeometry(size,size,1),new T.MeshBasicMaterial({transparent:true,depthWrite:false}));
@@ -74,7 +74,7 @@
       r.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...n));
       r.baseScale=scale;
       for(const m of r.marks){m.removeFromParent();m.geometry.dispose();m.material.dispose();}r.marks=[];
-      this.active=null;this.style(r,{});F.setStatus("Ebene aus drei Atomen erzeugt.");r.complete?.(r);
+      this.active=null;this.style(r,{});F.setStatus("Ebene aus drei Punkten erzeugt.");r.complete?.(r);
       return true;
     },
     style(r, change) {
