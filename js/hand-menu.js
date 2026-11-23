@@ -581,7 +581,8 @@
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
           label: ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
-            "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle"})[variant.cifMode] ||
+            "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle",
+            "co-precursor-molecule": "Komplexkation", "co-precursor-cell": "Zelle", "co-precursor-coordination": "Koordination"})[variant.cifMode] ||
             (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
           kind: "variant", cueId: "variant:" + variant.id, selected: variant.id === model.fkcVariantId, action: () => {
             if (!model.fkcPendingVisual) F.switchVariant(model, variant.id);

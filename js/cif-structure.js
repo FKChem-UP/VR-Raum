@@ -269,6 +269,10 @@
         excludedSites: structure.atoms.filter(atom => !complex.atoms.some(entry => entry.cifLabel === atom.cifLabel)).map(atom => atom.cifLabel)};
     }
     if (mode !== "cell") throw new Error("Unbekannte Co-Ansicht.");
+    return bondedCell(structure, base);
+  }
+
+  function bondedCell(structure, base) {
     const wrap = value => value - Math.floor(value);
     const atoms = [];
     const locate = (label, fractional) => {
@@ -351,6 +355,35 @@
       templates.push({states, bonds});
     }
     return templates;
+  }
+  function createBondedStructure(source, mode, centerElement) {
+    const data = read(source);
+    if (!data.bonds.length || data.bonds.some(bond => Math.abs(bond.reportedDistanceAngstrom - bond.calculatedDistanceAngstrom) > 0.03)) {
+      throw new Error("Die CIF-Bindungen fehlen oder passen nicht zu den Strukturkoordinaten.");
+    }
+    const cell = bondedCell(data, {mode:"cell", name:data.parsed.values._chemical_formula_sum || "CIF-Struktur",
+      cellLengthsAngstrom:data.lengths, cellAnglesDegrees:data.angles, cellMatrix:data.matrix,
+      spaceGroup:{name:data.spaceGroup, number:data.parsed.values._space_group_it_number}, measurePositions:true});
+    if (mode === "cell") return cell;
+    const template = cellComponents(cell).find(part => part.states.some(state => cell.atoms[state.index].element === centerElement));
+    if (!template) throw new Error(`Keine Komponente mit ${centerElement} gefunden.`);
+    const atoms = template.states.map(({index, shift}, i) => {
+      const site = cell.atoms[index];
+      const fractional = site.fractional.map((value, axis) => value + shift[axis]);
+      return {...site, fractional, modelNumber:i+1, positionAngstrom:cartesian(fractional, cell.cellMatrix)};
+    });
+    const center = atoms.findIndex(atom => atom.element === centerElement);
+    const bonds = template.bonds;
+    const neighbors = [...new Set(bonds.flatMap(bond => bond.a === center ? [bond.b] : bond.b === center ? [bond.a] : []))];
+    if (neighbors.length < 4) throw new Error("Keine vollständige Koordinationsumgebung gefunden.");
+    if (mode === "molecule") return {...cell, mode, atoms, bonds, hydrogenContacts:[], polyhedra:[{center,neighbors}]};
+    const indexes = [center,...neighbors];
+    const origin = atoms[center].positionAngstrom;
+    return {...cell, mode, hydrogenContacts:[], polyhedra:[{center:0,neighbors:neighbors.map((_,i)=>i+1)}],
+      atoms:indexes.map((index,i)=>({...atoms[index],modelNumber:i+1,
+        positionAngstrom:atoms[index].positionAngstrom.map((value,axis)=>value-origin[axis])})),
+      bonds:bonds.filter(bond=>bond.a===center || bond.b===center)
+        .map(bond=>({...bond,a:indexes.indexOf(bond.a),b:indexes.indexOf(bond.b)}))};
   }
   function completeCell(cell) {
     const atoms = [];
@@ -436,5 +469,5 @@
     }
     return candidates.sort((a,b) => a.minimumDistanceAngstrom - b.minimumDistanceAngstrom);
   }
-  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, environmentCandidates, completeCell};
+  F.CIFStructure = {parse, numeric, cellMatrix, cartesian, symmetryPoint, read, reconstructCoHeavy, createCoStructure, createBondedStructure, environmentCandidates, completeCell};
 })(window.FKCVR = window.FKCVR || {});

@@ -52,11 +52,26 @@ for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
     const file = path.basename(s.model);
     referenced.push(file);
     assert.match(s.info, /^Quelle:/);
-    const structure = F.CIF.createStructure(fs.readFileSync(path.join(root,s.model), "utf8"), s.cifMode);
+    const source = fs.readFileSync(path.join(root,s.model), "utf8");
+    const structure = F.CIF.createStructure(source, s.variants?.find(v => v.cifMode.endsWith("-cell"))?.cifMode || s.cifMode);
     assert.equal(structure.atoms.length, counts[file.replace(/\.cif$/, "").replaceAll("-", "_")], file);
     assert.ok(structure.measurePositions);
     assert.ok(structure.atoms.every(atom => F.CIF.elements[atom.element] && atom.positionAngstrom.every(Number.isFinite)),file);
   }
+}
+const precursor = teamB.stations[0];
+const educt = fs.readFileSync(path.join(root, precursor.model), "utf8");
+const views = precursor.variants.map(v => F.CIF.createStructure(educt, v.cifMode));
+const [complex, cell, coordination] = views;
+assert.deepEqual(Array.from(views,v=>[v.atoms.length,v.bonds.length]), [[37,40],[156,160],[7,6]]);
+assert.deepEqual(Array.from(coordination.atoms, a=>a.element).sort(), ["Co","N","N","O","O","O","O"]);
+assert.equal(coordination.polyhedra[0].neighbors.length,6);
+assert.ok(complex.atoms.every(atom=>atom.element!=="Cl"));
+assert.equal(cell.atoms.filter(atom=>atom.element==="Cl").length,8);
+assert.equal(cell.hydrogenContacts.length,32);
+for(const view of [complex,coordination]) for(const bond of view.bonds){
+  const a=view.atoms[bond.a].positionAngstrom,b=view.atoms[bond.b].positionAngstrom;
+  assert.ok(Math.abs(Math.hypot(...a.map((v,i)=>v-b[i]))-bond.distanceAngstrom)<1e-7);
 }
 assert.deepEqual(referenced.sort(), fs.readdirSync(path.join(root,"assets/praktikum")).filter(file=>file.endsWith(".cif")).sort());
 const exhibit = F.welcomeRoom.exhibits.find(entry => entry.roomId === "team-b");

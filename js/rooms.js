@@ -362,6 +362,11 @@
     title, model: "assets/praktikum/" + file, cifMode,
     info: `Quelle: ${source}.\n${note || "CIF-Zellpositionen mit Zellrahmen; keine automatisch ergänzten Bindungen. Messungen beziehen sich auf die ausgewählten angezeigten Positionen."}`
   });
+  const coPrecursor = practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15",
+    "co-precursor-molecule", "Die Komplexansicht zeigt das einkernige Kation. Am Co koordinieren zwei N- und zwei O-Atome der Pyridinmethanol-Liganden sowie zwei O-Atome aus gebundenem Wasser. Die Chlorid-Gegenionen und die CIF-Wasserstoffbrücken sind in der Elementarzelle sichtbar.");
+  coPrecursor.variantAlignment = "individual";
+  coPrecursor.variants = [["molecule", "Komplexkation"], ["cell", "Elementarzelle"], ["coordination", "Co-Koordination"]]
+    .map(([mode, title]) => ({id:"co-precursor-"+mode, title, model:coPrecursor.model, cifMode:"co-precursor-"+mode}));
 
   practicalStations("team-a", [
     ["Benzil", "#41628f", "#c3d9f8", [
@@ -380,7 +385,7 @@
   ]);
   practicalStations("team-b", [
     ["Co-Einkristalltransformation", "#654c99", "#d9c8f3", [
-      practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15"),
+      coPrecursor,
       {...coModel, title: "Verbindung 2 · Produkt", info: "Quelle: Praktikumsdatensatz P3_14.\n" + coModel.info},
       {title: "Verbindung 3 · reserviert"}, {title: "Verbindung 4 · reserviert"}]],
     ["Cobaltferrit", "#974339", "#efbbb0", [practicalCif("Cobaltferrit", "CoFe2O4.cif", "ICSD 33181", undefined,
