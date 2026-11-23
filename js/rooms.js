@@ -365,12 +365,21 @@
   const views = (record, entries) => ({...record, cifMode:entries[0][0], variantAlignment:"individual",
     variants:entries.map(([cifMode,title],i)=>({id:`view-${i+1}`,title,model:record.model,cifMode}))});
   const shell = (center,ligand,cutoff,count,label="") => `cif-view:shell:${center}:${ligand}:${cutoff}:${count}:${label}`;
-  const molecular = record => views({...record,info:record.info.split("\n")[0]+"\nBindungen geometrisch aus kovalenten Radien abgeleitet. Packung zeigt vollständige Randmoleküle."}, [
-    ["cif-view:molecule","Molekül"],["cif-view:molecular-cell","Elementarzelle"],["cif-view:packing","Packung"]]);
-  const lattice = (record, extras=[]) => views(record,[["cif-view:sites","Elementarzelle"],["cif-view:closed","Zelle mit Rändern"],...extras]);
+  const molecular = record => views({...record,info:record.info.split("\n")[0]+"\nBindungen geometrisch aus kovalenten Radien abgeleitet. 'Elementarzelle erweitern' ergänzt vollständige Randmoleküle. Gestrichelte H-Brücken sind geometrische Kandidaten."}, [
+    ["cif-view:molecule","Molekül"],["cif-view:molecular-cell","Elementarzelle"],["cif-view:independent","Unabhängige Moleküle"]]);
+  const lattice = (record, extras=[], rules="") => {
+    const mode = view => rules ? `cif-network:${view}:${rules}` : `cif-view:${view}`;
+    return views(record,[[mode("closed"),"Elementarzelle"],[mode("asu"),"Asymmetrische Einheit"],
+      ...extras.map(([id,title])=>[rules && id.startsWith("cif-view:shell:") ? `${mode("shell")}:${id.slice(15)}` : id,title])]);
+  };
   const cuprate = (record,tetragonal=false) => lattice(record,[
     [shell("Cu","O",2.4,tetragonal?2:4,"Cu1"),tetragonal?"Cu1 · O₂":"Cu1 · O₄"],
-    [shell("Cu","O",2.6,5,"Cu2"),"Cu2 · O₅"]]);
+    [shell("Cu","O",2.6,5,"Cu2"),"Cu2 · O₅"],[shell("Y","O",2.65,8),"Y · O₈"],
+    [shell("Ba","O",3.15,tetragonal?8:10),tetragonal?"Ba · O₈":"Ba · O₁₀"],
+    ["cif-network:polyhedra:Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15","Zelle · Polyeder"]],
+    "Cu/O/2.4/Cu1,Cu/O/2.6/Cu2,Y/O/2.65,Ba/O/3.15");
+  const copperExcerpt = (record, kind) => views(record,[[`cif-excerpt:${kind}:all`,"CIF-Ausschnitt"],
+    [`cif-excerpt:${kind}:focus`,"Cu-Knoten · Umgebung"]]);
   const coPrecursor = practicalCif("Verbindung 1 · Edukt", "Verbindung1_cis-Co-Edukt.cif", "Praktikumsdatensatz P3_15",
     "co-precursor-molecule", "Die Komplexansicht zeigt das einkernige Kation. Am Co koordinieren zwei N- und zwei O-Atome der Pyridinmethanol-Liganden sowie zwei O-Atome aus gebundenem Wasser. Die Chlorid-Gegenionen und die CIF-Wasserstoffbrücken sind in der Elementarzelle sichtbar.");
   coPrecursor.variantAlignment = "individual";
@@ -382,10 +391,12 @@
       molecular(practicalCif("Benzil · monoklin", "BENZIL03_monoklin.cif", "CSD BENZIL03")),
       molecular(practicalCif("Benzil · trigonal", "BENZIL04_trigonal.cif", "CSD BENZIL04"))]],
     ["HKUST-1", "#15766f", "#a8e3d3", [
-      practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
-      practicalCif("HKUST-1 · Referenzausschnitt", "HKUST-1_ohneH.cif", "CSD FIQCEN", "practical-sites", "Explizit exportierte Positionen, keine weitere Symmetrieexpansion; keine vollständige Pore oder Zelle zugesichert."),
-      practicalCif("Nebenprodukt VUXBUL · Ausschnitt", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL", "practical-sites",
-        "Explizit exportierte Positionen. Eine vollständige Zellbelegung aus diesem Export ist noch nicht verifiziert.")]],
+      copperExcerpt(practicalCif("HKUST-1 · mit Wasser (Ausschnitt)", "HKUST-1_mitH.cif", "CSD KAZWER", undefined,
+        "Cu₂-Schaufelrad: vier Carboxylat-O, ein axiales Wasser-O und das zweite Cu, soweit im Export vorhanden. Umgebung wächst nur innerhalb des Ausschnitts."),"hkust"),
+      copperExcerpt(practicalCif("HKUST-1 · Referenzausschnitt", "HKUST-1_ohneH.cif", "CSD FIQCEN", undefined,
+        "Cu–Cu-Kontakt und Cu–O-Koordination aus den exportierten Positionen. Umgebung wächst nur innerhalb des Ausschnitts."),"hkust"),
+      copperExcerpt(practicalCif("Nebenprodukt VUXBUL · Ausschnitt", "Nebenprodukt_VUXBUL.cif", "CSD VUXBUL", undefined,
+        "Cu–O- und Ligandenbindungen aus den exportierten Positionen. Umgebung wächst nur innerhalb des Ausschnitts."),"vuxbul")]],
     ["Supraleiter YBa₂Cu₃O₇₋ₓ", "#9d493b", "#f6c7b9", [
       cuprate(practicalCif("YBa₂Cu₃O₇", "YBa2Cu3O7_2016.cif", "ICSD 196264")),
       cuprate(practicalCif("YBa₂Cu₃O₆.₉₁", "YBa2Cu3O7_2026.cif", "ICSD 229409")),
@@ -403,14 +414,14 @@
       {title: "Verbindung 3 · reserviert"}, {title: "Verbindung 4 · reserviert"}]],
     ["Cobaltferrit", "#974339", "#efbbb0", [lattice(practicalCif("Cobaltferrit", "CoFe2O4.cif", "ICSD 33181", undefined,
       "Co und Fe teilen sich kristallographische Plätze. Das Label zeigt die mittlere Besetzung, nicht zwei gleichzeitig vorhandene Ionen."),[
-      [shell("Co","O",2.0,4,"Co1"),"Tetraederplatz"],[shell("Co","O",2.2,6,"Co2"),"Oktaederplatz"]])]],
+      [shell("Co","O",2.0,4,"Co1"),"Tetraederplatz"],[shell("Co","O",2.2,6,"Co2"),"Oktaederplatz"]],"Co/O/2.2")]],
     ["Nicotinamid", "#206c80", "#b7dfec", [molecular(practicalCif("Nicotinamid", "Nikotinsaeureamid_NICOAM05.cif", "CSD NICOAM05"))]],
     ["Thermochromie · Ag₂[HgI₄]", "#a65913", "#ffdbad", [
       lattice(practicalCif("Ag₂[HgI₄] · Tieftemperaturform", "AgHgI4-Tieftemperaturform.cif", "ICSD 30264"),[
-        [shell("Hg","I",3,4),"HgI₄-Nachbarschaft"],[shell("Ag","I",3,4),"AgI₄-Nachbarschaft"]]),
+        [shell("Hg","I",3,4),"HgI₄-Nachbarschaft"],[shell("Ag","I",3,4),"AgI₄-Nachbarschaft"]],"Hg/I/3,Ag/I/3"),
       lattice(practicalCif("Ag₂[HgI₄] · Hochtemperaturform", "AgHgI4-Hochtemperaturform.cif", "ICSD 38178", undefined,
         "Ag und Hg teilen sich mittlere Gitterplätze. Die Labels zeigen die statistischen Anteile; die Restbesetzung ist leer."),[
-        [shell("Hg","I",2.9,4,"Hg1"),"Mischplatz · I₄"]])]],
+        [shell("Hg","I",2.9,4,"Hg1"),"Mischplatz · I₄"]],"Hg/I/2.9")]],
     ["Vanillin", "#48763e", "#cceab8", [molecular(practicalCif("Vanillin", "Vanillin_YUHTEA.cif", "CSD YUHTEA"))]]
   ]);
   Object.assign(F.welcomeRoom.exhibits.find(exhibit => exhibit.roomId === "team-b"), coModel,
@@ -484,10 +495,11 @@
   const fulleren = v1.stations[2];
   welcome("vorlesung-1", {...fulleren, model:fulleren.variants[1].model,cifMode:"molecule",variants:fulleren.variants.slice(1),
     info:"C₆₀ aus CIF: Einzelmolekül und periodische Elementarzelle mit 240 C-Positionen. Die beiden Ansichten sind separat normalisiert."});
-  welcome("vorlesung-2", molecular({model:"assets/structures/H2O.cif", info:"Quelle: H2O.cif · Eis. Molekül, Zellbelegung und Packung; Wasserstoffbrücken werden hier nicht automatisch ergänzt."}));
+  welcome("vorlesung-2", views({model:"assets/structures/H2O.cif", info:"Quelle: H2O.cif · Eis. Gestrichelte Linien zeigen geometrisch abgeleitete mögliche Wasserstoffbrücken. Die 2×2-Zelle vergrößert den Blick entlang der Basalebene."},[
+    ["cif-view:ice-cell","Elementarzelle"],["cif-view:ice-supercell","2×2-Zellen"],["cif-view:molecule","Wassermolekül"]]));
   welcome("vorlesung-3", room("team-a").zones[2].models[1]);
   welcome("vorlesung-6", lattice({model:"assets/structures/Cu.cif", info:"Quelle: Cu.cif · kubisch dichteste Packung. Die zwölf Stäbe der Koordinationsansicht markieren nächste Nachbarn, keine kovalenten Bindungen."},
-    [[shell("Cu","Cu",2.8,12),"12 nächste Nachbarn"]]));
+    [[shell("Cu","Cu",2.8,12),"12 nächste Nachbarn"],["cif-network:packing:Cu/Cu/2.8","Dichteste Packung"]],"Cu/Cu/2.8"));
   welcome("vorlesung-8", molecular({model:"assets/structures/S8.cif",info:"Quelle: S8.cif · elementarer Schwefel."}));
   welcome("team-a", room("team-a").zones[1].models[0]);
 

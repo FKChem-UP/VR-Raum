@@ -2353,39 +2353,10 @@
       }
     }, parent);
 
-    box(
-      door, 0, 1.45, 0,
-      2.35, 2.9, 0.12, "#795238"
-    );
-
-    [-0.58, 0.58].forEach(x => {
-      [0.73, 2.08].forEach(y => {
-        box(
-          door, x, y, 0.073,
-          0.91, 1.06, 0.035, "#684530"
-        );
-
-        gold(
-          door, x, y - 0.54, 0.098,
-          0.96, 0.025, 0.018
-        );
-
-        gold(
-          door, x, y + 0.54, 0.098,
-          0.96, 0.025, 0.018
-        );
-
-        gold(
-          door, x - 0.47, y, 0.098,
-          0.025, 1.08, 0.018
-        );
-
-        gold(
-          door, x + 0.47, y, 0.098,
-          0.025, 1.08, 0.018
-        );
-      });
-    });
+    box(door, 0, 1.45, 0, 2.35, 2.9, 0.12, "#fcfcfa");
+    for (const y of [0.45, 2.45]) box(door, -1.16, y, 0.078, 0.075, 0.18, 0.06, "#687572");
+    box(door, 0.94, 1.38, 0.10, 0.075, 0.22, 0.065, "#687572");
+    box(door, 0.84, 1.43, 0.155, 0.24, 0.05, 0.085, "#687572");
 
     [-1.27, 1.27].forEach(x => {
       box(
@@ -2415,10 +2386,10 @@
      */
     panel(
       door,
-      {x: 0, y: 1.75, z: 0.17},
+      {x: 0, y: 1.95, z: 0.075},
       "0 0 0",
-      1.8,
-      1.8 * 9 / 16,
+      0.96,
+      0.54,
       textBoard([
         "Zurück",
         "zum Begrüßungsraum"
@@ -2656,10 +2627,17 @@
       const width = zone.x1 - zone.x0, depth = zone.z1 - zone.z0;
       box(parent, x, -0.08, z, width, 0.16, depth, zone.tint, flat);
       box(parent, x, c.height + 0.08, z, width, 0.16, depth, zone.tint, flat);
-      const wallX = side => box(parent, side * (c.width / 2 + 0.08), c.height / 2, z,
-        0.16, c.height, depth, zone.tint, flat);
-      const wallZ = side => box(parent, x, c.height / 2, side * (c.depth / 2 + 0.08),
-        width, c.height, 0.16, zone.tint, flat);
+      const wallX = side => {
+        box(parent, side * (c.width / 2 + 0.08), c.height / 2, z,0.16,c.height,depth,zone.tint,flat);
+        for(const y of [0.055,c.height-0.055])box(parent,side*(c.width/2-0.025),y,z,0.05,0.11,depth,zone.accent,flat);
+      };
+      const wallZ = side => {
+        box(parent,x,c.height/2,side*(c.depth/2+0.08),width,c.height,0.16,zone.tint,flat);
+        for(const y of [0.055,c.height-0.055])box(parent,x,y,side*(c.depth/2-0.025),width,0.11,0.05,zone.accent,flat);
+        for(const edge of [zone.x0,zone.x1].filter(v=>Math.abs(v)===c.width/2)){
+          box(parent,edge-Math.sign(edge)*0.028,c.height/2,side*(c.depth/2-0.028),0.057,c.height,0.057,zone.accent,flat);
+        }
+      };
       if (zone.x0 === -c.width / 2) wallX(-1);
       if (zone.x1 === c.width / 2) wallX(1);
       if (zone.z0 === -c.depth / 2) wallZ(-1);

@@ -36,7 +36,8 @@
           positionAngstrom: cartesian(fractional, matrix)});
       }
     }
-    return {kind: "positions", name: "CIF-Zellpositionen", mode: "cell", atoms, bonds: [], bondSegments: [],
+    const operations = symmetry?.rows.map(row=>row._symmetry_equiv_pos_as_xyz || row._space_group_symop_operation_xyz) || [];
+    return {kind: "positions", name: "CIF-Zellpositionen", mode: "cell", atoms, bonds: [], bondSegments: [], operations,
       cellAtomCount: atoms.length, cellMatrix: matrix, cellLengthsAngstrom: lengths, cellAnglesDegrees: angles,
       spaceGroup: {name: values["_space_group_name_h-m_alt"] || values["_symmetry_space_group_name_h-m"] || "Nicht angegeben",
         number: values._space_group_it_number || values._symmetry_int_tables_number || ""}};
@@ -49,7 +50,7 @@
       return xs.flatMap(x => ys.flatMap(y => zs.map(z => {
         const cellShift = [x, y, z];
         const fractional = atom.fractional.map((value, axis) => value + cellShift[axis]);
-        return {...atom, id: imageId(atom, cellShift), siteIndex, cellShift, fractional,
+      return {...atom, id: imageId(atom, cellShift), sourceSiteId:atom.id, siteIndex, cellShift, fractional,
           cellWeight: 1 / (xs.length * ys.length * zs.length),
           positionAngstrom: F.CIFStructure.cartesian(fractional, cell.cellMatrix)};
       })));
@@ -57,7 +58,7 @@
   }
 
   // Strukturregeln liefern die Kanten; die Suche kennt keine Elementsymbole.
-  function expandContacts(cell, contacts, seeds, depth, origin = [0, 0, 0]) {
+  function expandContacts(cell, contacts, seeds, depth, origin = [0, 0, 0], limit = 256) {
     const adjacency = cell.atoms.map(() => []);
     for (const bond of contacts) {
       adjacency[bond.a].push({site: bond.b, shift: bond.cellShift, bond});
@@ -75,7 +76,7 @@
           const cellShift = current.cellShift.map((value, axis) => value + edge.shift[axis]);
           const id = imageId(base, cellShift);
           if (indices.has(id)) continue;
-          if (atoms.length >= 256) throw new Error("Zu viele Positionen für die Kontakterweiterung.");
+          if (atoms.length >= limit) throw new Error("Zu viele Positionen für die Kontakterweiterung.");
           const fractional = base.fractional.map((value, axis) => value + cellShift[axis]);
           const positionAngstrom = F.CIFStructure.cartesian(fractional.map((value, axis) => value - origin[axis]), cell.cellMatrix);
           indices.set(id, atoms.length);
@@ -109,6 +110,45 @@
     return found.sort((a,b)=>a.distanceAngstrom-b.distanceAngstrom);
   }
 
+  function network(cell, rules) {
+    const edges = new Map();
+    cell.atoms.forEach((atom, a) => {
+      for (const [center, ligand, cutoff, label] of rules) {
+        if (atom.element !== center || (label && atom.cifLabel !== label)) continue;
+        for (const edge of neighbors(cell,a,cutoff,site=>site.element===ligand)) {
+          const forward = `${a}:${edge.b}:${edge.cellShift.join(",")}`;
+          const reverse = `${edge.b}:${a}:${edge.cellShift.map(n=>-n).join(",")}`;
+          const id = [forward,reverse].sort()[0];
+          if (!edges.has(id)) edges.set(id,{...edge,id});
+        }
+      }
+    });
+    return {...cell,bonds:[...edges.values()]};
+  }
+
+  function expandable(base, cell, origin = [0,0,0]) {
+    if (!cell.bonds.length) return base;
+    const atoms = base.atoms.map(atom=>{
+      const siteIndex = cell.atoms.findIndex(site=>site.id===(atom.sourceSiteId || atom.id));
+      if(siteIndex<0)throw new Error("Basisplatz für die Kontakterweiterung fehlt.");
+      return {...atom,siteIndex,cellShift:atom.cellShift || [0,0,0]};
+    });
+    return {...base,atoms,contactExpansion:{cell,bonds:cell.bonds,origin,limit:600},contactDepth:0};
+  }
+
+  function excerpt(cell, copperPair) {
+    const radii={H:0.31,C:0.76,O:0.66};
+    const bonds=[];
+    cell.atoms.forEach((a,i)=>cell.atoms.slice(i+1).forEach((b,j)=>{
+      const pair=[a.element,b.element].sort().join(":");
+      const cutoff=pair==="Cu:Cu" ? (copperPair ? 2.8 : 0) : pair==="Cu:O" ? 2.4 :
+        radii[a.element] && radii[b.element] && pair!=="H:H" ? radii[a.element]+radii[b.element]+0.22 : 0;
+      const distanceAngstrom=Math.hypot(...a.positionAngstrom.map((n,k)=>n-b.positionAngstrom[k]));
+      if(distanceAngstrom>0.55 && distanceAngstrom<=cutoff) bonds.push({id:`excerpt-${i}-${i+j+1}`,a:i,b:i+j+1,cellShift:[0,0,0],distanceAngstrom});
+    }));
+    return {...cell,mode:"sites",bonds,measurePositions:true};
+  }
+
   function molecularCell(cell) {
     const radii = {H:0.31,C:0.76,N:0.71,O:0.66,S:1.05};
     if (cell.atoms.some(a=>!(a.element in radii) || a.occupancy !== 1)) throw new Error("Geometrische Molekülrekonstruktion nicht für diese Besetzung oder Elemente verfügbar.");
@@ -122,16 +162,79 @@
       .filter(bond=>bond.b>a && bond.distanceAngstrom <= radii[atom.element]+radii[cell.atoms[bond.b].element]+0.22)
       .map(bond=>({...bond,id:`bond-${a}-${bond.b}-${bond.cellShift.join("_")}`})));
     if (!bonds.length) throw new Error("Keine geometrisch plausiblen Molekülbindungen gefunden.");
-    return {...cell,bonds,measurePositions:true};
+    const donors=new Map(), protonated=new Set();
+    for(const bond of bonds) {
+      const {a,b,deltaFractional:delta}=bond;
+      const h=atoms[a].element==="H"?a:atoms[b].element==="H"?b:-1;
+      if(h<0)continue;
+      const d=h===a?b:a;
+      if(!["N","O"].includes(atoms[d].element))continue;
+      protonated.add(d);
+      if(!donors.has(h))donors.set(h,{d,vector:F.CIFStructure.cartesian(h===a?delta:delta.map(n=>-n),cell.cellMatrix)});
+    }
+    const hydrogenContacts=[];
+    for(const [h,{d,vector}] of donors) {
+      for(const edge of neighbors(cell,h,2.6,atom=>["N","O"].includes(atom.element))) {
+        if(edge.distanceAngstrom<1.4 || (atoms[edge.b].element==="N" && protonated.has(edge.b)))continue;
+        const direction=F.CIFStructure.cartesian(edge.deltaFractional,cell.cellMatrix);
+        const cosine=vector.reduce((sum,v,i)=>sum+v*direction[i],0)/(Math.hypot(...vector)*edge.distanceAngstrom);
+        if(cosine> -0.5 || Math.hypot(...direction.map((n,i)=>n-vector[i]))>3.5)continue;
+        hydrogenContacts.push({...edge,donorLabel:atoms[d].cifLabel, hydrogenLabel:atoms[h].cifLabel,
+          acceptorLabel:atoms[edge.b].cifLabel,inferred:true});
+      }
+    }
+    return {...cell,bonds,hydrogenContacts,measurePositions:true};
   }
 
   function molecule(cell) {
     const template = F.CIFStructure.cellComponents(cell).sort((a,b)=>b.states.length-a.states.length)[0];
-    return {...cell, mode:"molecule", bonds:template.bonds, atoms:template.states.map(({index,shift},i)=>{
+    return {...cell, mode:"molecule", environmentCell:cell,originAngstrom:[0,0,0],hydrogenContacts:[],bonds:template.bonds, atoms:template.states.map(({index,shift},i)=>{
       const site=cell.atoms[index];
       const fractional=site.fractional.map((v,j)=>v+shift[j]);
       return {...site,fractional,modelNumber:i+1,positionAngstrom:F.CIFStructure.cartesian(fractional,cell.cellMatrix)};
     })};
+  }
+
+  function independentMolecules(cell) {
+    const seen = new Set(), atoms=[], bonds=[];
+    for(const part of F.CIFStructure.cellComponents(cell)){
+      const sites=part.states.map(({index,shift})=>{
+        const atom=cell.atoms[index], fractional=atom.fractional.map((v,i)=>v+shift[i]);
+        return {...atom,fractional,positionAngstrom:F.CIFStructure.cartesian(fractional,cell.cellMatrix)};
+      });
+      const signatures=cell.operations.map(operation=>sites.map(atom=>atom.element+":"+
+        F.CIFStructure.symmetryPoint(atom.fractional,operation).map(v=>((Math.round(v*1e6)%1e6+1e6)%1e6)).join(",")).sort().join(";")).sort();
+      const key=signatures[0];
+      if(seen.has(key))continue;
+      seen.add(key);
+      const offset=atoms.length;
+      atoms.push(...sites.map((atom,i)=>({...atom,modelNumber:offset+i+1})));
+      bonds.push(...part.bonds.map(b=>({...b,a:b.a+offset,b:b.b+offset})));
+    }
+    return {...cell,mode:"molecule",atoms,bonds,hydrogenContacts:[],environmentCell:cell,originAngstrom:[0,0,0],independentCount:seen.size};
+  }
+
+  function supercell(cell, repeats) {
+    const atoms=[], copies=new Map();
+    const key=(site,shift)=>`${site}:${shift.join(",")}`;
+    for(let x=0;x<repeats[0];x++)for(let y=0;y<repeats[1];y++)for(let z=0;z<repeats[2];z++){
+      cell.atoms.forEach((atom,i)=>{
+        const shift=[x,y,z], fractional=atom.fractional.map((v,a)=>v+shift[a]);
+        copies.set(key(i,shift),atoms.length);
+        atoms.push({...atom,id:imageId(atom,shift),cellShift:shift,siteIndex:i,modelNumber:atoms.length+1,
+          fractional:fractional.map((v,a)=>v/repeats[a]),positionAngstrom:F.CIFStructure.cartesian(fractional,cell.cellMatrix)});
+      });
+    }
+    const copyEdges=edges=>edges.flatMap(edge=>atoms.flatMap((atom,a)=>{
+      if(atom.siteIndex!==edge.a)return [];
+      const shift=edge.deltaFractional.map((v,i)=>Math.round(v+cell.atoms[edge.a].fractional[i]-cell.atoms[edge.b].fractional[i])+atom.cellShift[i]);
+      const b=copies.get(key(edge.b,shift));
+      return b===undefined ? [] : [{...edge,a,b,id:`${edge.id || "contact"}:${a}:${b}`,
+        deltaFractional:edge.deltaFractional.map((v,i)=>v/repeats[i])}];
+    }));
+    return {...cell,mode:"cell-complete",atoms,bonds:copyEdges(cell.bonds),hydrogenContacts:copyEdges(cell.hydrogenContacts),
+      cellAtomCount:atoms.length,cellMatrix:cell.cellMatrix.map((v,i)=>v.map(n=>n*repeats[i])),
+      cellLengthsAngstrom:cell.cellLengthsAngstrom.map((v,i)=>v*repeats[i]),showHydrogenByDefault:true};
   }
 
   function coordination(cell, centerElement, ligandElement, cutoff, count, centerLabel) {
@@ -140,8 +243,8 @@
     const contacts=neighbors(cell,center,cutoff,a=>a.element===ligandElement);
     if(contacts.length!==count) throw new Error("Erwartete Koordinationsschale nicht vollständig.");
     const origin=cell.atoms[center];
-    const atoms=[{...origin, id:"center",modelNumber:1,positionAngstrom:[0,0,0]}, ...contacts.map((edge,i)=>({
-      ...cell.atoms[edge.b],id:imageId(cell.atoms[edge.b],edge.cellShift),modelNumber:i+2,
+    const atoms=[{...origin, id:"center",sourceSiteId:origin.id,modelNumber:1,positionAngstrom:[0,0,0]}, ...contacts.map((edge,i)=>({
+      ...cell.atoms[edge.b],sourceSiteId:cell.atoms[edge.b].id,cellShift:edge.cellShift,id:imageId(cell.atoms[edge.b],edge.cellShift),modelNumber:i+2,
       positionAngstrom:F.CIFStructure.cartesian(edge.deltaFractional,cell.cellMatrix)
     }))];
     const indexes = contacts.map((_,i)=>i+1);
@@ -180,5 +283,5 @@
     return {...cell,atoms,cellAtomCount:atoms.length,measurePositions:true};
   }
 
-  F.StructureCell = {read, imageId, closedImages, expandContacts, molecularCell, molecule, coordination, occupiedSites};
+  F.StructureCell = {read, imageId, closedImages, expandContacts, network, expandable, excerpt, molecularCell, molecule, independentMolecules, supercell, coordination, occupiedSites};
 })(window.FKCVR);

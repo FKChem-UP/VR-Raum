@@ -580,7 +580,7 @@
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
-          label: variant.cifMode?.startsWith("cif-view:") ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
+          label: /^cif-(view|network|excerpt):/.test(variant.cifMode) ? variant.title : ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
             "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle",
             "co-precursor-molecule": "Komplexkation", "co-precursor-cell": "Zelle", "co-precursor-coordination": "Koordination"})[variant.cifMode] ||
             (/\.glb$/i.test(variant.model || "") ? "GLB" : "Molekül"),
@@ -621,13 +621,14 @@
             action:()=>F.AtomPlane.begin(model,{midpoint:true})});
         }
         row(display);
-        if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
-          button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
+        if (structure && ["cell", "cell-complete"].includes(structure.mode) && (structure.canComplete || structure.name?.startsWith("Co-Produkt1"))) {
+          button(structure.mode === "cell-complete" ? "Elementarzelle normal" : "Elementarzelle erweitern",
             () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");
         }
         if (structure && structure.hydrogenContacts && structure.hydrogenContacts.length) {
           const enabled = !!model.fkcShowHydrogenContacts;
-          button("H-Brücken: " + (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
+          button((structure.hydrogenContacts.some(contact=>contact.inferred) ? "Mögliche H-Brücken: " : "H-Brücken: ") +
+            (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
             () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }
         const hasPlane = !!F.AtomPlane?.get(model)?.normalAngstrom;
@@ -648,7 +649,7 @@
           text(`Kontaktschalen · ${depth} von ${F.CIF.maxContactDepth} zusätzlich`);
           row([{label: "− Weniger", change: -1}, {label: "+ Mehr", change: 1}].map(({label, change}) => ({
             label, kind: "plain", action: () => F.CIF.setContactDepth(model, depth + change)
-          })));
+          })),true);
         }
         if (locked || structure && structure.environmentCell) {
           const state = locked ? {selected:[],enabled:false} : F.CIF.environmentState(model);
@@ -659,13 +660,17 @@
             action: () => F.CIF.setEnvironment(model, radius !== null, radius === null ? undefined : radius)})));
           button("Ergänzungen zurücksetzen", () => F.CIF.resetEnvironment(model));
         }
-        text(structure?.atoms.some(atom=>atom.siteOccupants) ? "Legende · Mischplatz (M): Anteile am Label" : "Legende: Atomsorten");
+        text(structure?.atoms.some(atom=>atom.siteOccupants) ? "Mischplatz: zwei Farben, Anteile am Label" : "Legende: Atomsorten");
         if (structure) {
           const colors = new Map();
           const visual = model.querySelector(".model-visual");
           visual.object3D.traverse(mesh => {
             const atom = mesh.userData && mesh.userData.fkcAtom;
-            const symbol = atom?.siteOccupants ? "M" : atom?.element;
+            if(atom?.siteOccupants){
+              atom.siteOccupants.forEach(site=>colors.set(site.element,F.CIF.elements[site.element].color));
+              return;
+            }
+            const symbol = atom?.element;
             if (symbol && !colors.has(symbol)) {
               const labels = this.el.components["fkc-atom-labels"];
               const material = labels && labels.active && labels.active.mesh === mesh

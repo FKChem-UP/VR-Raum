@@ -230,7 +230,7 @@
       const scene = this.el;
       const camera = scene.camera;
       if (camera) this.updateExtraLabels(camera);
-      if (!camera || (F.Menu && F.Menu.opened)) { this.clear(); return; }
+      if (!camera || F.Draw?.mode === "paint" || (F.Menu && F.Menu.opened)) { this.clear(); return; }
       let target = null;
       const xr = scene.renderer && scene.renderer.xr;
       if (scene.is("vr-mode") || (xr && xr.getSession())) {

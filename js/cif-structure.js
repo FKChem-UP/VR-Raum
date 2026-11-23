@@ -362,7 +362,7 @@
     if (!data.bonds.length || data.bonds.some(bond => Math.abs(bond.reportedDistanceAngstrom - bond.calculatedDistanceAngstrom) > 0.03)) {
       throw new Error("Die CIF-Bindungen fehlen oder passen nicht zu den Strukturkoordinaten.");
     }
-    const cell = bondedCell(data, {mode:"cell", name:data.parsed.values._chemical_formula_sum || "CIF-Struktur",
+    const cell = bondedCell(data, {mode:"cell",canComplete:true, name:data.parsed.values._chemical_formula_sum || "CIF-Struktur",
       cellLengthsAngstrom:data.lengths, cellAnglesDegrees:data.angles, cellMatrix:data.matrix,
       spaceGroup:{name:data.spaceGroup, number:data.parsed.values._space_group_it_number}, measurePositions:true});
     if (mode === "cell") return cell;
@@ -377,7 +377,8 @@
     const bonds = template.bonds;
     const neighbors = [...new Set(bonds.flatMap(bond => bond.a === center ? [bond.b] : bond.b === center ? [bond.a] : []))];
     if (neighbors.length < 4) throw new Error("Keine vollständige Koordinationsumgebung gefunden.");
-    if (mode === "molecule") return {...cell, mode, atoms, bonds, hydrogenContacts:[], polyhedra:[{center,neighbors}]};
+    if (mode === "molecule") return {...cell, mode, atoms, bonds, hydrogenContacts:[], environmentCell:cell,
+      originAngstrom:[0,0,0],polyhedra:[{center,neighbors}]};
     const indexes = [center,...neighbors];
     const origin = atoms[center].positionAngstrom;
     return {...cell, mode, hydrogenContacts:[], polyhedra:[{center:0,neighbors:neighbors.map((_,i)=>i+1)}],
@@ -424,7 +425,7 @@
   }
   function environmentCandidates(base, radius) {
     if (!base.environmentCell || base.mode !== "molecule" || ![1.5, 2, 2.5, 3, 4, 5].includes(radius)) {
-      throw new Error("Umgebung nur für Co-Komplex und unterstützte Reichweiten verfügbar.");
+      throw new Error("Umgebung nur für vollständige Molekülansichten und unterstützte Reichweiten verfügbar.");
     }
     const cell = base.environmentCell;
     const templates = cellComponents(cell);

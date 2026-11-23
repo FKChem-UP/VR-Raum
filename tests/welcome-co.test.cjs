@@ -53,8 +53,9 @@ for (const [id, prefix, count] of [["team-a", "A", 4], ["team-b", "B", 5]]) {
     referenced.push(file);
     assert.match(s.info, /^Quelle:/);
     const source = fs.readFileSync(path.join(root,s.model), "utf8");
-    const structure = F.CIF.createStructure(source, s.variants?.find(v => /(?:-cell|:cell|:sites)$/.test(v.cifMode))?.cifMode || s.cifMode);
-    assert.equal(structure.atoms.length, counts[file.replace(/\.cif$/, "").replaceAll("-", "_")], file);
+    const structure = F.CIF.createStructure(source, s.variants?.find(v => /(?:-cell|:cell|:sites)$|^cif-network:sites:/.test(v.cifMode))?.cifMode || s.cifMode);
+    assert.equal(structure.contactExpansion?.cell.atoms.length ?? structure.atoms.length,
+      counts[file.replace(/\.cif$/, "").replaceAll("-", "_")], file);
     assert.ok(structure.measurePositions);
     assert.ok(structure.atoms.every(atom => F.CIF.elements[atom.element] && atom.positionAngstrom.every(Number.isFinite)),file);
   }
@@ -64,6 +65,16 @@ const molecules = {H2O:3,S8:8,BENZIL03_monoklin:26,BENZIL04_trigonal:26,Vanillin
 for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
   for(const v of s.variants || [s]) {
     const structure=F.CIF.createStructure(fs.readFileSync(path.join(root,v.model),"utf8"),v.cifMode);
+    if(/^cif-(network|excerpt):/.test(v.cifMode) && !v.cifMode.startsWith("cif-network:asu:"))assert.ok(structure.bonds.length,v.title);
+    if(structure.contactExpansion && /^cif-(network|excerpt):/.test(v.cifMode)) {
+      const expanded=F.CIF.contactStructure(structure,1);
+      assert.ok(expanded.atoms.length>structure.atoms.length,v.title);
+      assert.equal(new Set(expanded.atoms.map(a=>a.id)).size,expanded.atoms.length,v.title);
+    }
+    if(v.cifMode==="cif-excerpt:hkust:focus") {
+      assert.equal(structure.atoms.filter(a=>a.element==="Cu").length,2);
+      assert.equal(structure.atoms.filter(a=>a.element==="O").length,5);
+    }
     assert.ok(structure.atoms.length && structure.atoms.every(a=> F.CIF.elements[a.element] && a.positionAngstrom.every(Number.isFinite)),v.title);
     assert.equal(new Set(structure.atoms.map(a=>a.id)).size,structure.atoms.length,v.title);
     if(v.cifMode==="cif-view:molecule")assert.equal(structure.atoms.length,molecules[path.basename(v.model,".cif")]);
@@ -82,6 +93,17 @@ for(const s of activeModels.filter(entry=>entry.model?.endsWith(".cif"))) {
 const mixed = F.CIF.createStructure(fs.readFileSync(path.join(root,"assets/praktikum/AgHgI4-Hochtemperaturform.cif"),"utf8"),"cif-view:sites");
 assert.equal(mixed.atoms.filter(a=>a.siteOccupants?.length===2 && a.occupancy===0.75).length,4);
 assert.ok(mixed.atoms.some(a=>a.displayLabel==="Hg 25 % / Ag 50 % / leer 25 %"));
+const ice = F.welcomeRoom.exhibits.find(e=>e.roomId==="vorlesung-2");
+const iceSource = fs.readFileSync(path.join(root,ice.model),"utf8");
+const iceCell = F.CIF.createStructure(iceSource,ice.variants[0].cifMode);
+const iceLarge = F.CIF.createStructure(iceSource,ice.variants[1].cifMode);
+assert.ok(iceCell.showHydrogenByDefault && iceCell.hydrogenContacts.length>0);
+assert.equal(iceLarge.atoms.length,4*iceCell.atoms.length);
+assert.ok(iceLarge.hydrogenContacts.length>iceCell.hydrogenContacts.length);
+const nic = fs.readFileSync(path.join(root,"assets/praktikum/Nikotinsaeureamid_NICOAM05.cif"),"utf8");
+assert.ok(F.CIFStructure.environmentCandidates(F.CIF.createStructure(nic,"cif-view:molecule"),3).length>0);
+assert.ok(F.CIF.createStructure(nic,"cif-view:molecular-cell").hydrogenContacts.every(c=>c.inferred));
+assert.ok(F.CIF.createStructure(nic,"cif-view:molecular-cell").hydrogenContacts.length>0);
 for(const id of ["vorlesung-1","vorlesung-2","vorlesung-3","vorlesung-6","vorlesung-7","vorlesung-8","team-a","team-b"]){
   assert.match(F.welcomeRoom.exhibits.find(e=>e.roomId===id).model,/\.cif$/);
 }
