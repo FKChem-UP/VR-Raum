@@ -46,6 +46,8 @@
     menuTarget(scene, root) {
       const chapter = scene.components["fkc-tutorial"];
       if (this.active && chapter?.phase === "bragg" && chapter.selectedAnimation === root && !F.Menu?.opened) {
+        if(chapter.animationStep===7 && chapter.animation?.state.source!=="mo") return "source:mo";
+        if(chapter.animationStep===7 && chapter.animation?.state.sweep) return null;
         return F.Bragg.cues[chapter.animationStep] || null;
       }
       if (!this.allowsModel(root) || F.Menu?.opened || root.fkcPendingVisual) return null;
@@ -231,7 +233,7 @@
         const numbered = training || (animation && !animationPractice) || (mirror && !mirrorDone);
         ctx.fillStyle = numbered ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
         ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line,
-          50, numbered ? 153 + i * (animation ? 36 : 41) : 180 + i * 55, 924);
+          50, numbered ? 148 + i * (animation ? 32 : 41) : 180 + i * 55, 924);
       });
       if (mirror && !mirrorDone) {
         ctx.font = "30px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText(F.MirrorTutorial.hints[this.mirror.step],50,451,924);
@@ -245,9 +247,9 @@
       }
       this.buttons = this.phase === "question" ? [{x: 80, w: 380, title: "Ja", action: () => this.show("training")},
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
-        structurePractice ? [{x: 80, w: 490, title: "Teil 2: Bragg-Animation", action: () => { this.beginAnimation(); this.render(); }},
+        (training || structurePractice) ? [{x: 80, w: 490, title: training ? "Überspringen → Teil 2" : "Teil 2: Bragg-Animation", action: () => { this.beginAnimation(); this.render(); }},
           {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
-        animationPractice ? [{x: 80, w: 490, title: "Teil 3: Zeichne den Spiegel", action: () => this.beginMirror()},
+        animation ? [{x: 80, w: 490, title: animationPractice ? "Teil 3: Zeichne den Spiegel" : "Überspringen → Teil 3", action: () => this.beginMirror()},
           {x: 600, w: 340, title: "Zum Begrüßungsraum", action: () => this.close()}] :
         [{x: 80, w: 860, title: "Tutorial beenden", action: () => this.close()}];
       for (const button of this.buttons) {
@@ -378,11 +380,12 @@
         if (this.phase === "bragg") {
           const {state, el} = this.animation;
           F.Bragg.advance(state, Math.min(delta || 0, 100) / 1000);
-          this.animation.update(this.head);
+          this.animation.update(this.head, this.animationStep===5);
           const p = el.object3D.getWorldPosition(this.modelWorld);
           const next = F.Bragg.progress(this.animationStep, Math.hypot(this.head.x - p.x, this.head.z - p.z) < 1.8,
             this.selectedAnimation === el, F.HandMenu.opened && menu?.model === el, state, this.distanceInfoOpened);
           if (next !== this.animationStep) {
+            if(this.animationStep===7 && next===8) F.Bragg.command(state,"sweep");
             this.animationStep = next;
             if (next === 1) this.board.object3D.position.set(p.x + 1.85, this.head.y, p.z - 0.25);
             this.render();

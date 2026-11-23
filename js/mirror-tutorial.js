@@ -151,8 +151,8 @@
       },
       tick(hit,held,near,opened,selected){if(step===0 && near)move(1); if(step===2 && selected)move(3); if(step===3 && opened && selected)move(4);
         if(!held)waitRelease=false;
-        if(held && !opened && !waitRelease) sample(hit);
-        if(active && (!held || opened || hit?.el!==board)){
+        if(held && !waitRelease) sample(hit);
+        if(active && (!held || hit?.el!==board)){
           if(active.accepted){strokes.push({parts:active.parts,color:active.parts[0].color});active=null;waitRelease=held;
             move(strokes.length===1 && !drawingMenu ? 2 : 4+strokes.length);}
           else {active.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;active=null;message="Noch einmal: vom markierten F durch B ziehen.";draw();}}},

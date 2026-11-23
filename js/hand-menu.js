@@ -312,12 +312,12 @@
       const model = this.model;
       const painting = F.Draw && F.Draw.mode === "paint";
       this.buttons = [];
-      ctx.fillStyle = painting ? "#fff5cd" : "#edf4ee";
+      const chapter = this.el.components["fkc-tutorial"];
+      const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      ctx.fillStyle = animation ? "#fbe7e5" : painting ? "#fff5cd" : "#edf4ee";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.fillStyle = "#203f30";
       ctx.font = "bold 38px Arial";
-      const chapter = this.el.components["fkc-tutorial"];
-      const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
       const locked = chapter?.phase === "mirror" && !chapter.mirror.drawingMenu;
       ctx.fillText(animation ? "Animationssteuerung" : this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
         painting ? "Malstift" : "Modellwerkzeuge", 28, 48, 510);
@@ -352,7 +352,7 @@
         const shift = pressed ? 4 : 0;
         ctx.fillStyle = "#8c9b92";
         ctx.fillRect(b.x, b.y + 4, b.w, b.h);
-        ctx.fillStyle = pressed ? "#f3bcbc" : hovered ? "#fff0b8" : selected ? (painting ? "#ffd665" : "#b9dcc4") : (painting ? "#ffedac" : "#d5e2d9");
+        ctx.fillStyle = pressed ? "#f3bcbc" : hovered ? "#fff0b8" : animation ? (selected?"#e8918b":"#f2ccca") : selected ? (painting ? "#ffd665" : "#b9dcc4") : (painting ? "#ffedac" : "#d5e2d9");
         ctx.fillRect(b.x, b.y + shift, b.w, b.h);
         ctx.strokeStyle = hovered ? "#b57c00" : "#82988a";
         ctx.lineWidth = hovered ? 4 : 2;
@@ -379,7 +379,7 @@
           const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
           ctx.fillRect(x, y + 5, w, height + 5);
-          ctx.fillStyle = pressed ? "#e99d9d" : selected ? "#f3bcbc" : hovered ? "#fff0b8" : painting ? "#ffedac" : "#d5e2d9";
+          ctx.fillStyle = pressed ? "#e99d9d" : selected ? (animation?"#e8918b":painting?"#ffd665":"#f3bcbc") : hovered ? "#fff0b8" : animation ? "#f2ccca" : painting ? "#ffedac" : "#d5e2d9";
           ctx.fillRect(x, y + shift, w, height);
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
@@ -445,6 +445,7 @@
           ctx.fillStyle = "#173527";
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
+          if(entry.heading) ctx.fillText(entry.heading,x+w/2,y+shift+29,w-12);
           ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 63 : 73), w - 12);
           ctx.textAlign = "left";
           if (locked) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
@@ -478,7 +479,7 @@
         text("Abspieltempo");
         for (const [id, speed] of [["slow", 0.5], ["normal", 1], ["fast", 2]]) control(id, `${speed}×`, state.speed === speed);
         row([["mo", "Mo Kα"], ["cu", "Cu Kα"]].map(([id, label]) => ({label, kind: "plain",
-          selected: state.source === id, action: () => F.Bragg.command(state, id)})));
+          selected: state.source === id, cueId:"source:"+id, action: () => F.Bragg.command(state, id)})));
         text(`Detektorwinkel 2θ: ${state.angle.toFixed(1)}°`);
         control("bragg", "Bragg-Stellung", state.angle === F.Bragg.angleFor(1, state.source));
         control("compare", "Vergleich: halbe Welle versetzt", state.angle === F.Bragg.angleFor(1.5, state.source));
@@ -565,11 +566,11 @@
           })));
         }
         const mode = model.fkcAtomLabels || "hover";
-        button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
-          F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
-        });
-        if (locked || structure && !structure.contactExpansion) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
-          () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen), false, "hide-hydrogen");
+        const display = [{heading:"Atomlabels",label:({hover:"Beim Anvisieren",all:"Alle",off:"Aus"}[mode]),kind:"plain",
+          action:()=>F.AtomLabels.setMode(model,{hover:"all",all:"off",off:"hover"}[mode])}];
+        if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
+          kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
+        row(display);
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
             () => F.CIF.setCompleteCell(model, structure.mode !== "cell-complete"), structure.mode === "cell-complete");

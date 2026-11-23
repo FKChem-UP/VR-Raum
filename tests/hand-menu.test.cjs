@@ -104,6 +104,8 @@ const menu = Object.assign({ctx, model, offset: 0, texture: {},
 const structure = {mode: "molecule", atoms: new Array(60), spaceGroup: {name: "Pa-3"}};
 menu.render(structure);
 assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "Alle Buttons innerhalb der Fläche");
+const labelTile=menu.buttons.find(b=>b.label==="Beim Anvisieren"), hydrogenTile=menu.buttons.find(b=>b.label==="Sichtbar");
+assert.equal(labelTile.y,hydrogenTile.y);assert.ok(labelTile.h>=70 && labelTile.x+labelTile.w < hydrogenTile.x);
 assert.equal(menu.buttons.length, 16, "Werkzeuge einschließlich H-Sichtbarkeit, Modus und Zahnrad");
 const distanceButton = menu.buttons[9];
 const angleButton = menu.buttons[10];

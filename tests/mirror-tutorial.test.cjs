@@ -40,7 +40,7 @@ let samples=0;
 F.Draw={color:"gold",mode:"laser",setMode(mode){this.mode=mode;},sampleSurface(last){samples++;if(last)return last;const s={color:this.color,worldRadius:0.004,opacity:0.6,material:{}};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){}};
 F.HandMenu={laserHand:()=>"right"};F.releaseModel=()=>{};
 const station=F.MirrorTutorial.station({});
-function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,false);}
+function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,station.drawingMenu);}
 function line(i){paint(0,project(0,atoms[i]));paint(0,[0,0]);paint(0,[0,0],false);}
 station.tick(null,false,true,false,false);paint(0,project(0,atoms[1]));paint(0,[0,0]);assert.equal(station.step,1);
 const atB=samples;paint(0,[-0.45,-0.12]);assert.equal(samples,atB+1);paint(0,[0,0],false);

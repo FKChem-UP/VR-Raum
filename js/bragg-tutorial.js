@@ -4,7 +4,7 @@
 (function (F) {
   const tau = 2 * Math.PI, d = 2;
   const sources = Object.freeze({mo: 0.7107, cu: 1.5406}); // Kα-Lehrwerte in Å
-  const defaultSource = "mo", minAngle = 10, maxAngle = 80;
+  const defaultSource = "mo", minAngle = 10, maxAngle = 105;
   const angleFor = (periods, source = defaultSource) => 2 * Math.asin(periods * sources[source] / (2 * d)) * 180 / Math.PI;
   const bragg = angleFor(1);
   function geometry(twoTheta, source = defaultSource) {
@@ -78,16 +78,18 @@
     }
   }
   const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
-    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Info zum Ebenenabstand öffnen", "Vergleichswinkel einstellen", "Animation pausieren"];
+    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Info zum Ebenenabstand öffnen", "Vergleichswinkel einstellen", "Mo-Winkellauf: nächsten Reflex beobachten", "Animation pausieren"];
   const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf die Netzebenen oder den Infotext darunter und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
     "Wähle Bragg-Stellung und 0,5×. Die Wellenlänge bleibt gleich.", "Bei Bragg und 0,5×: Öffne das i neben d = 2,00 Å.",
-    "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
-  const cues = {3: "play", 4: "slow", 6: "compare", 7: "play"};
+    "Wähle Vergleich: Berg trifft jetzt Tal.", "Mo Kα wählen, Winkellauf starten. Warte auf den Halt ab Ordnung 2.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
+  const cues = {3: "play", 4: "slow", 6: "compare", 7: "sweep", 8: "play"};
   const slowBragg = s => s.running && s.speed === 0.5 && geometry(s.angle, s.source).matched;
   function progress(step, near, selected, menu, s, infoOpened = false) {
     return [near, selected, menu, s.running && s.time >= 4, slowBragg(s), slowBragg(s) && infoOpened,
-      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7, !s.running][step] ? step + 1 : step;
+      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7,
+      s.running && s.source === "mo" && s.sweep && s.sweepHold > 0 && geometry(s.angle,s.source).periods >= 1.999999 && geometry(s.angle,s.source).matched,
+      !s.running][step] ? step + 1 : step;
   }
 
   function station(parent) {
@@ -150,10 +152,19 @@
     badge.ctx.fillStyle = "#276f8b"; badge.ctx.fillRect(0, 0, 128, 128);
     badge.ctx.fillStyle = "#ffffff"; badge.ctx.font = "bold 94px Arial"; badge.ctx.textAlign = "center";
     badge.ctx.fillText("i", 64, 98); badge.texture.needsUpdate = true;
+    const badgeMaterials = {normal:badge.mesh.material};
+    for (const [id, color, ink] of [["cue", "#ffe049", "#3c3011"], ["selected", "#ad4935", "#ffffff"]]) {
+      const tile = card(128,128,0.13,0.13);
+      tile.ctx.fillStyle=color; tile.ctx.fillRect(0,0,128,128);
+      tile.ctx.fillStyle=ink;tile.ctx.font="bold 90px Arial";tile.ctx.textAlign="center";tile.ctx.fillText("i",64,98);
+      if(id==="selected"){tile.ctx.strokeStyle=ink;tile.ctx.lineWidth=6;tile.ctx.strokeRect(6,6,116,116);}
+      tile.texture.needsUpdate=true;badgeMaterials[id]=tile.mesh.material;
+    }
+    const badges=[];
     for (const [id, group, pos] of [["distance", rig, [-1.06, -depth / 2, 0.248]],
       ["path", rig, [0.13, -depth - 0.11, 0.21]], ["waves", el.object3D, [0.96, -0.77, 0.12]]]) {
       const marker = badge.mesh.clone(); marker.userData.braggInfo = id;
-      marker.position.set(...pos); group.add(marker);
+      marker.position.set(...pos); group.add(marker); badges.push(marker);
     }
     const info = card(800, 350, 1.25, 0.55);
     info.mesh.position.set(-1.48, 0.39, 0.23); info.mesh.visible = false;
@@ -191,6 +202,7 @@
     const spot = new T.Mesh(keep(new T.SphereGeometry(0.031, 14, 10)), basic(0xffffff));
     detector.add(spot); spot.position.x = -0.018;
     const detectorBadge = badge.mesh.clone(); detectorBadge.userData.braggInfo = "detector";
+    badges.push(detectorBadge);
     detectorBadge.position.set(0.02, 0.27, 0.14); detector.add(detectorBadge);
     spot.userData.braggInfo = "detector";
     // WebGL-Linienbreite ist auf vielen Geräten auf einen Pixel beschränkt.
@@ -240,8 +252,12 @@
     const format = (value, digits) => value.toFixed(digits).replace(".", ",");
     let equationKey = "";
     const ctx = canvas.getContext("2d"); let previous = "", lastFrame = "";
-    function update(head) {
+    function update(head, distanceTask) {
       if (head && info.mesh.visible) info.mesh.lookAt(head);
+      for(const marker of badges){const id=marker.userData.braggInfo;
+        marker.material=badgeMaterials[id===openInfo?"selected":distanceTask && id==="distance"?"cue":"normal"];
+        marker.scale.setScalar(id===openInfo?1.2:distanceTask && id==="distance"?1.12:1);
+      }
       const sweepPaused = state.sweepHold > 0;
       const settings = `${state.source}:${state.angle}:${sweepPaused}`;
       const frame = `${settings}:${state.time}`;

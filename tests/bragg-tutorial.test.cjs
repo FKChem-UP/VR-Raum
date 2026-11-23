@@ -36,14 +36,14 @@ B.advance(sweep, 3);
 B.advance(sweep, 0.1);
 close(sweep.angle, B.angleFor(1) + 0.6);
 close(sweep.time, 0);
-sweep.angle = 79.8; B.advance(sweep, 0.1);
-close(sweep.angle, 79.6); assert.equal(sweep.sweep, -1);
+sweep.angle = 104.8; B.advance(sweep, 0.1);
+close(sweep.angle, 104.6); assert.equal(sweep.sweep, -1);
 sweep.angle = 10.2; B.advance(sweep, 0.1);
 close(sweep.angle, 10.4); assert.equal(sweep.sweep, 1);
 B.command(sweep, "sweep"); B.advance(sweep, 0.1); close(sweep.angle, 10.4);
 B.command(sweep, "sweep"); B.command(sweep, "bragg");
 assert.equal(sweep.sweep, 0); close(sweep.angle, B.angleFor(1));
-for (const [source, order, direction] of [["mo", 2, 1], ["mo", 3, -1], ["cu", 1, 1]]) {
+for (const [source, order, direction] of [["mo", 2, 1], ["mo", 3, -1], ["cu", 1, 1], ["cu", 2, 1], ["cu", 2, -1]]) {
   const exact = B.angleFor(order, source);
   Object.assign(sweep, {source, angle: exact - direction * 0.2, sweep: direction, sweepHold: 0, running: true});
   B.advance(sweep, 0.1);
@@ -53,7 +53,7 @@ for (const [source, order, direction] of [["mo", 2, 1], ["mo", 3, -1], ["cu", 1,
   B.advance(sweep, 0.2); close(sweep.angle, exact + direction * 0.6);
 }
 for (const [source, wavelength] of [["mo", 0.7107], ["cu", 1.5406]]) {
-  for (const n of source === "mo" ? [1, 2, 3] : [1]) {
+  for (const n of source === "mo" ? [1, 2, 3] : [1, 2]) {
     const result = B.geometry(B.angleFor(n, source), source);
     assert.equal(result.matched, true, `Bragg-Bedingung gilt auch für ungerades n = ${n}`);
     close(result.extra, n * wavelength);
@@ -83,9 +83,12 @@ B.command(s, "slow"); assert.equal(B.progress(4, true, true, true, s), 5); close
 assert.equal(B.progress(5, true, true, true, s), 5);
 assert.equal(B.progress(5, true, true, true, s, true), 6);
 B.command(s, "compare"); assert.equal(B.progress(6, true, true, true, s), 7);
-B.command(s, "play"); assert.equal(B.progress(7, true, true, true, s), 8);
-for (let i = 0; i < 90; i++) B.command(s, "plus"); assert.equal(s.angle, 80);
-for (let i = 0; i < 90; i++) B.command(s, "minus"); assert.equal(s.angle, 10);
+B.command(s, "sweep");assert.equal(B.progress(7,true,true,true,s),7);
+for(let i=0;i<250 && !s.sweepHold;i++) B.advance(s,0.05);
+assert.equal(B.progress(7,true,true,true,s),8);B.command(s,"sweep");
+B.command(s, "play"); assert.equal(B.progress(8, true, true, true, s), 9);
+for (let i = 0; i < 110; i++) B.command(s, "plus"); assert.equal(s.angle, 105);
+for (let i = 0; i < 110; i++) B.command(s, "minus"); assert.equal(s.angle, 10);
 B.command(s, "reset"); assert.deepEqual(s, B.initial());
 
 // Übergang ohne Raumwechsel, mit freier Bewegung und Trigger-Auswahl.
@@ -130,6 +133,7 @@ assert.equal(tutorial.buttons[0].title, "Teil 2: Bragg-Animation");
 tutorial.buttons[0].action();
 assert.equal(tutorial.phase, "bragg");
 assert.equal(tutorial.board, board);
+assert.equal(tutorial.buttons[0].title,"Überspringen → Teil 3");
 tutorial.click({el: station.el});
 tutorial.animationStep = B.tasks.length;
 tutorial.render();
