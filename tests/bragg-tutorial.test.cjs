@@ -25,6 +25,8 @@ close(B.waveComparison(0.25, other.periods)[2], 0);
 close(B.waveComparison(0.25, 0.25)[2], 1);
 const sweep = B.initial();
 B.command(sweep, "sweep");
+assert.equal(sweep.sweepHold, 3);
+B.advance(sweep, 3);
 B.advance(sweep, 0.1);
 close(sweep.angle, B.angleFor(1) + 0.6);
 close(sweep.time, 0);
@@ -35,6 +37,15 @@ close(sweep.angle, 10.4); assert.equal(sweep.sweep, 1);
 B.command(sweep, "sweep"); B.advance(sweep, 0.1); close(sweep.angle, 10.4);
 B.command(sweep, "sweep"); B.command(sweep, "bragg");
 assert.equal(sweep.sweep, 0); close(sweep.angle, B.angleFor(1));
+for (const [source, order, direction] of [["mo", 2, 1], ["mo", 3, -1], ["cu", 1, 1]]) {
+  const exact = B.angleFor(order, source);
+  Object.assign(sweep, {source, angle: exact - direction * 0.2, sweep: direction, sweepHold: 0, running: true});
+  B.advance(sweep, 0.1);
+  close(sweep.angle, exact); assert.equal(sweep.sweepHold, 3);
+  const time = sweep.time;
+  B.advance(sweep, 2.9); close(sweep.angle, exact); assert.ok(sweep.time > time);
+  B.advance(sweep, 0.2); close(sweep.angle, exact + direction * 0.6);
+}
 for (const [source, wavelength] of [["mo", 0.7107], ["cu", 1.5406]]) {
   for (const n of source === "mo" ? [1, 2, 3] : [1]) {
     const result = B.geometry(B.angleFor(n, source), source);
@@ -70,7 +81,7 @@ for (let i = 0; i < 90; i++) B.command(s, "minus"); assert.equal(s.angle, 10);
 B.command(s, "reset"); assert.deepEqual(s, B.initial());
 
 // Übergang ohne Raumwechsel, mit freier Bewegung und Trigger-Auswahl.
-const board = {}, station = {el: {}, state: s, dispose() {}};
+const board = {}, station = {el: {}, state: s, dispose() {}, toggleInfo(id) { return id !== "close"; }};
 F.releaseModel = F.invalidateHits = () => {}; B.station = () => station;
 const welcomeWalkable = (x, z) => Math.hypot(x, z) >= 2.73;
 const room = {isWalkable: welcomeWalkable};
@@ -83,6 +94,9 @@ assert.equal(tutorial.selectedAnimation, null);
 for (const z of [3, 2, 1, 0.25, 0, -1, -2]) assert.ok(room.isWalkable(-0.55, z), "Weg bis durch die Station bleibt frei");
 assert.equal(room.isWalkable(-0.55, 8.1), false);
 tutorial.click({el: station.el}); assert.equal(tutorial.selectedAnimation, station.el);
+const clickInfo = id => tutorial.click({el: station.el, mesh: {userData: {braggInfo: id}}});
+clickInfo("waves"); assert.equal(B.progress(7, true, true, false, s, tutorial.distanceInfoOpened), 7);
+clickInfo("distance"); assert.equal(B.progress(7, true, true, false, s, tutorial.distanceInfoOpened), 8);
 assert.equal(B.progress(0, false, true, false, s), 0, "Früher Klick ersetzt nicht das Hingehen");
 tutorial.animationStep = 5;
 assert.equal(F.Tutorial.menuTarget({components: {"fkc-tutorial": tutorial}}, station.el), "compare");
@@ -111,6 +125,12 @@ tutorial.render();
 assert.ok(text.includes("Animationsteil geschafft!"));
 assert.equal(tutorial.selectedAnimation, station.el, "Animationsauswahl bleibt nach Abschluss bestehen");
 assert.equal(F.Tutorial.menuTarget({components: {"fkc-tutorial": tutorial}}, station.el), null, "Freies Üben ohne Pflicht-Hinweis");
-assert.equal(tutorial.buttons[0].title, "Zum Begrüßungsraum");
+assert.equal(tutorial.buttons[1].title, "Zum Begrüßungsraum");
+assert.equal(tutorial.buttons[0].title, "Teil 3: Zeichne den Spiegel");
+let disposed = false;
+F.MirrorTutorial = {station: () => ({dispose() { disposed = true; }})};
+tutorial.buttons[0].action();
+assert.equal(tutorial.phase, "mirror"); assert.equal(tutorial.selectedAnimation, null);
 tutorial.close();
+assert.ok(disposed); assert.equal(room.isWalkable, welcomeWalkable);
 console.log("Bragg-Geometrie, Steuerung, begehbare Station und beide freien Übungsphasen geprüft.");

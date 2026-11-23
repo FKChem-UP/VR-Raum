@@ -22,25 +22,46 @@
     const upper = Math.sin(tau * cycles), lower = Math.sin(tau * (cycles + phaseOffset));
     return [upper, lower, upper + lower];
   }
-  function initial() { return {angle: bragg, source: defaultSource, speed: 1, running: false, time: 0, sweep: 0}; }
+  const holdSeconds = 3;
+  function initial() { return {angle: bragg, source: defaultSource, speed: 1, running: false, time: 0, sweep: 0, sweepHold: 0}; }
   function advance(s, seconds) {
     if (s.running) s.time += seconds * s.speed;
     if (!s.sweep) return;
+    if (s.sweepHold > 0) {
+      const held = Math.min(seconds, s.sweepHold);
+      s.sweepHold -= held;
+      seconds -= held;
+      if (!seconds) return;
+    }
     const angle = s.angle + s.sweep * seconds * 6;
+    // Eine Stellung kann zwischen zwei Frames liegen: auf den exakten Winkel
+    // setzen, statt darauf zu warten, dass ein Frame ihn zufällig trifft.
+    const stops = [];
+    for (let n = 1; n <= geometry(maxAngle, s.source).periods; n++) stops.push(angleFor(n, s.source));
+    if (s.sweep < 0) stops.reverse();
+    const stop = stops.find(value => value >= minAngle && (s.sweep > 0
+      ? value > s.angle + 1e-7 && value <= angle : value < s.angle - 1e-7 && value >= angle));
+    if (stop !== undefined) { s.angle = stop; s.sweepHold = holdSeconds; return; }
     if (angle >= maxAngle) { s.angle = 2 * maxAngle - angle; s.sweep = -1; }
     else if (angle <= minAngle) { s.angle = 2 * minAngle - angle; s.sweep = 1; }
     else s.angle = angle;
   }
   function command(s, id) {
-    if (["bragg", "compare", "minus", "plus"].includes(id)) s.sweep = 0;
+    if (["bragg", "compare", "minus", "plus"].includes(id)) { s.sweep = 0; s.sweepHold = 0; }
     switch (id) {
       case "reset": Object.assign(s, initial()); break;
       case "play": s.running = !s.running; break;
       case "slow": s.speed = 0.5; break;
       case "normal": s.speed = 1; break;
       case "fast": s.speed = 2; break;
-      case "sweep": s.sweep = s.sweep ? 0 : s.angle >= maxAngle ? -1 : 1; break;
-      case "mo": case "cu": s.source = id; break; // Wirkung von λ bei gleichem Winkel zeigen.
+      case "sweep":
+        s.sweep = s.sweep ? 0 : s.angle >= maxAngle ? -1 : 1;
+        s.sweepHold = s.sweep && geometry(s.angle, s.source).matched ? holdSeconds : 0;
+        break;
+      case "mo": case "cu":
+        s.source = id; // Wirkung von λ bei gleichem Winkel zeigen.
+        s.sweepHold = s.sweep && geometry(s.angle, s.source).matched ? holdSeconds : 0;
+        break;
       case "bragg": s.angle = angleFor(1, s.source); break;
       case "compare": s.angle = angleFor(1.5, s.source); break;
       case "minus": s.angle = Math.max(minAngle, s.angle - 1); break;
@@ -48,14 +69,15 @@
     }
   }
   const tasks = ["Zur Bragg-Station gehen", "Animation mit dem Trigger auswählen", "Handmenü öffnen",
-    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Vergleichswinkel einstellen", "Animation pausieren"];
+    "Animation starten", "Auf halbe Geschwindigkeit wechseln", "Vergleichswinkel einstellen", "Animation pausieren", "Info zum Ebenenabstand öffnen"];
   const hints = ["Strukturteil geschafft! Geh zur Bragg-Station vor dir.", "Ziele auf die Netzebenen oder den Infotext darunter und drücke den Trigger.",
     "Dreh die Handfläche ohne Laser zu dir.", "Drücke Start. Beobachte die Wellen bis zum Detektor.",
-    "Wähle 0,5×. Die Wellenlänge bleibt gleich.", "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen."];
+    "Wähle 0,5×. Die Wellenlänge bleibt gleich.", "Wähle Vergleich: Berg trifft jetzt Tal.", "Drücke Pause. Der Phasenvergleich bleibt stehen.",
+    "Ziele auf das i neben d = 2,00 Å und drücke den Trigger."];
   const cues = {3: "play", 4: "slow", 5: "compare", 6: "play"};
-  function progress(step, near, selected, menu, s) {
+  function progress(step, near, selected, menu, s, infoOpened = false) {
     return [near, selected, menu, s.running && s.time >= 4, s.running && s.speed === 0.5,
-      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7, !s.running][step] ? step + 1 : step;
+      Math.abs(s.angle - angleFor(1.5, s.source)) < 1e-7, !s.running, infoOpened][step] ? step + 1 : step;
   }
 
   function station(parent) {
@@ -102,6 +124,44 @@
       keep(new T.MeshBasicMaterial({map: keep(new T.CanvasTexture(distanceLabel)), side: T.DoubleSide})));
     distanceMesh.position.set(-0.82, -depth / 2, 0.24);
     distanceMesh.raycast = function () {}; rig.add(distanceMesh);
+    const infoContent = {
+      distance: ["Netzebenenabstand d", "d ist der senkrechte Abstand", "zwischen benachbarten Netzebenen.", "Hier: d = 2,00 Å."],
+      path: ["Gangunterschied Δs", "Unten sind zwei Wege je d sin θ länger.", "Zusammen: Δs = 2d sin θ.", "Gilt Δs = nλ, sind die Wellen in Phase."],
+      waves: ["Wellen am Detektor", "λ: Wellenlänge · θ: Winkel zur Ebene.", "n: positive ganze Beugungsordnung.", "Die Summe zeigt Amplitude, keine Intensität."]
+    };
+    function card(width, height, w, h) {
+      const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
+      const texture = keep(new T.CanvasTexture(canvas));
+      const mesh = new T.Mesh(keep(new T.PlaneGeometry(w, h)), keep(new T.MeshBasicMaterial({map: texture, side: T.DoubleSide})));
+      return {canvas, ctx: canvas.getContext("2d"), texture, mesh};
+    }
+    const badge = card(128, 128, 0.13, 0.13);
+    badge.ctx.fillStyle = "#276f8b"; badge.ctx.fillRect(0, 0, 128, 128);
+    badge.ctx.fillStyle = "#ffffff"; badge.ctx.font = "bold 94px Arial"; badge.ctx.textAlign = "center";
+    badge.ctx.fillText("i", 64, 98); badge.texture.needsUpdate = true;
+    for (const [id, group, pos] of [["distance", rig, [-1.06, -depth / 2, 0.248]],
+      ["path", rig, [0.13, -depth - 0.11, 0.21]], ["waves", el.object3D, [0.96, -0.77, 0.12]]]) {
+      const marker = badge.mesh.clone(); marker.userData.braggInfo = id;
+      marker.position.set(...pos); group.add(marker);
+    }
+    const info = card(800, 350, 1.25, 0.55);
+    info.mesh.position.set(-1.48, 0.39, 0.23); info.mesh.visible = false;
+    info.mesh.userData.braggInfo = "close"; el.object3D.add(info.mesh);
+    let openInfo = null;
+    function toggleInfo(id) {
+      if (id === openInfo || id === "close") { openInfo = null; info.mesh.visible = false; return false; }
+      if (!Object.hasOwn(infoContent, id)) return false;
+      openInfo = id;
+      const ctx = info.ctx;
+      ctx.fillStyle = "#f6fafb"; ctx.fillRect(0, 0, 800, 350);
+      ctx.fillStyle = "#276f8b"; ctx.fillRect(0, 0, 800, 82);
+      ctx.fillStyle = "#ffffff"; ctx.font = "bold 44px Arial"; ctx.fillText(infoContent[id][0], 25, 57, 750);
+      ctx.fillStyle = "#193947"; ctx.font = "35px Arial";
+      infoContent[id].slice(1).forEach((line, index) => ctx.fillText(line, 25, 133 + index * 53, 750));
+      ctx.font = "27px Arial"; ctx.fillText("Mit Trigger schließen", 25, 320);
+      info.texture.needsUpdate = true; info.mesh.visible = true;
+      return true;
+    }
     const guideGeometry = keep(new T.BufferGeometry());
     const guidePositions = new T.Float32BufferAttribute(new Float32Array(2 * 6 * 2 * 3), 3);
     guideGeometry.setAttribute("position", guidePositions);
@@ -167,7 +227,8 @@
     let equationKey = "";
     const ctx = canvas.getContext("2d"); let previous = "", lastFrame = "";
     function update() {
-      const settings = `${state.source}:${state.angle}`;
+      const sweepPaused = state.sweepHold > 0;
+      const settings = `${state.source}:${state.angle}:${sweepPaused}`;
       const frame = `${settings}:${state.time}`;
       if (frame === lastFrame) return;
       lastFrame = frame;
@@ -186,7 +247,7 @@
         guidePositions.needsUpdate = true;
         liveCtx.fillStyle = "#f6fafb"; liveCtx.fillRect(0, 0, 1024, 190);
         liveCtx.fillStyle = "#193947"; liveCtx.font = "30px Arial";
-        liveCtx.fillText(`${state.source === "mo" ? "Mo" : "Cu"} Kα  ·  2θ = ${format(state.angle, 1)}°`, 24, 42);
+        liveCtx.fillText(`${state.source === "mo" ? "Mo" : "Cu"} Kα  ·  2θ = ${format(state.angle, 1)}°${sweepPaused ? "  ·  Winkellauf hält" : ""}`, 24, 42);
         liveCtx.fillStyle = g.matched ? "#137341" : "#a32929";
         liveCtx.font = "bold 40px Arial";
         const value = g.matched ? String(Math.round(g.periods)) : format(g.periods, 3);
@@ -244,12 +305,11 @@
           if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         } ctx.stroke();
       }
-      ctx.fillText("λ Wellenlänge · d Ebenenabstand · θ Winkel zur Netzebene", 20, 326);
-      ctx.fillText("n Beugungsordnung (1, 2, …) · keine Intensitätssimulation", 20, 348);
+      ctx.fillText("Die i-Zeichen öffnen kurze Erklärungen.", 20, 348);
       texture.needsUpdate = true;
     }
     update();
-    return {el, state, update, dispose() { el.remove(); resources.forEach(resource => resource.dispose()); }};
+    return {el, state, update, toggleInfo, dispose() { el.remove(); resources.forEach(resource => resource.dispose()); }};
   }
   F.Bragg = {station, geometry, lowerPath, waveComparison, initial, advance, command, tasks, hints, cues, progress, angleFor};
 })(window.FKCVR);

@@ -218,7 +218,7 @@
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
         structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
-        animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Das Animationsmenü bleibt verfügbar."] :
+        animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Oder starte Teil 3: Zeichne den Spiegel."] :
         animation ? F.Bragg.tasks :
           tasks.slice(first, first + tasksPerPage);
       const menuPalm = training ? palm(F.HandMenu.laserHand()) : "";
@@ -229,7 +229,8 @@
         const current = animation ? this.animationStep : this.step;
         const numbered = training || (animation && !animationPractice);
         ctx.fillStyle = numbered ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
-        ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line, 50, numbered ? 153 + i * 41 : 180 + i * 55, 924);
+        ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line,
+          50, numbered ? 153 + i * (animation ? 36 : 41) : 180 + i * 55, 924);
       });
       if (animation && !animationPractice) {
         ctx.font = "30px Arial"; ctx.fillStyle = "#203f30";
@@ -243,7 +244,9 @@
         {x: 560, w: 380, title: "Nein", action: () => this.close()}] :
         structurePractice ? [{x: 80, w: 490, title: "Teil 2: Bragg-Animation", action: () => { this.beginAnimation(); this.render(); }},
           {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
-        [{x: 80, w: 860, title: animationPractice ? "Zum Begrüßungsraum" : "Tutorial beenden", action: () => this.close()}];
+        animationPractice ? [{x: 80, w: 490, title: "Teil 3: Zeichne den Spiegel", action: () => this.beginMirror()},
+          {x: 600, w: 340, title: "Zum Begrüßungsraum", action: () => this.close()}] :
+        [{x: 80, w: 860, title: "Tutorial beenden", action: () => this.close()}];
       for (const button of this.buttons) {
         ctx.fillStyle = "#b9dcc4"; ctx.fillRect(button.x, 480, button.w, 100);
         ctx.fillStyle = "#203f30"; ctx.fillText(button.title, button.x + 30, 547, button.w - 60);
@@ -251,8 +254,16 @@
       this.texture.needsUpdate = true;
     },
     click: function (hit) {
+      if (this.phase === "mirror") {
+        if (hit.el === this.board && !F.Menu.opened) this.mirror.click(hit.uv);
+        return;
+      }
       if (this.animation && hit.el === this.animation.el) {
-        if (F.Tutorial.active && this.phase === "bragg") this.selectedAnimation = hit.el;
+        if (F.Tutorial.active && this.phase === "bragg") {
+          this.selectedAnimation = hit.el;
+          const infoId = hit.mesh?.userData.braggInfo;
+          if (infoId && this.animation.toggleInfo(infoId) && infoId === "distance") this.distanceInfoOpened = true;
+        }
         return;
       }
       if (!F.Tutorial.active || !hit.uv) return;
@@ -266,6 +277,15 @@
       if (uv) this.cursor.position.set((uv.x - 0.5) * boardWidth, (uv.y - 0.5) * boardHeight,
         this.phase === "question" ? 0 : 0.002);
     },
+    beginMirror: function () {
+      this.el.components["fkc-hand-menu"]?.hide();
+      this.selectedAnimation = null;
+      this.animation.dispose(); this.animation = null;
+      this.phase = "mirror";
+      // Feste Tafel: Beim Umrunden darf sich das räumliche Molekül nicht mitdrehen.
+      this.mirror = F.MirrorTutorial.station(this.board, this.canvas, this.texture, () => this.close());
+      F.invalidateHits();
+    },
     beginAnimation: function () {
       F.releaseModel(this.target);
       this.target.object3D.visible = false;
@@ -278,6 +298,7 @@
       F.Draw?.setMode("laser");
       this.phase = "bragg";
       this.animationStep = 0;
+      this.distanceInfoOpened = false;
       this.animation = F.Bragg.station(this.group);
       this.selectedAnimation = null;
       // Der sichtbare Tutorialboden (18 × 16 m) ersetzt hier die Kollisionen
@@ -317,6 +338,7 @@
       // Hauptmenü hat Vorrang, danach dieselbe Aufgabe fortsetzen.
       this.board.object3D.visible = !F.Menu.opened;
       if (F.Menu.opened) {
+        this.mirror?.tick(null, false, 0);
         this.cursor.visible = false;
         this.previous = null;
         return;
@@ -328,6 +350,11 @@
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
       const tools = laser && laser.components["fkc-controller"];
       this.updateCursor(tools && tools.source && tools.line.visible ? tools.hit : null);
+      if (this.phase === "mirror") {
+        const uv = tools?.source && tools.line.visible && tools.hit?.el === this.board ? tools.hit.uv : null;
+        this.mirror.tick(uv, !!tools?.states.trigger, Math.min(delta || 0, 100) / 1000);
+        return;
+      }
       if (this.phase === "question") {
         this.board.object3D.updateWorldMatrix(true, false);
         this.local.copy(this.head);
@@ -343,7 +370,7 @@
           this.animation.update();
           const p = el.object3D.getWorldPosition(this.modelWorld);
           const next = F.Bragg.progress(this.animationStep, Math.hypot(this.head.x - p.x, this.head.z - p.z) < 1.8,
-            this.selectedAnimation === el, F.HandMenu.opened && menu?.model === el, state);
+            this.selectedAnimation === el, F.HandMenu.opened && menu?.model === el, state, this.distanceInfoOpened);
           if (next !== this.animationStep) {
             this.animationStep = next;
             if (next === 1) this.board.object3D.position.set(p.x + 1.85, this.head.y, p.z - 0.25);
@@ -383,7 +410,8 @@
       }
     },
     close: function () {
-      const returnToSpawn = ["training", "structure-practice", "bragg"].includes(this.phase);
+      const returnToSpawn = ["training", "structure-practice", "bragg", "mirror"].includes(this.phase);
+      if (this.mirror) { this.mirror.dispose(); this.mirror = null; }
       this.restoreWalkable?.();
       this.restoreWalkable = null;
       this.selectedAnimation = null;
