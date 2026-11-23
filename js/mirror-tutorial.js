@@ -92,7 +92,7 @@
       for (const v of [0,1]) {
         const x = v ? 520 : 16; ctx.fillStyle = "white"; ctx.fillRect(x,90,486,364);
         ctx.fillStyle = "#193947"; ctx.font = "bold 24px Arial";
-        ctx.fillText(v ? "Besitzt BF₃ ein Inversionszentrum auf dem B?" : "Zeichne die drei Spiegelebenen ein",x+12,132,460);
+        ctx.fillText(v ? "Liegt auf B ein Inversionszentrum?" : "Zeichne die drei senkrechten Spiegelebenen ein",x+12,132,460);
         const points = atoms.map(p => pixel(v, v ? side(p) : project(0,p)));
         points.slice(1).forEach(p => { ctx.strokeStyle = "#81908d"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(...points[0]); ctx.lineTo(...p); ctx.stroke(); });
         for (const i of [1,2,3,0]) { const [a,b] = points[i]; ctx.fillStyle = i ? "#258365" : "#975841";
@@ -103,11 +103,18 @@
           ctx.fillStyle="rgba(245,248,246,0.64)";ctx.fillRect(x,90,486,364);
         }
       }
-      ctx.font="27px Arial";ctx.fillStyle="#193947";ctx.fillText(message || hints[step] || "Geschafft! Die drei farbigen Ebenen bleiben am Modell.",22,507,980);
-      ctx.fillText(step>=8 ? "Nein: B bleibt auf B, aber die drei invertierten F treffen auf kein F." :
-        step===7 ? "Hypothese prüfen: Wo liegen die Atome nach der Punktspiegelung an B?" :
-        strokes.length ? `${strokes.length} von 3 Ebenen: Je ein F bleibt fest, die beiden anderen tauschen Plätze.` :
-        "Der Strich links wird im Molekül zu einer senkrechten Spiegelebene.",22,565,980);
+      const notes = step >= 8 ? ["Punktspiegelung an B: Das zentrale Boratom bleibt an seinem Platz.",
+        "Gegenüber jedem F liegt eine Lücke. Das rosa Drahtmodell deckt sich nicht mit BF₃.",
+        "BF₃ hat deshalb kein Inversionszentrum – trotz seiner Spiegelebenen."] : step === 7 ? [
+        "Markiere B als mögliches Inversionszentrum in der rechten Schrägansicht.",
+        "Zu jedem F müsste es auf der Gegenseite im gleichen Abstand ein F geben.",
+        "Vergleiche das invertierte Drahtmodell mit den ursprünglichen Atomplätzen."] : [
+        "BF₃ ist trigonal-planar: Die drei F–B–F-Winkel betragen jeweils 120°.",
+        strokes.length ? `${strokes.length} von 3 senkrechten Ebenen: B und ein F bleiben fest, die anderen F tauschen Plätze.` :
+          "In der Draufsicht erscheint jede senkrechte Spiegelebene als Gerade durch F und B.",
+        "Die Molekülebene selbst ist eine weitere Spiegelebene; sie ist hier nicht gesucht."];
+      ctx.font="27px Arial";ctx.fillStyle="#193947";
+      notes.forEach((note,i)=>ctx.fillText(i===0 && message ? message : note,22,502+i*50,980));
       texture.needsUpdate=true;
     }
     const move = n => { step=n; message=""; draw(); };
@@ -117,7 +124,7 @@
       const p = [(hit.uv.x*1024-centers[v])/unit, (cy-(1-hit.uv.y)*640)/unit];
       if (Math.abs(p[0])>1.75 || Math.abs(p[1])>1.27) return;
       const used = strokes.some(s=>s.color===F.Draw.color);
-      if (!active && !v && used) { message="Wähle im Zeichenmenü eine noch nicht verwendete Farbe."; draw(); return; }
+      if (!active && !v && used) { message="Jede Farbe kennzeichnet eine andere Spiegelebene."; draw(); return; }
       const start = v ? [0,0] : project(0, atoms[strokes.length+1]);
       if (!active && Math.hypot(p[0]-start[0],p[1]-start[1])>0.32) return;
       if (!active) active={start:p, parts:[]};
@@ -136,7 +143,7 @@
       if (!m || Math.abs(dot(f,m.normal))>0.25) return;
       active.accepted=true;
       plate.position.set(0,0,0);plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...plane(0,...solution(0,strokes.length+1)).normal));
-      message="Ebene erkannt. Du kannst durch B weiterziehen. Zum Abschließen loslassen.";draw();
+      message="Die Gerade durch F und B ist die Spur der Spiegelebene in der Draufsicht.";draw();
     }
     draw();
     return {board, root, get step(){return step;}, get drawingMenu(){return drawingMenu;}, unused(c){return !strokes.some(s=>s.color===c);},
@@ -148,6 +155,10 @@
         const last=strokes.pop();if(!last)return;
         last.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;
         move(strokes.length ? 4+strokes.length : 1);
+      },
+      clear(){
+        F.Draw.clear(board); active=null; dotStroke=null; strokes=[]; waitRelease=true;
+        plates.forEach(p=>p.visible=false); ghosts.forEach(g=>g.visible=false); move(1);
       },
       tick(hit,held,near,opened,selected){if(step===0 && near)move(1); if(step===2 && selected)move(3); if(step===3 && opened && selected)move(4);
         if(!held)waitRelease=false;

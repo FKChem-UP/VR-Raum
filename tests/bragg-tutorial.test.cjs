@@ -64,6 +64,8 @@ for (const [source, wavelength] of [["mo", 0.7107], ["cu", 1.5406]]) {
   assert.ok(B.angleFor(1.5, source) <= 80);
 }
 assert.equal(B.geometry(0).matched, false);
+const quarter=B.initial(); B.command(quarter,"quarter"); B.command(quarter,"play"); B.advance(quarter,1);
+close(quarter.time,0.25); close(quarter.angle,B.angleFor(1));
 const fixedAngle = s.angle;
 B.command(s, "cu");
 close(s.angle, fixedAngle);

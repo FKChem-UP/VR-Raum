@@ -37,7 +37,7 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../js/mirror-tutorial.js
 F.create=()=>({object3D:new Obj(),dataset:{},setObject3D(){},setAttribute(){},remove(){}});
 const ink=[];
 let samples=0;
-F.Draw={color:"gold",mode:"laser",setMode(mode){this.mode=mode;},sampleSurface(last){samples++;if(last)return last;const s={color:this.color,worldRadius:0.004,opacity:0.6,material:{}};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){}};
+F.Draw={color:"gold",mode:"laser",setMode(mode){this.mode=mode;},sampleSurface(last){samples++;if(last)return last;const s={color:this.color,worldRadius:0.004,opacity:0.6,material:{}};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){ink.length=0;}};
 F.HandMenu={laserHand:()=>"right"};F.releaseModel=()=>{};
 const station=F.MirrorTutorial.station({});
 function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,station.drawingMenu);}
@@ -53,5 +53,7 @@ station.color("gold");line(2);assert.equal(station.step,5);station.color("blue")
 line(3);assert.equal(station.step,6);station.color("red");line(3);assert.equal(station.step,7);
 paint(1,[0,0]);assert.equal(station.step,8);assert.equal(ink.length,4);
 station.undo();assert.equal(station.step,9);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
+station.clear();assert.equal(station.step,1);assert.equal(ink.length,0);assert.equal(station.drawingMenu,true);
+paint(0,[0,0],false);line(1);assert.equal(station.step,5,"Nach Zurücksetzen erneut zeichnen");
 station.dispose();
 console.log("BF₃: Laserstrich über B hinaus, Modellmenü und anschließende Zeichenaufgaben geprüft.");

@@ -366,9 +366,9 @@
         y += compact ? 38 : 46;
       };
       // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
-      const row = entries => {
+      const row = (entries, actionRow = false) => {
         const compactRow = !!structure || locked;
-        const height = compactRow ? 72 : 87;
+        const height = actionRow ? 60 : compactRow ? 72 : 87;
         const w = (712 - (entries.length - 1) * 12) / entries.length;
         entries.forEach((entry, index) => {
           const x = 28 + index * (w + 12);
@@ -446,13 +446,18 @@
           ctx.font = "23px Arial";
           ctx.textAlign = "center";
           if(entry.heading) ctx.fillText(entry.heading,x+w/2,y+shift+29,w-12);
-          ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 63 : 73), w - 12);
+          const labelY = entry.kind === "plain" && !entry.heading ? height/2+8 : compactRow ? 63 : 73;
+          ctx.fillText(entry.label, x + w / 2, y + shift + labelY, w - 12);
           ctx.textAlign = "left";
           if (locked) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
           else this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
         });
-        y += compactRow ? 85 : 100;
+        y += height + 13;
       };
+      const tile = (label, action, selected=false, cueId=null) => ({kind:"plain", label, action, selected, cueId});
+      const drawingActions = (undo, clear, cueId=null) => row([
+        tile("Letzten Strich entfernen",undo,false,cueId), tile("Alle Zeichnungen zurücksetzen",clear)
+      ]);
       if (chapter?.phase === "mirror" && chapter.mirror.drawingMenu) {
         const mirror = chapter.mirror;
           text("Stiftfarbe · je Spiegel eine andere Farbe");
@@ -464,28 +469,27 @@
           text("Deckkraft");
           row([0.35,0.6,1].map(opacity=>({label:Math.round(opacity*100)+" %",kind:"opacity",
             selected:F.Draw.opacity===opacity,action:()=>{F.Draw.opacity=opacity;}})));
-          button("Letzten Strich entfernen",()=>mirror.undo(),false,"mirror:undo");
+          drawingActions(()=>mirror.undo(),()=>mirror.clear(),"mirror:undo");
         this.texture.needsUpdate=true;return;
       }
       if (animation) {
         const state = animation.state;
-        const control = (id, title, selected = false) => button(title, () => {
+        const control = (id, title, selected = false) => tile(title, () => {
           F.Bragg.command(state, id);
           if (id === "reset" && chapter.animationStep >= 3 && chapter.animationStep < F.Bragg.tasks.length) {
             chapter.distanceInfoOpened = false; chapter.animationStep = 3; chapter.render();
           }
         }, selected, id);
-        control("play", state.running ? "Pause" : "Start", state.running);
+        row([control("play", state.running ? "Pause" : "Start", state.running),control("reset", "Animation zurücksetzen")]);
         text("Abspieltempo");
-        for (const [id, speed] of [["slow", 0.5], ["normal", 1], ["fast", 2]]) control(id, `${speed}×`, state.speed === speed);
+        row([["quarter",0.25,"¼×"],["slow",0.5,"½×"],["normal",1,"1×"],["fast",2,"2×"]].map(
+          ([id,speed,label])=>control(id,label,state.speed===speed)));
         row([["mo", "Mo Kα"], ["cu", "Cu Kα"]].map(([id, label]) => ({label, kind: "plain",
           selected: state.source === id, cueId:"source:"+id, action: () => F.Bragg.command(state, id)})));
         text(`Detektorwinkel 2θ: ${state.angle.toFixed(1)}°`);
-        control("bragg", "Bragg-Stellung", state.angle === F.Bragg.angleFor(1, state.source));
-        control("compare", "Vergleich: halbe Welle versetzt", state.angle === F.Bragg.angleFor(1.5, state.source));
-        row([["minus", "−1°"], ["plus", "+1°"]].map(([id, label]) => ({label, kind: "plain", action: () => F.Bragg.command(state, id)})));
-        control("sweep", state.sweep ? "Winkellauf anhalten" : "Automatischer Winkellauf", !!state.sweep);
-        control("reset", "Animation zurücksetzen");
+        row([control("bragg", "Bragg-Stellung", state.angle === F.Bragg.angleFor(1, state.source)),
+          control("compare", "Vergleich: halbe Welle versetzt", state.angle === F.Bragg.angleFor(1.5, state.source))]);
+        row([control("minus","−1°"),control("plus","+1°"),control("sweep",state.sweep?"Winkellauf anhalten":"Winkellauf starten",!!state.sweep)]);
         this.texture.needsUpdate = true;
         return;
       }
@@ -493,9 +497,8 @@
         // Kompaktere Einstellungszeilen lassen Platz für Palette und Reichweite.
         button("Zurück zu Modellwerkzeugen", () => { this.page = "model"; });
         text("Handmenügröße · gilt für die Sitzung");
-        for (const [size, title] of [["small", "Kleiner (85 %)"], ["standard", "Standard (100 %)"], ["large", "Größer (115 %)"]]) {
-          button(title, () => F.HandMenu.setSize(size), F.HandMenu.size === size);
-        }
+        row([["small", "Kleiner (85 %)"], ["standard", "Standard (100 %)"], ["large", "Größer (115 %)"]].map(
+          ([size,title])=>tile(title,()=>F.HandMenu.setSize(size),F.HandMenu.size===size)));
         if (painting) {
           text("Malfarbe · unabhängig von der Laserfarbe");
           row([["#ffcc33", "Gelb"], ["#ee5151", "Rot"], ["#507dff", "Blau"], ["#45d77e", "Grün"]].map(([color, label]) => ({
@@ -509,9 +512,8 @@
             selected: F.Draw.opacity === opacity, action: () => { F.Draw.opacity = opacity; }})));
         } else if (structure) {
           text("Bindungsfarben · nur Ball-and-Stick");
-          for (const [mode, title] of [["auto", "Style-Standard"], ["element", "Endatomfarben"], ["uniform", "Einheitliche Farbe"]]) {
-            button(title, () => F.CIF.setBondAppearance(model, mode), (model.fkcBondColorMode || "auto") === mode);
-          }
+          row([["auto", "Style-Standard"], ["element", "Endatomfarben"], ["uniform", "Einheitliche Farbe"]].map(
+            ([mode,title])=>tile(title,()=>F.CIF.setBondAppearance(model,mode),(model.fkcBondColorMode||"auto")===mode)));
           text("Farbwahl aktiviert einheitliche Bindungsfarbe");
           row([["#949494", "Grau"], ["#eeeeee", "Weiß"], ["#ff9d38", "Orange"], ["#000000", "Schwarz"]].map(([color, title]) => ({
             label: title, kind: "color", color, selected: model.fkcBondColorMode === "uniform" && (model.fkcBondColor || "#949494") === color,
@@ -533,11 +535,11 @@
         text("Trigger halten: Oberfläche markieren");
         text("Laser/Malstift oben wechselt zurück zur Atomauswahl.");
         text("Farbe, Dicke und Deckkraft im Zahnrad einstellen.");
-        button("Letzten eigenen Strich zurücknehmen", () => {
-          const stroke = F.Draw.strokes.at(-1);
+        text("Zeichnungen am ausgewählten Modell");
+        drawingActions(() => {
+          const stroke = F.Draw.strokes.filter(s=>s.owner===model || model.contains(s.owner)).at(-1);
           if (stroke) F.Draw.remove(stroke);
-        });
-        button("Zeichnungen am ausgewählten Modell entfernen", () => F.Draw.clear(model));
+        }, () => F.Draw.clear(model));
       } else {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
         const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
@@ -587,9 +589,9 @@
             selected: F.Measure.enabled && F.Measure.mode === mode,
             action: () => F.Measure.toggleMode(mode)
           })));
-          button("Alle Messungen zurücksetzen", () => this.el.components["fkc-measurements"].reset());
-        }
-        button("Modell zurücksetzen", () => F.resetTarget(model));
+          row([tile("Messungen zurücksetzen", () => this.el.components["fkc-measurements"].reset()),
+            tile("Modell zurücksetzen", () => F.resetTarget(model))], true);
+        } else button("Modell zurücksetzen", () => F.resetTarget(model));
         if (structure?.contactExpansion) {
           const depth = structure.contactDepth;
           text(`Kontaktschalen · ${depth} von ${F.CIF.maxContactDepth} zusätzlich`);

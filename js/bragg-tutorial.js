@@ -60,6 +60,7 @@
     switch (id) {
       case "reset": Object.assign(s, initial()); break;
       case "play": s.running = !s.running; break;
+      case "quarter": s.speed = 0.25; break;
       case "slow": s.speed = 0.5; break;
       case "normal": s.speed = 1; break;
       case "fast": s.speed = 2; break;
