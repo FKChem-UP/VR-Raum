@@ -306,6 +306,33 @@ window.FKCVR = window.FKCVR || {};
     }
   });
 
+  function meshBounds(mesh, frame, visibleOnly = false) {
+    frame.updateWorldMatrix(true, false);
+    mesh.updateWorldMatrix(false, true);
+    const inverse = new M().copy(frame.matrixWorld).invert();
+    const bounds = new THREE.Box3().makeEmpty();
+    const matrix = new M();
+    const visit = object => {
+      if (!object.isMesh || !object.geometry) return;
+      if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+      if (!object.geometry.boundingBox) return;
+      matrix.multiplyMatrices(inverse, object.matrixWorld);
+      bounds.union(object.geometry.boundingBox.clone().applyMatrix4(matrix));
+    };
+    if (visibleOnly) mesh.traverseVisible(visit);
+    else mesh.traverse(visit);
+    return bounds;
+  }
+
+  function gripBounds(bounds, padding, factor = 1) {
+    const size = bounds.getSize(new V());
+    return {
+      width: Math.max(0.08, size.x * factor + padding),
+      height: Math.max(0.08, size.y * factor + padding),
+      depth: Math.max(0.08, size.z * factor + padding)
+    };
+  }
+
   F.applyModelBounds = function (visualEl) {
     const component = visualEl.components["fkc-normalize"];
     if (!component || !component.result) return false;
@@ -338,6 +365,23 @@ window.FKCVR = window.FKCVR || {};
       this.el.addEventListener("model-error", this.failed);
     },
 
+    refreshGripBounds: function () {
+      const mesh = this.el.getObject3D("mesh");
+      const hitbox = this.el.closest(".interactable")?.querySelector(".hitbox");
+      const frame = hitbox?.object3D.parent;
+      if (!mesh || !frame) return false;
+
+      // In den Koordinaten des Hitbox-Elternelements messen. Das Modell
+      // behält seine Normalisierung und die vom Nutzer gesetzte Pose.
+      mesh.updateWorldMatrix(true, false);
+      const bounds = meshBounds(mesh, frame, true);
+      if (bounds.isEmpty()) return false;
+      const center = bounds.getCenter(new V());
+      this.result = {hitbox: gripBounds(bounds, this.data.padding), center};
+      hitbox.object3D.position.copy(center);
+      return F.applyModelBounds(this.el);
+    },
+
     normalize: function () {
       if (!this.el.isConnected) return;
 
@@ -349,26 +393,7 @@ window.FKCVR = window.FKCVR || {};
 
       visual.position.set(0, 0, 0);
       visual.scale.setScalar(1);
-      visual.updateWorldMatrix(true, true);
-
-      const inverse = new M().copy(visual.matrixWorld).invert();
-      const bounds = new THREE.Box3().makeEmpty();
-      const matrix = new M();
-
-      mesh.traverse(object => {
-        if (!object.isMesh || !object.geometry) return;
-
-        if (!object.geometry.boundingBox) {
-          object.geometry.computeBoundingBox();
-        }
-
-        if (!object.geometry.boundingBox) return;
-
-        matrix.multiplyMatrices(inverse, object.matrixWorld);
-        bounds.union(
-          object.geometry.boundingBox.clone().applyMatrix4(matrix)
-        );
-      });
+      const bounds = meshBounds(mesh, visual);
 
       if (bounds.isEmpty()) {
         this.fallback();
@@ -415,11 +440,7 @@ window.FKCVR = window.FKCVR || {};
       const boxCenter = center.clone().sub(commonCenter).multiplyScalar(factor);
 
       this.result = {
-        hitbox: {
-          width: Math.max(0.08, size.x * factor + this.data.padding),
-          height: Math.max(0.08, size.y * factor + this.data.padding),
-          depth: Math.max(0.08, size.z * factor + this.data.padding)
-        },
+        hitbox: gripBounds(bounds, this.data.padding, factor),
         center: boxCenter
       };
 

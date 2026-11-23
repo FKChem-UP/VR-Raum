@@ -991,8 +991,9 @@
       scene?.components["fkc-measurements"]?.reset(root);
       component.built = built;
       visual.fkcStructure = structure;
-      // Kein model-loaded: Der Koordinatenrahmen und Griffbereich der Basis bleiben stehen.
+      // Kein model-loaded: Der Koordinatenrahmen bleibt stehen, nur die Hitbox wächst mit.
       visual.setObject3D("mesh", built.group);
+      visual.components["fkc-normalize"]?.refreshGripBounds();
       previous.dispose();
       F.invalidateHits();
     },
@@ -1176,7 +1177,10 @@
       root.fkcStyle = styleId;
       // Anzeigegröße/Griffbereich an geänderte Atomradien anpassen.
       const normalize = visual.components["fkc-normalize"];
-      if (normalize && !visual.fkcStructure.contactDepth) {
+      const contactBase = visual.components["fkc-cif-model"]?.contactBase;
+      if (normalize && (visual.fkcStructure.contactDepth || contactBase && contactBase !== visual.fkcStructure)) {
+        normalize.refreshGripBounds();
+      } else if (normalize) {
         // Umgebung darf die Basis beim Stylewechsel nicht unerwartet verkleinern.
         const environment = mesh.userData.fkcEnvironment;
         const records = environment ? [...environment.records.values()] : [];

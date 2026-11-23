@@ -198,6 +198,18 @@ assert.ok(hLegend && hLegend.y < 890, "Sechste Atomsorte H vollständig im Co-Me
 model.querySelector = originalQuery;
 const atomOptions = [];
 F.CIF.setAtomOptions = (...args) => atomOptions.push(args);
+F.CIF.maxContactDepth = 20;
+const knot = {...structure, mode: "sites", contactExpansion: {}, contactDepth: 0,
+  atoms: [{element: "Cu"}, {element: "O"}]};
+menu.render(knot);
+menu.buttons.find(button => button.label === "Sichtbar").action();
+assert.deepEqual(atomOptions.at(-1), [model, true], "H schon vor der ersten Kontaktschale ausblendbar");
+model.fkcHideHydrogen = true;
+menu.render({...knot, atoms: [...knot.atoms, {element: "H"}], contactDepth: 4});
+assert.ok(menu.buttons.every(button => button.y + button.h <= 900), "H-Schalter und Kontaktschalen passen auf die Fläche");
+menu.buttons.find(button => button.label === "Ausgeblendet").action();
+assert.deepEqual(atomOptions.at(-1), [model, false], "H nach der Erweiterung wieder einblendbar");
+delete model.fkcHideHydrogen;
 menu.buttons.find(button => button.label === "tool-mode").action();
 assert.equal(F.Draw.mode, "laser", "Pinsel öffnet das Zeichenmenü, ohne gleich zu malen");
 menu.render(structure);

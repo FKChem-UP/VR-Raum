@@ -645,7 +645,7 @@
         if(structure && !chapter?.phase && F.StructureAnalysis)display.push(tile("Struktur analysieren",()=>{
           F.StructureAnalysis.begin(model);this.page="analysis";
         }));
-        if(locked || structure && !structure.contactExpansion) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
+        if(locked || structure) display.push({heading:"H-Atome",label:model.fkcHideHydrogen?"Ausgeblendet":"Sichtbar",
           kind:"plain",cueId:"hide-hydrogen",action:()=>F.CIF.setAtomOptions(model,!model.fkcHideHydrogen)});
         if(F.AtomPlane && (structure || locked && chapter.mirror.step>=14)){
           const active=F.AtomPlane.active?.root===model ? F.AtomPlane.active : null;
