@@ -37,7 +37,7 @@
   }
   F.Tutorial = {
     active: false, crossed, hasSelectedMolecule, palm,
-    allowsModel(root) { return !!root && root.id === "tutorial-co-model" && this.active && root.object3D.visible; },
+    allowsModel(root) { return !!root && ["tutorial-co-model", "tutorial-bf3-model"].includes(root.id) && this.active && root.object3D.visible; },
     measurementTarget(mesh, mode) {
       const data = mesh.userData;
       return !data.fkcEnvironmentId && (!!data.fkcAtom || (mode === "distance" &&
@@ -99,7 +99,7 @@
       this.texture = new T.CanvasTexture(this.canvas);
       this.geometry = new T.PlaneGeometry(boardWidth, boardHeight);
       this.material = new T.MeshBasicMaterial({map: this.texture, side: T.DoubleSide,
-        transparent: true, opacity: 1, depthTest: false, depthWrite: false});
+        transparent: true, opacity: 1, fog: false, depthTest: false, depthWrite: false});
       this.board = F.create("a-entity", {class: "vr-action"}, this.group);
       this.board.dataset.fkcTutorial = "true";
       const mesh = new T.Mesh(this.geometry, this.material);
@@ -115,13 +115,6 @@
       this.cursor.raycast = function () {};
       this.cursor.visible = false;
       this.board.object3D.add(this.cursor);
-      this.shellGeometry = new T.SphereGeometry(60, 24, 16);
-      this.shellMaterial = new T.MeshBasicMaterial({color: "#ffffff", side: T.BackSide,
-        transparent: true, opacity: 0.91, depthTest: false, depthWrite: false});
-      this.shell = new T.Mesh(this.shellGeometry, this.shellMaterial);
-      this.shell.raycast = function () {};
-      this.shell.renderOrder = 80;
-      this.group.object3D.add(this.shell);
       this.floor = F.create("a-plane", {width: 18, height: 16, rotation: "-90 0 0",
         material: {shader: "flat", color: "#d5dce2"}}, this.group);
       this.grid = new T.GridHelper(16, 16, "#b3bec8", "#bfc9d2");
@@ -187,7 +180,13 @@
       this.cursor.visible = false;
       this.previous = null;
       this.target.object3D.visible = phase !== "question";
-      this.shell.visible = phase === "question";
+      if (this.questionFog) { this.el.object3D.fog = this.previousFog; this.questionFog = null; }
+      if (question) {
+        this.previousFog = this.el.object3D.fog;
+        // Kein Overlay vor dem Betrachter: volle Kontraste im Nahbereich.
+        this.questionFog = new T.Fog(0xf9fafb, 1.6, 5.6);
+        this.el.object3D.fog = this.questionFog;
+      }
       this.floor.object3D.visible = this.grid.visible = phase !== "question";
       this.room = document.getElementById("room-root");
       if (phase !== "question" && this.room) {
@@ -206,18 +205,20 @@
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 1024, 640);
       ctx.fillStyle = "#203f30"; ctx.font = "bold 64px Arial";
       const training = this.phase === "training";
-      const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : 0;
+      const mirror = this.phase === "mirror";
+      const mirrorDone = mirror && this.mirror.step === F.MirrorTutorial.tasks.length;
+      const first = training ? Math.floor(this.step / tasksPerPage) * tasksPerPage : mirror ? Math.floor(this.mirror.step/tasksPerPage)*tasksPerPage : 0;
       const animation = this.phase === "bragg";
       const structurePractice = this.phase === "structure-practice";
       const animationPractice = animation && this.animationStep === F.Bragg.tasks.length;
       ctx.fillText(this.phase === "question" ? "Tutorial?" : structurePractice ? "Strukturteil geschafft!" :
-        animationPractice ? "Animationsteil geschafft!" :
+        mirror ? (mirrorDone ? "Zeichenteil geschafft!" : `Zeichnen · ${this.mirror.step+1} / ${F.MirrorTutorial.tasks.length}`) : animationPractice ? "Animationsteil geschafft!" :
         animation ? `Animation · ${this.animationStep + 1} / ${F.Bragg.tasks.length}` :
         `Tutorial · ${this.step + 1} / ${tasks.length}`, 50, 100);
       ctx.font = "36px Arial";
       const lines = this.phase === "question" ? ["Möchtest du die Bedienung kennenlernen?",
         "Mit dem Laser zeigen und mit dem Trigger auswählen.", "Nein oder durch das Schild gehen: überspringen."] :
-        structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
+        mirror ? (mirrorDone ? ["Die drei Spiegel bleiben am BF₃-Modell.", "Greife es und betrachte die Ebenen von allen Seiten."] : F.MirrorTutorial.tasks.slice(first, first+tasksPerPage)) : structurePractice ? ["Du kannst hier weiter am Co-Komplex üben.", "Starte Teil 2, wenn du bereit bist."] :
         animationPractice ? ["Probiere weitere Winkel und Tempi aus.", "Oder starte Teil 3: Zeichne den Spiegel."] :
         animation ? F.Bragg.tasks :
           tasks.slice(first, first + tasksPerPage);
@@ -226,13 +227,15 @@
       lines.forEach((line, i) => {
         const index = first + i;
         if (training && index === 3) line += ` (${menuPalm} drehen)`;
-        const current = animation ? this.animationStep : this.step;
-        const numbered = training || (animation && !animationPractice);
+        const current = mirror ? this.mirror.step : animation ? this.animationStep : this.step;
+        const numbered = training || (animation && !animationPractice) || (mirror && !mirrorDone);
         ctx.fillStyle = numbered ? (index < current ? "#397c40" : index === current ? "#b34a21" : "#65717b") : "#203f30";
         ctx.fillText((numbered ? (index < current ? "✓ " : `${index + 1} · `) : "") + line,
           50, numbered ? 153 + i * (animation ? 36 : 41) : 180 + i * 55, 924);
       });
-      if (animation && !animationPractice) {
+      if (mirror && !mirrorDone) {
+        ctx.font = "30px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText(F.MirrorTutorial.hints[this.mirror.step],50,451,924);
+      } else if (animation && !animationPractice) {
         ctx.font = "30px Arial"; ctx.fillStyle = "#203f30";
         ctx.fillText(F.Bragg.hints[this.animationStep], 50, 451, 924);
       } else if (training) {
@@ -254,10 +257,7 @@
       this.texture.needsUpdate = true;
     },
     click: function (hit) {
-      if (this.phase === "mirror") {
-        if (hit.el === this.board && !F.Menu.opened) this.mirror.click(hit.uv);
-        return;
-      }
+      if (this.phase === "mirror" && hit.el !== this.board) return;
       if (this.animation && hit.el === this.animation.el) {
         if (F.Tutorial.active && this.phase === "bragg") {
           this.selectedAnimation = hit.el;
@@ -282,8 +282,11 @@
       this.selectedAnimation = null;
       this.animation.dispose(); this.animation = null;
       this.phase = "mirror";
-      // Feste Tafel: Beim Umrunden darf sich das räumliche Molekül nicht mitdrehen.
-      this.mirror = F.MirrorTutorial.station(this.board, this.canvas, this.texture, () => this.close());
+      this.previousDrawMode = F.Draw?.mode;
+      F.Draw?.setMode("paint");
+      this.mirror = F.MirrorTutorial.station(this.group);
+      this.mirrorProgress = this.mirror.step;
+      this.render();
       F.invalidateHits();
     },
     beginAnimation: function () {
@@ -338,21 +341,27 @@
       // Hauptmenü hat Vorrang, danach dieselbe Aufgabe fortsetzen.
       this.board.object3D.visible = !F.Menu.opened;
       if (F.Menu.opened) {
-        this.mirror?.tick(null, false, 0);
+        this.mirror?.tick(null, false, false, false);
         this.cursor.visible = false;
         this.previous = null;
         return;
       }
       if (this.phase === "training" && this.renderedPalm !== palm(F.HandMenu.laserHand())) this.render();
       const menu = this.el.components["fkc-hand-menu"];
-      if (menu && this.phase !== "bragg" && this.phase !== "structure-practice" &&
+      if (menu && this.phase !== "bragg" && this.phase !== "mirror" && this.phase !== "structure-practice" &&
           (this.phase !== "training" || this.step < 3)) menu.hide();
       const laser = document.getElementById(F.HandMenu.laserHand() + "Hand");
       const tools = laser && laser.components["fkc-controller"];
       this.updateCursor(tools && tools.source && tools.line.visible ? tools.hit : null);
       if (this.phase === "mirror") {
-        const uv = tools?.source && tools.line.visible && tools.hit?.el === this.board ? tools.hit.uv : null;
-        this.mirror.tick(uv, !!tools?.states.trigger, Math.min(delta || 0, 100) / 1000);
+        this.board.object3D.lookAt(this.head);
+        const p = this.mirror.board.object3D.getWorldPosition(this.modelWorld);
+        this.mirror.tick(tools?.source && tools.line.visible ? tools.hit : null, !!tools?.states.trigger,
+          Math.hypot(this.head.x-p.x,this.head.z-p.z)<1.85, F.HandMenu.opened);
+        if(this.mirrorProgress!==this.mirror.step){
+          if(this.mirrorProgress===0)this.board.object3D.position.set(1.2,1.65,-3.1);
+          this.mirrorProgress=this.mirror.step;this.render();
+        }
         return;
       }
       if (this.phase === "question") {
@@ -411,7 +420,8 @@
     },
     close: function () {
       const returnToSpawn = ["training", "structure-practice", "bragg", "mirror"].includes(this.phase);
-      if (this.mirror) { this.mirror.dispose(); this.mirror = null; }
+      if (this.questionFog) { this.el.object3D.fog = this.previousFog; this.questionFog = null; }
+      if (this.mirror) { this.mirror.dispose(); this.mirror = null; F.Draw?.setMode(this.previousDrawMode || "laser"); }
       this.restoreWalkable?.();
       this.restoreWalkable = null;
       this.selectedAnimation = null;
@@ -450,7 +460,7 @@
       this.el.removeEventListener("enter-vr", this.enter);
       this.el.removeEventListener("exit-vr", this.exit);
       this.group.remove();
-      [this.geometry, this.material, this.texture, this.shellGeometry, this.shellMaterial,
+      [this.geometry, this.material, this.texture,
         this.grid.geometry, this.grid.material, this.cursorGeometry, this.cursorMaterial].forEach(resource => resource.dispose());
     }
   });

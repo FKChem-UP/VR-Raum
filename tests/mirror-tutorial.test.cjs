@@ -25,4 +25,27 @@ for (const f of [2, 3]) {
   assert.equal(check(0, solution(0, f), false), null);
   assert.ok(check(0, solution(0, f), true), "Weitere Spiegelebenen im freien Modus");
 }
-console.log("BF₃: Projektionen, beide Spiegelungen, Treffertoleranz und freie Symmetriesuche geprüft.");
+// Geführte Eingaben ohne XR-Renderer: echte Stationslogik mit kleinen Zeichen-/Mesh-Doubles.
+class Vec { set() {return this;} fromArray(){return this;} multiplyScalar(){return this;} copy(){return this;} }
+class Obj { constructor(){this.position=new Vec();this.scale={setScalar(){}};this.quaternion={setFromUnitVectors(){}};this.visible=true;}
+  add(){} dispose(){} }
+class Mesh extends Obj {constructor(g,m){super();this.material=m;} }
+class Material extends Obj {constructor(){super();this.color={set(){}};} }
+const T={Group:Obj,Vector3:Vec,Mesh,MeshBasicMaterial:Material,SphereGeometry:Obj,PlaneGeometry:Obj,CylinderGeometry:Obj,CanvasTexture:Obj};
+const ctx=new Proxy({}, {get:(o,k)=>o[k]||(()=>{})});
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,"../js/mirror-tutorial.js"),"utf8"),{window:{FKCVR:F},AFRAME:{THREE:T},document:{createElement:()=>({getContext:()=>ctx})}});
+F.create=()=>({object3D:new Obj(),dataset:{},setObject3D(){},setAttribute(){},remove(){}});
+const ink=[];
+F.Draw={color:"gold",sample(last){if(last)return last;const s={color:this.color};ink.push(s);return s;},remove(s){ink.splice(ink.indexOf(s),1);},clear(){}};
+F.HandMenu={laserHand:()=>"right"};F.releaseModel=()=>{};
+const station=F.MirrorTutorial.station({});
+function paint(view,p,held=true){station.tick({el:station.board,uv:{x:((view?760:264)+116*p[0])/1024,y:1-(278-116*p[1])/640}},held,true,false);}
+function line(i){paint(0,project(0,atoms[i]));paint(0,[0,0]);paint(0,[0,0],false);}
+station.tick(null,false,true,false);line(1);assert.equal(station.step,2);
+station.tick(null,false,true,true);assert.equal(station.cue(),"mirror:menu");station.menu();assert.equal(station.step,4);
+station.color("gold");assert.equal(station.step,4);station.color("blue");line(2);assert.equal(station.step,6);
+line(3);assert.equal(station.step,6);station.color("red");line(3);assert.equal(station.step,7);
+paint(1,[0,0]);assert.equal(station.step,8);assert.equal(ink.length,4);
+station.undo();assert.equal(station.step,9);assert.equal(ink.length,3);assert.equal(station.drawingMenu,true);
+station.dispose();
+console.log("BF₃: Projektionen, Spiegelungen und neun Zeichenschritte mit Farbwechsel und Rückgängig geprüft.");

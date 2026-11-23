@@ -24,6 +24,7 @@
   function selectedModel(scene) {
     const tutorial = scene.components?.["fkc-tutorial"];
     if (tutorial?.phase === "bragg") return tutorial.selectedAnimation;
+    if (tutorial?.phase === "mirror") return tutorial.mirror.root;
     const model = scene.lastSelectedModel;
     return model && model.isConnected && model.modelReady &&
       model.classList.contains("interactable") ? model : null;
@@ -265,11 +266,12 @@
       const visual = model.querySelector(".model-visual");
       const structure = visual && visual.fkcStructure;
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
-      const cue = this.page === "model" && F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
+      const mirror = chapter?.phase === "mirror" ? chapter.mirror : null;
+      const cue = mirror ? mirror.cue() : this.page === "model" && F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
       const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
       const signature = [model.fkcVariantId, !!model.fkcPendingVisual,
-        cue, pulse, animation?.state.source, animation?.state.angle.toFixed(1), animation?.state.speed, animation?.state.running, animation?.state.sweep,
+        cue, pulse, mirror?.step, mirror?.drawingMenu, animation?.state.source, animation?.state.angle.toFixed(1), animation?.state.speed, animation?.state.running, animation?.state.sweep,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
@@ -447,6 +449,25 @@
         });
         y += compactRow ? 85 : 100;
       };
+      if (chapter?.phase === "mirror") {
+        const mirror = chapter.mirror;
+        if (!mirror.drawingMenu) {
+          text("BF₃ · Werkzeuge für die Zeichentafel");
+          button("Zeichenmenü öffnen", () => mirror.menu(), false, "mirror:menu");
+        } else {
+          text("Stiftfarbe · je Spiegel eine andere Farbe");
+          row([["#ffcc33","Gelb"],["#ee5151","Rot"],["#507dff","Blau"],["#45d77e","Grün"]].map(([color,label])=>({label,kind:"color",color,
+            selected:F.Draw.color===color,cueId:mirror.unused(color)?"mirror:color":null,action:()=>mirror.color(color)})));
+          text("Strichdicke");
+          row([0.002,0.004,0.008].map(radius=>({label:radius*2000+" mm",kind:"bond-size",factor:radius/0.008,
+            selected:F.Settings.strokeRadius===radius,action:()=>{F.Settings.strokeRadius=radius;}})));
+          text("Deckkraft");
+          row([0.35,0.6,1].map(opacity=>({label:Math.round(opacity*100)+" %",kind:"opacity",
+            selected:F.Draw.opacity===opacity,action:()=>{F.Draw.opacity=opacity;}})));
+          button("Letzten Strich entfernen",()=>mirror.undo(),false,"mirror:undo");
+        }
+        this.texture.needsUpdate=true;return;
+      }
       if (animation) {
         const state = animation.state;
         const control = (id, title, selected = false) => button(title, () => {

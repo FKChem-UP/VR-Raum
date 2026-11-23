@@ -6,7 +6,6 @@
     const angle = Math.PI / 10 + i * 2 * Math.PI / 3;
     return [Math.cos(angle), 0, -Math.sin(angle)];
   })];
-  const colors = ["#176da0", "#b05d14"];
   const centers = [264, 760], cy = 278, unit = 116;
   const project = (view, p) => [p[0], view === 0 ? -p[2] : p[1]];
   const dot = (a, b) => a.reduce((sum, value, i) => sum + value * b[i], 0);
@@ -37,128 +36,108 @@
     if (hits.includes(-1) || new Set(hits).size !== 4 || (view === 0 && !free && hits[1] !== 1)) return null;
     return solution(view, view === 0 ? hits.findIndex((j, i) => i > 0 && j === i) : 1);
   }
-  function station(board, canvas, texture, exit) {
-    const T = AFRAME.THREE, ctx = canvas.getContext("2d"), keep = [];
-    const group = new T.Group(); board.object3D.add(group);
-    group.position.set(1.40, 0, 0); group.scale.setScalar(0.44);
-    const material = options => { const m = new T.MeshBasicMaterial(options); keep.push(m); return m; };
-    const mesh = (geometry, mat) => { keep.push(geometry); const m = new T.Mesh(geometry, mat);
-      m.raycast = function () {}; group.add(m); return m; };
-    const atomColor = i => i ? 0x42a881 : 0xa46b58;
-    const ghosts = [], plates = [];
+  const tasks = ["Zur BF₃-Zeichentafel gehen", "Erste Spiegelebene zeichnen", "Handmenü öffnen",
+    "Zeichenmenü wählen", "Eine andere Farbe wählen", "Zweite Spiegelebene zeichnen",
+    "Neue Farbe und dritte Spiegelebene", "Rechts einen Punkt auf B setzen", "Letzten Strich im Handmenü entfernen"];
+  const hints = ["Geh zur zweigeteilten Tafel vor dir.", "Links: Trigger am goldenen F drücken und bis B ziehen.",
+    "Dreh die Handfläche ohne Laser zum Kopf.", "Drücke den gelb umrahmten Knopf Zeichenmenü.",
+    "Wähle eine andere Stiftfarbe als für Ebene eins.", "Hand senken. Links vom neu markierten F bis B zeichnen.",
+    "Im Zeichenmenü dritte Farbe wählen. Vom letzten F bis B ziehen.", "Rechts: B kurz antippen. Vergleiche die rosa Bilder mit den grünen F.",
+    "Handfläche drehen und Letzten Strich entfernen drücken."];
+  function station(parent) {
+    const T = AFRAME.THREE, resources = [], keep = r => (resources.push(r), r);
+    const canvas = document.createElement("canvas"); canvas.width = 1024; canvas.height = 640;
+    const ctx = canvas.getContext("2d"), texture = keep(new T.CanvasTexture(canvas));
+    const board = F.create("a-entity", {class: "vr-action", position: "-1.4 1.45 -2.7"}, parent);
+    board.dataset.fkcTutorial = "true";
+    const face = new T.Mesh(keep(new T.PlaneGeometry(1.8, 1.125)), keep(new T.MeshBasicMaterial({map: texture})));
+    board.setObject3D("mesh", face);
+    const root = F.create("a-entity", {id: "tutorial-bf3-model", class: "interactable", position: "0.05 1.35 -2.5"}, parent);
+    root.dataset.title = "BF₃ · Zeichenübung";
+    const body = F.create("a-entity", {class: "manip-body"}, root);
+    F.create("a-box", {class: "hitbox", width: 0.9, height: 0.28, depth: 0.9, visible: false}, body);
+    root.setAttribute("fkc-manipulable", ""); root.modelReady = true;
+    const group = new T.Group(); body.object3D.add(group); group.scale.setScalar(0.40);
+    const make = (geometry, options) => { const m = new T.Mesh(keep(geometry), keep(new T.MeshBasicMaterial(options)));
+      group.add(m); return m; };
+    const plates = [], ghosts = [];
     atoms.forEach((p, i) => {
-      const radius = i ? 0.16 : 0.20;
-      mesh(new T.SphereGeometry(radius, 24, 16), material({color: atomColor(i)})).position.fromArray(p);
-      if (i) {
-        const bond = mesh(new T.CylinderGeometry(0.047, 0.047, 1, 12), material({color: 0x728382}));
-        bond.position.fromArray(p).multiplyScalar(0.5);
-        bond.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), new T.Vector3(...p));
-      }
-      const ghost = mesh(new T.SphereGeometry(radius * 1.18, 12, 8), material({color: 0xbd2375, wireframe: true}));
-      ghost.visible = false; ghosts.push(ghost);
+      make(new T.SphereGeometry(i ? 0.16 : 0.20, 20, 12), {color: i ? 0x258365 : 0x975841}).position.fromArray(p);
+      if (!i) return;
+      const bond = make(new T.CylinderGeometry(0.045, 0.045, 1, 12), {color: 0x81908d});
+      bond.position.fromArray(p).multiplyScalar(0.5); bond.quaternion.setFromUnitVectors(new T.Vector3(0,1,0), new T.Vector3(...p));
+      const ghost = make(new T.SphereGeometry(0.17, 12, 8), {color: 0xc93482, wireframe: true});
+      ghost.position.fromArray(p).multiplyScalar(-1); ghost.visible = false; ghosts.push(ghost);
+      const plate = make(new T.PlaneGeometry(2.65, 2.2), {transparent: true, opacity: 0.33, side: T.DoubleSide, depthWrite: false});
+      plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1), new T.Vector3(...plane(0,...solution(0,i)).normal));
+      plate.visible = false; plates.push(plate);
     });
-    for (const color of colors) {
-      const plate = mesh(new T.PlaneGeometry(2.9, 2.9), material({color, transparent: true, opacity: 0.28,
-        side: T.DoubleSide, depthWrite: false})); plate.visible = false; plates.push(plate);
-    }
-    const ring = mesh(new T.TorusGeometry(0.21, 0.019, 8, 28), material({color: 0xe9a725}));
-    ring.position.fromArray(atoms[1]);
-    let view = 0, lines = [null, null], passed = [false, false], history = [], hint = false, drag = null;
-    let message = "Links: Zieh mit gehaltenem Trigger vom goldenen F durch B.", preview = null, elapsed = 0;
-    const buttons = [{x: 20, w: 216, label: "Spiegelung testen", action: test},
-      {x: 248, w: 202, label: "Lösung zeigen", action: () => { hint = true; redraw(); }},
-      {x: 462, w: 168, label: "Rückgängig", action: undo},
-      {x: 642, w: 174, label: "Weiter", action: next}, {x: 828, w: 176, label: "Beenden", action: exit}];
-    const pixel = (v, p) => [centers[v] + p[0] * unit, cy - p[1] * unit];
-    function stroke(v, line, color, dashed) {
-      const [a, b] = line.map(p => pixel(v, p)); ctx.strokeStyle = color; ctx.lineWidth = 6;
-      ctx.setLineDash(dashed ? [10, 8] : []); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); ctx.setLineDash([]);
-    }
-    function redraw() {
-      ctx.fillStyle = "#f6faf8"; ctx.fillRect(0, 0, 1024, 640);
-      ctx.fillStyle = "#203f30"; ctx.font = "bold 43px Arial"; ctx.fillText("Teil 3 · Zeichne den Spiegel", 24, 58);
-      ctx.font = "27px Arial"; ctx.fillText("Idealisiertes BF₃ · B: Bor, F: Fluor · Der Laser ist auf der Zeichenfläche dein Stift.", 24, 99, 972);
-      for (let v = 0; v < 2; v++) {
-        ctx.fillStyle = "#fff"; ctx.fillRect(20 + v * 496, 124, 488, 314);
-        ctx.strokeStyle = v === view ? colors[v] : "#c2cdca"; ctx.lineWidth = 4; ctx.strokeRect(20 + v * 496, 124, 488, 314);
-        ctx.fillStyle = "#193947"; ctx.font = "bold 25px Arial"; ctx.fillText(v ? "2 · Von der Seite" : "1 · Von oben", 36 + v * 496, 158);
-        const points = atoms.map(p => project(v, p));
-        points.slice(1).forEach(p => stroke(v, [points[0], p], "#81908d", false));
-        points.forEach((p, i) => {
-          const [x, y] = pixel(v, p); ctx.fillStyle = i ? "#258365" : "#975841";
-          ctx.beginPath(); ctx.arc(x, y, 15, 0, 2 * Math.PI); ctx.fill();
-          ctx.fillStyle = "white"; ctx.font = "bold 19px Arial"; ctx.fillText(i ? "F" : "B", x - 6, y + 6);
-          if (!v && i === 1) { ctx.strokeStyle = "#d89210"; ctx.beginPath(); ctx.arc(x, y, 21, 0, 2 * Math.PI); ctx.stroke(); }
-        });
-        if (view === v && !discovered && !passed[v]) {
-          const guides = v === 0 ? [points[1], points[0]] : [points.reduce((a, b) => a[0] < b[0] ? a : b), points.reduce((a, b) => a[0] > b[0] ? a : b)];
-          for (const p of guides) { const [x, y] = pixel(v, p); ctx.strokeStyle = "#d89210";
-            ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, 21, 0, 2 * Math.PI); ctx.stroke(); }
+    let step = 0, strokes = [], dotStroke, active, drawingMenu = false, message = "", waitRelease = false;
+    const pixel = (v,p) => [centers[v] + p[0] * unit, cy - p[1] * unit];
+    // Seitliche Projektion entlang B–F1: F1 liegt auf B, F2/F3 erscheinen paarweise.
+    const side = p => [-p[0]*atoms[1][2] + p[2]*atoms[1][0], p[1]];
+    function draw() {
+      ctx.fillStyle = "#f6faf8"; ctx.fillRect(0,0,1024,640);
+      ctx.font = "bold 36px Arial"; ctx.fillStyle = "#203f30"; ctx.fillText("BF₃ · Symmetrie mit dem Stift untersuchen",24,58);
+      const target = [1,5,6].includes(step) ? strokes.length + 1 : -1;
+      for (const v of [0,1]) {
+        const x = v ? 520 : 16; ctx.fillStyle = "white"; ctx.fillRect(x,90,486,364);
+        ctx.fillStyle = "#193947"; ctx.font = "bold 24px Arial";
+        ctx.fillText(v ? "Prüfe ein mögliches Inversionszentrum" : "Zeichne die drei Spiegelebenen ein",x+12,132,460);
+        const points = atoms.map(p => pixel(v, v ? side(p) : project(0,p)));
+        points.slice(1).forEach(p => { ctx.strokeStyle = "#81908d"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(...points[0]); ctx.lineTo(...p); ctx.stroke(); });
+        for (const i of [1,2,3,0]) { const [a,b] = points[i]; ctx.fillStyle = i ? "#258365" : "#975841";
+          ctx.beginPath(); ctx.arc(a,b,16,0,2*Math.PI); ctx.fill(); ctx.fillStyle = "white"; ctx.font="bold 20px Arial";ctx.fillText(i?"F":"B",a-7,b+7);
+          if ((!v && i === target) || (v && !i && step === 7)) {ctx.strokeStyle="#d69500";ctx.beginPath();ctx.arc(a,b,22,0,2*Math.PI);ctx.stroke();}
         }
-        if (view === v && hint) stroke(v, solution(v), "#d3a12a", true);
-        if (lines[v]) stroke(v, lines[v], colors[v], false);
       }
-      ctx.fillStyle = "#193947"; ctx.font = "29px Arial"; ctx.fillText(message, 24, 495, 975);
-      buttons.forEach(b => { ctx.fillStyle = "#c7e2d5"; ctx.fillRect(b.x, 544, b.w, 68);
-        ctx.fillStyle = "#163c2c"; ctx.font = "bold 25px Arial"; ctx.fillText(b.label, b.x + 10, 588, b.w - 20); });
-      texture.needsUpdate = true;
-      plates.forEach((plate, v) => { const m = lines[v] && plane(v, ...lines[v]); plate.visible = !!m;
-        if (m) { const n = new T.Vector3(...m.normal); plate.position.copy(n).multiplyScalar(m.offset);
-          plate.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), n); } });
+      ctx.font="27px Arial";ctx.fillStyle="#193947";ctx.fillText(message || hints[step] || "Geschafft! Die drei farbigen Ebenen bleiben am Modell.",22,507,980);
+      ctx.fillText(dotStroke ? "Inversion an B: Die rosa F-Abbilder treffen auf kein Fluoratom." : "Links: von oben · Rechts: entlang einer B–F-Bindung · Modell mit Grip bewegen",22,565,980);
+      texture.needsUpdate=true;
     }
-    function stopPreview() { preview = null; ghosts.forEach(g => { g.visible = false; }); }
-    function test() {
-      const m = lines[view] && plane(view, ...lines[view]);
-      if (!m) { message = "Zeichne zuerst einen längeren Strich. Lösung zeigen hilft dir."; redraw(); return; }
-      const correct = check(view, lines[view], discovered);
-      if (correct) { lines[view] = correct; passed[view] = true; hint = false; }
-      preview = plane(view, ...lines[view]); elapsed = 0;
-      message = !correct ? "Fast: Prüfe die rosa Spiegelbilder. Lösung zeigen hilft." : view ?
-        "Richtig: Alle vier Atome bleiben auf ihrem Platz. Weiter zum freien Üben." :
-        "Richtig: Zwei F tauschen die Plätze. Weiter zur Seitenansicht.";
-      redraw();
+    const move = n => { step=n; message=""; draw(); };
+    function sample(hit) {
+      if (hit?.el !== board || !hit.uv || ![1,5,6,7].includes(step)) return;
+      const v = step === 7 ? 1 : 0;
+      const p = [(hit.uv.x*1024-centers[v])/unit, (cy-(1-hit.uv.y)*640)/unit];
+      if (Math.abs(p[0])>1.75 || Math.abs(p[1])>1.27) return;
+      const used = strokes.some(s=>s.color===F.Draw.color);
+      if (!active && !v && used) { message="Wähle im Zeichenmenü eine noch nicht verwendete Farbe."; draw(); return; }
+      const start = v ? [0,0] : project(0, atoms[strokes.length+1]);
+      if (!active && Math.hypot(p[0]-start[0],p[1]-start[1])>0.32) return;
+      if (!active) active={start:p, parts:[]};
+      const last = active.parts.at(-1);
+      const part = F.Draw.sample(last, {...hit,type:"surface"}, F.HandMenu.laserHand());
+      if (part && part!==last) active.parts.push(part);
+      if (!part) return;
+      if (v) { dotStroke=part; active=null; waitRelease=true; ghosts.forEach(g=>g.visible=true); move(8); return; }
+      const candidate = plane(0, active.start, p), plate = plates[strokes.length];
+      if(candidate){const n=new T.Vector3(...candidate.normal);plate.position.copy(n).multiplyScalar(candidate.offset);
+        plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),n);plate.visible=true;plate.material.color.set(part.color);}
+      if (Math.hypot(...p)>0.27) return;
+      const m = plane(0,active.start,p), f = atoms[strokes.length+1];
+      if (!m || Math.abs(dot(f,m.normal))>0.25) return;
+      strokes.push({parts:active.parts,color:F.Draw.color});active=null;waitRelease=true;
+      plate.position.set(0,0,0);plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),new T.Vector3(...plane(0,...solution(0,strokes.length)).normal));
+      move(strokes.length===1?(drawingMenu?4:2):strokes.length===2?6:7);
     }
-    let discovered = false;
-    function next() {
-      if (!passed[view]) { message = "Teste erst deinen Spiegel. Die gestrichelte Lösung kannst du nachziehen."; hint = true; }
-      else { discovered ||= passed.every(Boolean); view = 1 - view; hint = false;
-        message = discovered ? "Frei üben: Finde links weitere Spiegelebenen durch B und ein F." : "Rechts: Zieh eine Linie durch alle Atomzentren und teste sie."; }
-      stopPreview(); redraw();
-    }
-    function undo() {
-      const old = history.pop(); if (!old) return;
-      ({lines, passed, view, discovered} = old); hint = !discovered; stopPreview();
-      message = "Letzten Strich und seine Wirkung zurückgenommen."; redraw();
-    }
-    const coords = uv => [uv.x * 1024, (1 - uv.y) * 640];
-    function point(uv) {
-      if (!uv) return null;
-      const [x, y] = coords(uv);
-      return Math.abs(x - centers[view]) <= 240 && y >= 165 && y <= 431 ? [(x - centers[view]) / unit, (cy - y) / unit] : null;
-    }
-    function click(uv) {
-      if (!uv) return;
-      const [x, y] = coords(uv); drag = null;
-      if (y >= 544 && y <= 612) { buttons.find(b => x >= b.x && x <= b.x + b.w)?.action(); return; }
-      const p = point(uv); if (!p) return;
-      history.push({lines: lines.slice(), passed: passed.slice(), view, discovered}); if (history.length > 32) history.shift();
-      stopPreview(); drag = p; lines[view] = [p, p]; passed[view] = false;
-      message = "Trigger halten und ziehen. Danach: Spiegelung testen."; redraw();
-    }
-    function tick(uv, held, dt) {
-      if (!held || !uv) drag = null;
-      const p = drag && point(uv);
-      if (p && Math.hypot(p[0] - lines[view][1][0], p[1] - lines[view][1][1]) > 0.013) {
-        lines[view] = [drag, p]; redraw();
-      }
-      if (preview) {
-        elapsed = Math.min(1, elapsed + dt);
-        ghosts.forEach((ghost, i) => { const end = reflect(atoms[i], preview);
-          ghost.visible = true; ghost.position.fromArray(atoms[i].map((n, k) => n + elapsed * (end[k] - n))); });
-      }
-    }
-    redraw();
-    return {click, tick, dispose() { group.removeFromParent(); keep.forEach(r => r.dispose()); }};
+    draw();
+    return {board, root, get step(){return step;}, get drawingMenu(){return drawingMenu;}, unused(c){return !strokes.some(s=>s.color===c);},
+      cue(){return step===3?"mirror:menu":step===4||step===6 && strokes.some(s=>s.color===F.Draw.color)?"mirror:color":step===8?"mirror:undo":null;},
+      menu(){if(step<3)return;drawingMenu=true;if(step===3)move(4);},
+      color(c){F.Draw.color=c;if(step===4 && !strokes.some(s=>s.color===c))move(5);else {message="";draw();}},
+      undo(){
+        if(dotStroke){F.Draw.remove(dotStroke);dotStroke=null;ghosts.forEach(g=>g.visible=false);move(9);return;}
+        const last=strokes.pop();if(!last)return;
+        last.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;
+        move([1,5,6][strokes.length]);
+      },
+      tick(hit,held,near,opened){if(step===0 && near)move(1); if(step===2 && opened)move(3);
+        if(!held)waitRelease=false;
+        if(held && !opened && !waitRelease) sample(hit);
+        if(active && (!held || opened || hit?.el!==board)){active.parts.forEach(s=>F.Draw.remove(s));plates[strokes.length].visible=false;active=null;message="Noch einmal: vom markierten F bis zum B ziehen.";draw();}},
+      dispose(){ F.releaseModel(root); F.Draw.clear(board);board.remove();root.remove();resources.forEach(r=>r.dispose()); }
+    };
   }
-  F.MirrorTutorial = {station, atoms, project, plane, reflect, solution, check};
+  F.MirrorTutorial = {station, atoms, project, plane, reflect, solution, check, tasks, hints};
 })(window.FKCVR);

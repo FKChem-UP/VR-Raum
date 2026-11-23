@@ -134,7 +134,8 @@ assert.equal(F.Tutorial.menuTarget({components: {"fkc-tutorial": tutorial}}, sta
 assert.equal(tutorial.buttons[1].title, "Zum Begrüßungsraum");
 assert.equal(tutorial.buttons[0].title, "Teil 3: Zeichne den Spiegel");
 let disposed = false;
-F.MirrorTutorial = {station: () => ({dispose() { disposed = true; }})};
+F.MirrorTutorial = {tasks:["Zur Tafel gehen"],hints:["Geh zur Tafel."],station: () => ({step:0,dispose() { disposed = true; }})};
+board.object3D={position:{set(){}}};
 tutorial.buttons[0].action();
 assert.equal(tutorial.phase, "mirror"); assert.equal(tutorial.selectedAnimation, null);
 tutorial.close();
