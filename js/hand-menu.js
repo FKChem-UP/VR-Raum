@@ -318,6 +318,7 @@
       ctx.font = "bold 38px Arial";
       const chapter = this.el.components["fkc-tutorial"];
       const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      const locked = chapter?.phase === "mirror" && !chapter.mirror.drawingMenu;
       ctx.fillText(animation ? "Animationssteuerung" : this.page === "settings" ? (painting ? "Malstift-Einstellungen" : "Modelleinstellungen") :
         painting ? "Malstift" : "Modellwerkzeuge", 28, 48, 510);
       ctx.font = "28px Arial";
@@ -343,7 +344,7 @@
         ctx.globalAlpha = 1;
       };
       const button = (label, action, selected = false, cueId = null) => {
-        const compact = this.page === "settings" || !!structure;
+        const compact = this.page === "settings" || !!structure || locked;
         const b = {x: 28, y, w: 712, h: compact ? 32 : 40, action};
         const index = this.buttons.length;
         const pressed = this.pressedIndex === index;
@@ -360,12 +361,13 @@
         ctx.fillStyle = "#173527";
         ctx.font = "29px Arial";
         ctx.fillText((selected ? "✓ " : "") + label, 43, y + (compact ? 25 : 29) + shift, 677);
-        this.buttons.push(b);
+        if (locked) { ctx.fillStyle = "rgba(185,185,185,0.68)"; ctx.fillRect(b.x,b.y,b.w,b.h+5); }
+        else this.buttons.push(b);
         y += compact ? 38 : 46;
       };
       // Direkte Buttonreihen statt Untermenüs. Kurze Beschriftung ergänzt Symbole.
       const row = entries => {
-        const compactRow = !!structure;
+        const compactRow = !!structure || locked;
         const height = compactRow ? 72 : 87;
         const w = (712 - (entries.length - 1) * 12) / entries.length;
         entries.forEach((entry, index) => {
@@ -445,7 +447,8 @@
           ctx.textAlign = "center";
           ctx.fillText(entry.label, x + w / 2, y + shift + (compactRow ? 63 : 73), w - 12);
           ctx.textAlign = "left";
-          this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
+          if (locked) { ctx.fillStyle="rgba(185,185,185,0.68)"; ctx.fillRect(x,y,w,height+10); }
+          else this.buttons.push({x, y, w, h: height + 10, label: entry.label, kind: entry.kind, action: entry.action});
         });
         y += compactRow ? 85 : 100;
       };
@@ -536,7 +539,7 @@
         button("Zeichnungen am ausgewählten Modell entfernen", () => F.Draw.clear(model));
       } else {
         text("Ansicht" + (model.fkcPendingVisual ? " – wird geladen …" : ""));
-        const variants = model.fkcVariants || [];
+        const variants = locked ? ["molecule", "cell", "coordination"].map(cifMode => ({id:cifMode,cifMode})) : model.fkcVariants || [];
         row(variants.slice(this.offset, this.offset + 4).map(variant => ({
           label: ({"zns-closed-cell": "Elementarzelle", "zns-sites": "CIF-Positionen",
             "zns-zn": "Zn-Koordination", "zns-s": "S-Koordination", coordination: "Koordination", cell: "Zelle"})[variant.cifMode] ||
@@ -549,9 +552,9 @@
         if (variants.length > 4) button("Weitere Ansichten", () => {
           this.offset = this.offset + 4 < variants.length ? this.offset + 4 : 0;
         });
-        if (structure) {
+        if (structure || locked) {
           text("Styles");
-          const available = F.CIF.availableStyles(structure);
+          const available = locked ? F.CIF.styles : F.CIF.availableStyles(structure);
           const activeStyle = available.some(style => style.id === model.fkcStyle) ? model.fkcStyle : "ball-stick";
           row(available.map(style => ({
             label: {"ball-stick": "Kugel–Stab", "space-filling": "Raumfüllend",
@@ -565,7 +568,7 @@
         button("Labels: " + ({hover: "Beim Anvisieren", all: "Alle", off: "Aus"}[mode]), () => {
           F.AtomLabels.setMode(model, {hover: "all", all: "off", off: "hover"}[mode]);
         });
-        if (structure && !structure.contactExpansion) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
+        if (locked || structure && !structure.contactExpansion) button("H-Atome: " + (model.fkcHideHydrogen ? "Ausgeblendet" : "Sichtbar"),
           () => F.CIF.setAtomOptions(model, !model.fkcHideHydrogen), false, "hide-hydrogen");
         if (structure && ["cell", "cell-complete"].includes(structure.mode) && structure.name && structure.name.startsWith("Co-Produkt1")) {
           button("Moleküle vervollständigen: " + (structure.mode === "cell-complete" ? "An" : "Aus"),
@@ -576,7 +579,7 @@
           button("H-Brücken: " + (enabled ? (model.fkcHideHydrogen ? "An (H-Atome ausgeblendet)" : "An") : "Aus"),
             () => F.CIF.setHydrogenContacts(model, !enabled), enabled);
         }
-        if (structure && ["molecule", "coordination"].includes(structure.mode)) {
+        if (locked || structure && ["molecule", "coordination"].includes(structure.mode)) {
           text("Messen · aktiven Knopf erneut drücken: Aus");
           row(["distance", "angle", "torsion"].map(mode => ({
             label: F.Measure.titles[mode], kind: mode, count: F.Measure.counts[mode], cueId: "measure:" + mode,
@@ -593,9 +596,9 @@
             label, kind: "plain", action: () => F.CIF.setContactDepth(model, depth + change)
           })));
         }
-        if (structure && structure.environmentCell) {
-          const state = F.CIF.environmentState(model);
-          text("Umgebung (Å) · " + state.selected.size + " übernommen");
+        if (locked || structure && structure.environmentCell) {
+          const state = locked ? {selected:[],enabled:false} : F.CIF.environmentState(model);
+          text(locked ? "Umgebung (Å)" : "Umgebung (Å) · " + state.selected.size + " übernommen");
           row([null, 1.5, 2, 2.5, 3, 4, 5].map(radius => ({label: radius === null ? "Aus" : String(radius).replace(".", ","), kind: "environment", radius,
             cueId: "environment:" + (radius ?? "off"),
             selected: radius === null ? !state.enabled : state.enabled && state.radius === radius,
@@ -665,7 +668,8 @@
       ctx.fillStyle = "#173527";
       ctx.font = "38px Arial";
       ctx.fillText("⚙", 681, 55 + (gearPressed ? 4 : 0));
-      this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.page = "settings"; }});
+      if (locked) {ctx.fillStyle="rgba(185,185,185,0.68)";ctx.fillRect(664,14,76,58);}
+      else this.buttons.push({x: 664, y: 14, w: 76, h: 58, action: () => { this.page = "settings"; }});
       this.texture.needsUpdate = true;
     },
 

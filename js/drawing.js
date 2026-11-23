@@ -211,6 +211,11 @@
     sample: function (stroke, hit, hand) {
       hit = this.surfaceHit(hit);
       if (!hit) return null;
+      return this.sampleSurface(stroke, hit);
+    },
+
+    // Bereits als Zeichenfläche bestätigter Treffer (auch geführter Laserstrich).
+    sampleSurface: function (stroke, hit) {
       const body = hit.type === "model"
         ? hit.el.querySelector(".manip-body")
         : hit.el;

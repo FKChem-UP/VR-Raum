@@ -240,7 +240,8 @@
     const format = (value, digits) => value.toFixed(digits).replace(".", ",");
     let equationKey = "";
     const ctx = canvas.getContext("2d"); let previous = "", lastFrame = "";
-    function update() {
+    function update(head) {
+      if (head && info.mesh.visible) info.mesh.lookAt(head);
       const sweepPaused = state.sweepHold > 0;
       const settings = `${state.source}:${state.angle}:${sweepPaused}`;
       const frame = `${settings}:${state.time}`;

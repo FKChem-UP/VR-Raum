@@ -378,7 +378,7 @@
         if (this.phase === "bragg") {
           const {state, el} = this.animation;
           F.Bragg.advance(state, Math.min(delta || 0, 100) / 1000);
-          this.animation.update();
+          this.animation.update(this.head);
           const p = el.object3D.getWorldPosition(this.modelWorld);
           const next = F.Bragg.progress(this.animationStep, Math.hypot(this.head.x - p.x, this.head.z - p.z) < 1.8,
             this.selectedAnimation === el, F.HandMenu.opened && menu?.model === el, state, this.distanceInfoOpened);
