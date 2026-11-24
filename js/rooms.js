@@ -507,6 +507,26 @@
   welcome("vorlesung-8", molecular({model:"assets/structures/S8.cif",info:"Quelle: S8.cif · elementarer Schwefel."}));
   welcome("team-a", hkustFramework);
 
+  // Die ersten zehn Räume behalten ihre Plätze im Begrüßungsraum.
+  const teamA = room("team-a");
+  const experimentRooms = [
+    ["versuch-benzil", "Benzil"], ["versuch-hkust", "HKUST-1"],
+    ["versuch-ybco", "Supraleiter · YBCO"], ["versuch-eu", "Eu-Komplex"]
+  ];
+  teamA.entrances = [...experimentRooms, [teamA.id, "Team-A-Übersicht"]];
+  experimentRooms.forEach(([id,title],index)=>{
+    if(id==="versuch-ybco"){
+      F.rooms.push({id,title,kind:"ybco-lesson",modelSize:1.3,stations:[]});
+      return;
+    }
+    const config=museumRoom(id,title,title);
+    const original=teamA.zones[index];
+    const zone={...original,title,along:0,x0:-config.width/2,x1:config.width/2,z0:-config.depth/2,z1:config.depth/2};
+    config.zones=[zone];
+    config.stations=zone.models.map((model,i)=>({...model,zone,wall:zone.wall,along:(i-(zone.models.length-1)/2)*1.75}));
+    F.rooms.push(config);
+  });
+
   Object.assign(v1.stations[4], {
     title: "Eis",
     model: "assets/models/Eis2.glb",

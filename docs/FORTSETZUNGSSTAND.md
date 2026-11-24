@@ -1,5 +1,12 @@
 # Fortsetzungsstand vor Compact
 
+## YBCO-Seminarraum
+
+- Die große grüne Lehrstation steht vor einer Trennwand; seitliche Wege führen in den blau markierten Übungsbereich mit elf nummerierten Tafeln und separaten Podesten. Aufgaben, Lösungen und Modellzustände werden gemeinsam genutzt. Eine Übungsstation lädt ihre Modelle erst bei „Übung starten“; beim Wechsel oder Beenden werden nur ihre Modelle freigegeben. Lehrtafel und Lehrmodelle bleiben unverändert. Layout und Bedienung sind auf PC und Pico nachzutesten.
+
+- Das Team-A-Poster bietet vier Versuchsraum-Zugänge und die Team-A-Übersicht. Benzil, HKUST-1 und Eu haben eigene Räume mit ihren bisherigen Stationen; es gibt keinen bestätigten fünften Versuch.
+- YBCO hat eine geführte Tafel mit elf Aufgaben und lädt die Modelle nur pro aktuellem Schritt. Schwerpunkte: Phasenvergleich im gleichen Maßstab, P/I/F-Vergleich, Pmmm-Spiegel mit Projektionen, Zellanteile, CaTiO3 (COD 1011211, kubische Lehrreferenz), Y/Ba-Nachbarn in Abstandsgruppen, Cu-/O-Plätze und Ketten/Ebenen. Lösungen sind separat einblendbar. Die Ba-Gruppen sind 4+2+2+2; O1 ist teilbesetzt. Lehrschrittwechsel sind lokal, nicht als gemeinsamer Lehrablauf synchronisiert. PC-/Pico-Nachtest offen.
+
 **Arbeitsbasis:** `main` und lokal bekanntes `origin/main` standen vor der Änderung der HKUST-1-Startansicht auf `30a1d8d` („HKUST-1“). Kein Fetch, Commit, Push oder Deployment durch den Agenten. Vor Fortsetzung Git und Quellcode prüfen; diese Dokumentation ist kein Ersatz für den Code. Bei nötiger Veröffentlichung ausdrücklich auf GitHub Desktop hinweisen. Pico hat Testpriorität; PC-Funktionen erhalten.
 
 ## HKUST-1: periodisches Gerüst und Porenausschnitt

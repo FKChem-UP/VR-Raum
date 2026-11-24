@@ -639,6 +639,7 @@
   }
 
   function createStructure(source, mode = "molecule") {
+    if(mode.startsWith("ybco-lesson:"))return F.YbcoLesson.structure(source,mode.slice(12));
     if(mode.startsWith("cif-hkust:"))return F.HKUSTStructure.build(source,mode.slice("cif-hkust:".length));
     if(mode.startsWith("cif-network:")) {
       const [,view,ruleText,center,ligand,cutoff,count,label] = mode.split(":");
@@ -805,7 +806,8 @@
     Cu: {color: "#bd6539", vdw: 1.4}, S: {color: "#e4bc24", vdw: 1.8},
     Y: {color: "#5a9bae", vdw: 2.32}, Ba: {color: "#79a446", vdw: 2.68}, Zn: {color: "#6976b1", vdw: 1.39},
     Fe: {color: "#c96132", vdw: 2.04}, Eu: {color: "#67b58f", vdw: 2.31},
-    Ag: {color: "#9fadb9", vdw: 1.72}, Hg: {color: "#b096ca", vdw: 1.55}, I: {color: "#6a367e", vdw: 1.98}
+    Ag: {color: "#9fadb9", vdw: 1.72}, Hg: {color: "#b096ca", vdw: 1.55}, I: {color: "#6a367e", vdw: 1.98},
+    Ca: {color:"#69a13f",vdw:2.31}, Ti: {color:"#7690bc",vdw:2.11}
   };
 
   // Konvexe Hülle aus echten Nachbarpositionen; koplanare Flächen nur einmal
@@ -1414,6 +1416,7 @@
       hydrogenContactDashes({...structure,hydrogenContacts:[contact]}).forEach(([a,b])=>addDash(a,b,hydrogenRed,sites));
     }
     const env=group.userData.fkcEnvironment;
+    if(structure.lessonOverlay)F.YbcoLesson.overlay(group, structure.lessonOverlay, axisResources);
     if(!env && (structure.hydrogenCell || structure.environmentCell || structure.contactExpansion?.cell.hydrogenContacts?.length)) {
       for(const d of environmentHydrogenDashes(structure,[]))addDash(d.start,d.end,hydrogenRed,d.sites);
     }

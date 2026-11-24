@@ -49,7 +49,9 @@
       Math.hypot(x + 1.2, z - 1.9) > 0.35};
   }
 
-  F.StructureRoom = {config, catalog, variants, build, click(hit) { hit.el.components["fkc-structure-tablet"]?.click(hit.uv); }};
+  F.StructureRoom = {config, catalog, variants, build, click(hit) {
+    (hit.el.components["fkc-ybco-lesson"] || hit.el.components["fkc-structure-tablet"])?.click(hit.uv);
+  }};
   AFRAME.registerComponent("fkc-structure-tablet", {
     init() {
       this.el.dataset.fkcStructureTablet = "true";

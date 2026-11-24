@@ -2067,16 +2067,34 @@
 
       const p = placements[index];
 
-      framedPanel(
+      const entrancePanel = framedPanel(
         parent,
         p.poster,
         p.rotation,
         c.posterWidth,
         c.posterHeight,
-        welcomeCard(room),
-        room.id,
+        room.entrances ? undefined : welcomeCard(room),
+        room.entrances ? null : room.id,
         c.colors
       );
+      if(room.entrances){
+        const screen=entrancePanel.querySelector("a-plane");
+        // Fünf getrennte Trefferflächen nutzen die bestehende Haltebestätigung.
+        room.entrances.forEach(([id,title],i)=>{
+          const target=create("a-plane",{class:"vr-action",position:`0 ${0.34-i*0.24} 0.045`,
+            width:2.75,height:0.21,material:{shader:"flat",src:image((ctx,w,h)=>{
+              ctx.fillStyle="#e3efe5";ctx.fillRect(0,0,w,h);
+              ctx.fillStyle="#203f30";ctx.font="bold 41px Arial";ctx.textAlign="center";
+              ctx.fillText(title,w/2,47,w-40);
+            },768,64)}},entrancePanel);
+          target.dataset.roomId=id;
+        });
+        screen.setAttribute("material","src",image((ctx,w,h)=>{
+          ctx.fillStyle="#203f30";ctx.fillRect(0,0,w,h);
+          ctx.fillStyle="#ffffff";ctx.font="bold 64px Arial";ctx.textAlign="center";
+          ctx.fillText("Team A · Versuche",w/2,80);
+        }));
+      }
 
       welcomePedestal(parent, exhibit, p, c);
 
@@ -2709,6 +2727,11 @@
   F.RoomBuilder = {
     build: function (parent, config, rooms) {
       if (config.kind === "structure-room") return F.StructureRoom.build(parent, makeModel);
+      if (config.kind === "ybco-lesson") {
+        const result=F.YbcoLesson.build(parent, config, makeModel, framedPanel, lighting);
+        addEntryHint(parent);
+        return result;
+      }
       const result = config.kind === "welcome"
         ? buildWelcome(parent, config, rooms)
         : config.zones ? buildPractical(parent, config) : buildMuseum(parent, config);

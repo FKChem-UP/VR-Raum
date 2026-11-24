@@ -64,7 +64,7 @@ const activeModels = [...F.welcomeRoom.exhibits, ...F.rooms.filter(r=>r.zones).f
 const hkust = F.welcomeRoom.exhibits.find(entry=>entry.roomId==="team-a");
 assert.equal(hkust.cifMode,"cif-hkust:node");
 const teamHkust=activeModels.filter(entry=>entry.model?.includes("/HKUST-1_"));
-assert.equal(teamHkust.length,2);
+assert.equal(teamHkust.length,3); // Begrüßung, Team-A-Übersicht und eigener Versuchsraum
 for(const entry of teamHkust){
   assert.equal(entry.variants[0].cifMode,entry.cifMode);
   assert.equal(entry.cifMode,"cif-hkust:node");
@@ -171,7 +171,7 @@ for(const view of [complex,coordination]) for(const bond of view.bonds){
 }
 const retainedWithoutStation = ["HKUST-1_mitH.cif", "YBa2Cu3O7_2016.cif"];
 assert.ok(retainedWithoutStation.every(file=>!referenced.includes(file)));
-assert.deepEqual([...referenced, ...retainedWithoutStation].sort(),
+assert.deepEqual([...referenced, ...retainedWithoutStation, "CaTiO3.cif"].sort(),
   fs.readdirSync(path.join(root,"assets/praktikum")).filter(file=>file.endsWith(".cif")).sort());
 const waterSource = fs.readFileSync(path.join(root,"assets/praktikum",retainedWithoutStation[0]),"utf8");
 const waterNode = F.CIF.createStructure(waterSource,"cif-excerpt:hkust:focus");
