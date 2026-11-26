@@ -53,12 +53,20 @@ F.XrayDemo.activate(F.findHit(ray, true));
 assert.equal(demo.selectedInfo, null);
 assert.equal(demo.infoPanel.visible, false, "Klick auf die Karte schließt sie");
 assert.equal(F.XrayDemo.activate({}), false);
-const {projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance} = F.XrayDemo;
-assert.ok(reflectionTolerance < 0.01);
+const {projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance,
+  beamstop, stopEntrance, blockedByBeamstop} = F.XrayDemo;
+assert.ok(reflectionTolerance > 0.0035 && reflectionTolerance < 0.01);
+assert.ok(beamstop.center + beamstop.length / 2 < 4.7 * 40 / 60 - 0.012,
+  "Beamstop steht auch vor der nächstgelegenen Detektorfläche bei 0°");
+assert.equal(blockedByBeamstop({x: 0, y: 0, z: 1}), true);
+assert.equal(blockedByBeamstop({x: 0, y: 0.04, z: 1}), true);
+assert.equal(blockedByBeamstop({x: 0.09, y: 0, z: 1}), false);
+assert.equal(stopEntrance, beamstop.center - beamstop.length / 2);
 for (const mode of Object.keys(scanModes)) {
-  const frames = [0, 5, 10, 15].map(time => scanFrame(mode, time));
-  assert.equal(new Set(frames.map(frame => frame.omega)).size, mode === "detector" ? 1 : 4);
-  assert.equal(new Set(frames.map(frame => frame.detector)).size, mode === "crystal" ? 1 : 4);
+  const frames = [0, 5, 10, 15, 20].map(time => scanFrame(mode, time));
+  assert.equal(new Set(frames.map(frame => frame.omega)).size, mode === "detector" ? 1 : 5);
+  assert.equal(new Set(frames.map(frame => frame.detector)).size, mode === "crystal" ? 1 : 5);
+  assert.equal(frames.at(-1).detector, mode === "crystal" ? 20 : 0);
   frames.forEach((frame, index) => {
     assert.deepEqual(scanFrame(mode, index * 5 + 3.9), frame, "Belichtung verändert keine Achsen");
     const slew = scanFrame(mode, index * 5 + 4.5);
@@ -72,7 +80,30 @@ const control = {...components["fkc-xray-demo"], shown: true, scanMode: "step", 
 control.setScanMode("detector");
 assert.equal(control.scanMode, "detector");
 assert.equal(control.paused, true);
-for (const time of [5, 10, 15, 0]) { control.nextFrame(); assert.equal(control.time, time); }
+for (const time of [5, 10, 15, 20, 0]) { control.nextFrame(); assert.equal(control.time, time); }
+control.setScanMode("crystal");
+control.showZeroAngle();
+assert.equal(control.scanMode, "detector");
+assert.equal(scanFrame(control.scanMode, control.time).detector, 0);
+Object.assign(control, {detectorDistance: 60, exposure: 1, time: 6});
+control.setDetectorDistance(40);
+assert.equal(control.time, 6);
+assert.equal(control.detectorRadius, 4.7 * 40 / 60);
+control.setExposure(5);
+assert.equal(control.exposure, 5);
+assert.equal(control.time, 6);
+assert.equal(control.paused, true);
+control.time = 9.5;
+control.setDetectorDistance(100);
+assert.equal(control.time, 5, "Änderung während der Fahrt kehrt zur letzten Messposition zurück");
+control.setDetectorDistance(90);
+assert.equal(control.detectorDistance, 100);
+const {spotStyle} = F.XrayDemo;
+assert.ok(spotStyle(40, 1).opacity > spotStyle(60, 1).opacity);
+assert.ok(spotStyle(60, 1).opacity > spotStyle(100, 1).opacity);
+assert.ok(spotStyle(100, 1).radius > spotStyle(40, 1).radius);
+assert.ok(spotStyle(100, 5).opacity > spotStyle(100, 0.2).opacity);
+assert.equal(spotStyle(100, 5).radius, spotStyle(100, 0.2).radius);
 const radius = 4.7;
 const labels = [];
 for (const beta of [0, 20, 35, 50, 65].map(deg => deg * Math.PI / 180)) {

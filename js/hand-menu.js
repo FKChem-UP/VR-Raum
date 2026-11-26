@@ -290,7 +290,8 @@
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.el.components["fkc-measurements"]?.saved?.length,
-        !!demo, demo?.paused, demo?.shown, demo?.data.speed, demo?.loop, demo?.playDirection, demo?.explanations, demo?.scanMode,
+        !!demo, demo?.paused, demo?.shown, demo?.data.speed, demo?.loop, demo?.playDirection, demo?.explanations,
+        demo?.scanMode, demo?.detectorDistance, demo?.exposure,
         this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness, model.fkcHydrogenThickness, F.StructureAnalysis?.revision,
         environment && environment.enabled, environment && environment.radius,
@@ -502,12 +503,19 @@
           text("Aufnahmemodus · während des Frames stehen beide Achsen");
           row(Object.entries(F.XrayDemo.scanModes).map(([id, label]) =>
             tile(label, () => demo.setScanMode(id), demo.scanMode === id)), true);
-          row([tile("Nächstes Bild (pausiert)", () => demo.nextFrame())], true);
+          row([tile("Nächstes Bild (pausiert)", () => demo.nextFrame()),
+            tile("2θ = 0°", () => demo.showZeroAngle()),
+            tile(demo.shown ? "Demo ausblenden" : "Demo einblenden", () => demo.setShown(!demo.shown))], true);
+          text("Detektorabstand");
+          row(F.XrayDemo.distances.map(distance => tile(`${distance} mm`,
+            () => demo.setDetectorDistance(distance), demo.detectorDistance === distance)), true);
+          text("Belichtungszeit · Helligkeit im Modell");
+          row(F.XrayDemo.exposures.map(seconds => tile(`${String(seconds).replace(".", ",")} s`,
+            () => demo.setExposure(seconds), demo.exposure === seconds)), true);
           row([tile(demo.explanations ? "i-Markierungen ausblenden" : "i-Markierungen einblenden",
             () => demo.setExplanations(!demo.explanations), demo.explanations), tile("Info schließen", () => demo.clearInformation())], true);
-          text("Bauteil oder i anklicken, um die Info zu öffnen.", false);
         }
-        row([tile(demo.shown ? "Demo ausblenden" : "Demo einblenden", () => demo.setShown(!demo.shown))], true);
+        if (nacl) row([tile(demo.shown ? "Demo ausblenden" : "Demo einblenden", () => demo.setShown(!demo.shown))], true);
         this.texture.needsUpdate = true;
         return;
       }

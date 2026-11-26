@@ -246,7 +246,8 @@ assert.equal(inkOf("Animationsmenü"),"#782a2a");
 assert.equal(inkOf("Abspieltempo"),"#782a2a");
 assert.equal(inkOf("Start"),"#191919");
 delete menu.el.components["fkc-tutorial"];
-F.XrayDemo = {scanModes: {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"}};
+F.XrayDemo = {scanModes: {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"},
+  distances: [40, 60, 100], exposures: [0.2, 1, 5]};
 for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-demo", "NaCl-Demo"],
   ["fkc-xray-experiment", "fkc-xray-demo", "Röntgendemo"]]) {
   const calls = [];
@@ -254,6 +255,9 @@ for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-de
     el: {setAttribute(...args) { calls.push(args); }}, setShown(value) { this.shown = value; },
     restart() { this.paused = true; }, nextPhase() { calls.push("phase"); }, reverseDirection() { this.playDirection *= -1; },
     scanMode: "step", setScanMode(mode) { this.scanMode = mode; }, nextFrame() { calls.push("frame"); },
+    showZeroAngle() { calls.push("zero-angle"); },
+    detectorDistance: 60, exposure: 1, setDetectorDistance(value) { this.detectorDistance = value; },
+    setExposure(value) { this.exposure = value; },
     clearInformation() { calls.push("close"); }, setExplanations(value) { this.explanations = value; }};
   entities.set(id, {isConnected: true, components: {[component]: demo}});
   menu.model = {id: "room-root", dataset: {}, querySelector: () => null};
@@ -270,7 +274,10 @@ for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-de
   } else {
     press("Nur Detektor"); assert.equal(demo.scanMode, "detector");
     press("Nur Kristall"); assert.equal(demo.scanMode, "crystal");
+    press("40 mm"); assert.equal(demo.detectorDistance, 40);
+    press("0,2 s"); assert.equal(demo.exposure, 0.2);
     press("Nächstes Bild (pausiert)"); assert.equal(calls.at(-1), "frame");
+    press("2θ = 0°"); assert.equal(calls.at(-1), "zero-angle");
     press("i-Markierungen ausblenden"); assert.equal(demo.explanations, false);
     press("Info schließen"); assert.equal(calls.at(-1), "close");
   }

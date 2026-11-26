@@ -109,12 +109,27 @@
   // Leicht geneigte Rotationsachse: eine reine y-Rotation konserviert g_y
   // und erzeugt im Lehrmodell auffällig gerade Reflexreihen.
   const scanAxis = [0.27, 1, 0.19];
-  const detectorAngles = [20, 35, 50, 65];
+  const detectorAngles = [20, 35, 50, 65, 0];
   const scanModes = {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"};
   const exposureTime = 4, frameTime = 5;
   // Reproduzierbare Beispielstellungen; im Kristallscan ist auch ein leerer Frame möglich.
-  const crystalAngles = {step: [3, 23, 27, 10], detector: [3, 3, 3, 3], crystal: [3, 5, 10, 59]};
-  const reflectionTolerance = 0.0035; // Å⁻¹, endliche Ewald-Schale des Lehrmodells.
+  const crystalAngles = {step: [-18.6, 17.3, 17.1, -15.5, -10], crystal: [3, 5, 10, 59, -18.6]};
+  const reflectionTolerance = 0.006; // Å⁻¹, endliche Ewald-Schale des Lehrmodells.
+  const distances = [40, 60, 100], exposures = [0.2, 1, 5];
+  const referenceRadius = 4.7;
+  const beamstop = Object.freeze({center: 2.45, radius: 0.18, length: 0.26});
+  const stopEntrance = beamstop.center - beamstop.length / 2;
+  function blockedByBeamstop(direction) {
+    return direction.z > 0 && Math.hypot(direction.x, direction.y) * stopEntrance <= beamstop.radius * direction.z;
+  }
+  const settingsLabel = value => String(value).replace(".", ",");
+  function spotStyle(distance, exposure) {
+    const relativeDistance = distance / 60;
+    // Schematically combine a local detector blur with angular divergence.
+    // The opacity describes peak brightness, not integrated Bragg intensity.
+    return {radius: Math.hypot(0.24, 0.145 * relativeDistance),
+      opacity: 1 - Math.exp(-0.9 * exposure / relativeDistance ** 2)};
+  }
   function scanFrame(mode, time) {
     const block = Math.floor(time / frameTime), slot = block % detectorAngles.length;
     const next = (slot + 1) % detectorAngles.length;
@@ -122,10 +137,12 @@
     const mix = (a, b) => a + (b - a) * progress ** 2 * (3 - 2 * progress);
     const crystal = crystalAngles[mode];
     const detector = mode === "crystal" ? 20 : mix(detectorAngles[slot], detectorAngles[next]);
-    return {block, slot, moving: progress > 0, omega: mix(crystal[slot], crystal[next]) * Math.PI / 180, detector};
+    const omega = (mode === "detector" ? 3 : mix(crystal[slot], crystal[next])) * Math.PI / 180;
+    return {block, slot, moving: progress > 0, omega, detector};
   }
   F.XrayDemo = {
-    projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance,
+    projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance, distances, exposures, spotStyle,
+    beamstop, stopEntrance, blockedByBeamstop,
     activate(hit) {
       const demo = hit.xrayDemo;
       if (!demo || !hit.xrayInfo) return false;
@@ -212,6 +229,8 @@
       this.explanations = true;
       this.removed = false;
       this.scanMode = "step";
+      this.detectorDistance = 60;
+      this.exposure = 1;
       this.lastFrame = -1;
       this.lastMoving = null;
       this.reflectionOmega = null;
@@ -817,6 +836,34 @@
       this.updateFrame(true);
     },
 
+    showZeroAngle: function () {
+      if (!this.shown) this.setShown(true);
+      if (this.scanMode === "crystal") this.scanMode = "detector";
+      this.paused = true;
+      this.time = detectorAngles.indexOf(0) * frameTime;
+      this.updateFrame(true);
+    },
+
+    rebuildExposure: function () {
+      this.paused = true;
+      // Change settings on a still frame; if travelling, return to its last pose.
+      if (scanFrame(this.scanMode, this.time).moving) this.time = Math.floor(this.time / frameTime) * frameTime;
+      this.updateFrame(true);
+    },
+
+    setDetectorDistance: function (distance) {
+      if (!distances.includes(distance) || distance === this.detectorDistance) return;
+      this.detectorDistance = distance;
+      this.detectorRadius = referenceRadius * distance / 60;
+      this.rebuildExposure();
+    },
+
+    setExposure: function (seconds) {
+      if (!exposures.includes(seconds) || seconds === this.exposure) return;
+      this.exposure = seconds;
+      this.rebuildExposure();
+    },
+
     addStream: function (start, end, color, count, rate) {
       const mesh = new T.InstancedMesh(
         this.particleGeometry, this.basic(color), count
@@ -1175,43 +1222,44 @@
       );
 
       this.line(
-        vec(0, 0, 0), vec(0, 0, 5.7),
+        vec(0, 0, 0), vec(0, 0, stopEntrance),
         this.colors.ka, this.scattering, 0.55
       );
 
       const stop = new T.Mesh(
         this.trackGeometry(new T.CylinderGeometry(
-          0.18, 0.18, 0.26, 16
+          beamstop.radius, beamstop.radius, beamstop.length, 16
         )),
         this.material(0x303845)
       );
 
       stop.rotation.x = Math.PI / 2;
-      stop.position.set(0, 0, 5.7);
+      stop.position.set(0, 0, beamstop.center);
       this.scattering.add(stop);
 
       const stopSupport = this.rod(
-        vec(0, -1.1, 5.7), vec(0, -0.2, 5.7),
+        vec(0, -1.1, beamstop.center), vec(0, -beamstop.radius, beamstop.center),
         0.045, 0x8a98ac, this.scattering
       );
 
       const stopWorld = this.samplePosition.clone()
-        .addScaledVector(this.beamDirection, 5.7);
+        .addScaledVector(this.beamDirection, beamstop.center);
 
       this.addInfo(
         "Beamstop",
         "Der Beamstop absorbiert den direkten Primärstrahl " +
-        "hinter der Probe. Dieser direkte Strahl wird hier " +
-        "nicht als Beugungsreflex verwendet.",
+        "hinter der Probe. Auch in der 0°-Stellung endet der Primärstrahl vor dem Detektor. " +
+        "Der Beamstop schattet außerdem Beugung bei sehr kleinen Winkeln ab.",
         stopWorld.clone().add(vec(-0.55, 0.55, 0)),
         [stop, stopSupport]
       );
 
       this.addStream(
-        this.samplePosition, stopWorld, this.colors.ka, 35, 0.6
+        this.samplePosition, this.samplePosition.clone().addScaledVector(this.beamDirection, stopEntrance),
+        this.colors.ka, 20, 0.6
       );
 
-      this.detectorRadius = 4.7;
+      this.detectorRadius = referenceRadius;
       this.detectorWidth = 2.8;
       this.detectorHeight = 2.3;
 
@@ -1264,7 +1312,8 @@
       this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
         "Hier wird jeder Frame bei feststehenden Achsen belichtet. Beim Verstellen wird kein Bild aufgezeichnet. " +
-        "Im Detektorscan ändert sich nur der erfasste Ausschnitt derselben Beugungsrichtungen. " +
+        "Größerer Abstand: Reflexe liegen weiter auseinander, aber die Fläche erfasst einen kleineren Winkelbereich. " +
+        "Helligkeit und Fleckgröße sind schematisch. Belichtungszeit ändert hier nur das Signal, nicht die Abspielzeit. " +
         "Die Gradangaben bezeichnen den jeweiligen Streuwinkel 2θ. Die Bögen verbinden Orte gleichen 2θ " +
         "(Schritte von 5°); sie sind keine Pulverringe. " +
         "Bei einem geneigten Detektor sind diese Bögen keine exakten Kreise.",
@@ -1284,8 +1333,8 @@
 
       const arcPoints = [];
 
-      for (let i = 0; i <= 70; i++) {
-        const angle = T.MathUtils.degToRad(15 + i);
+      for (let i = 0; i <= 65; i++) {
+        const angle = T.MathUtils.degToRad(i);
 
         arcPoints.push(vec(
           4.7 * Math.sin(angle),
@@ -1333,16 +1382,27 @@
       this.reflectionParticles.count = 0;
       this.scattering.add(this.reflectionParticles);
 
-      this.spotGeometry = this.trackGeometry(
-        new T.CircleGeometry(0.028, 12)
-      );
+      const spotCanvas = document.createElement("canvas");
+      spotCanvas.width = spotCanvas.height = 64;
+      const ctx = spotCanvas.getContext("2d");
+      const glow = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      glow.addColorStop(0, "rgba(255,255,255,1)");
+      glow.addColorStop(0.55, "rgba(255,255,255,0.45)");
+      glow.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, 64, 64);
+      const spotTexture = new T.CanvasTexture(spotCanvas);
+      this.textures.add(spotTexture);
+      this.spotGeometry = this.trackGeometry(new T.PlaneGeometry(2, 2));
 
       this.spotMaterial = this.trackMaterial(
         new T.MeshBasicMaterial({
           color: 0xd9efff,
+          map: spotTexture,
           side: T.DoubleSide,
           transparent: true,
-          opacity: 0.85,
+          depthWrite: false,
+          blending: T.AdditiveBlending,
           toneMapped: false
         })
       );
@@ -1480,6 +1540,8 @@
     },
 
     projectReflections: function (moving) {
+      const style = spotStyle(this.detectorDistance, this.exposure);
+      this.spotMaterial.opacity = style.opacity;
       for (const point of this.reflections) {
         if (point.direction.z < 0.15) continue;
 
@@ -1487,6 +1549,11 @@
         point.distance = 5;
         point.x = 0;
         point.y = 0;
+
+        if (blockedByBeamstop(point.direction)) {
+          point.distance = stopEntrance / point.direction.z;
+          continue;
+        }
 
         const denominator = point.direction.dot(this.normal);
 
@@ -1516,6 +1583,8 @@
           );
 
           spot.position.set(point.x, point.y, -0.028);
+          spot.scale.setScalar(style.radius);
+          spot.renderOrder = 1;
           this.detector.add(spot);
           this.spots.push(spot);
           this.frameHits.add(point.key);
@@ -1567,7 +1636,7 @@
       this.lastMoving = moving;
 
       const beta = T.MathUtils.degToRad(degrees);
-      if (!moving && degrees !== this.guideAngle) {
+      if (!moving && (degrees !== this.guideAngle || this.detectorRadius !== this.guideRadius)) {
         const geometry = this.detectorGuides.geometry;
         const labels = [];
         // Beim Winkelwechsel darf Three.js den bisherigen GPU-Puffer freigeben.
@@ -1578,6 +1647,7 @@
         geometry.computeBoundingSphere();
         this.drawDetectorLabels(labels);
         this.guideAngle = degrees;
+        this.guideRadius = this.detectorRadius;
       }
       this.detectorGuides.visible = !moving;
       this.detectorLabels.visible = !moving;
@@ -1931,13 +2001,13 @@
 
     const button = (label, action, selected) => {
       const entry = {
-        x: 55, y, w: 914, h: 72, label, action
+        x: 55, y, w: 914, h: 55, label, action
       };
 
       const index = this.buttons.length;
       this.buttons.push(entry);
       paintButton(this, entry, index, selected);
-      y += 82;
+      y += 65;
     };
 
     if (demo) {
@@ -1992,7 +2062,22 @@
         const current = getDemo();
         if (!current) return;
         current.nextFrame();
-        notify(this, "Frame " + (scanFrame(current.scanMode, current.time).slot + 1) + " von 4 · pausiert");
+        const frame = scanFrame(current.scanMode, current.time);
+        notify(this, `Frame ${frame.slot + 1} von ${detectorAngles.length} · 2θ: ${frame.detector}° · pausiert`);
+      });
+
+      button(`Detektorabstand: ${demo.detectorDistance} mm – wechseln`, () => {
+        const current = getDemo();
+        if (!current) return;
+        current.setDetectorDistance(distances[(distances.indexOf(current.detectorDistance) + 1) % distances.length]);
+        notify(this, `${current.detectorDistance} mm · aktuelles Bild pausiert`);
+      });
+
+      button(`Belichtungszeit: ${settingsLabel(demo.exposure)} s – wechseln`, () => {
+        const current = getDemo();
+        if (!current) return;
+        current.setExposure(exposures[(exposures.indexOf(current.exposure) + 1) % exposures.length]);
+        notify(this, `${settingsLabel(current.exposure)} s · aktuelles Bild pausiert`);
       });
 
       button(
