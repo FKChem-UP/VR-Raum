@@ -1381,6 +1381,7 @@
       });
     }
 
+    if(structure.lessonDistanceLabels)F.YbcoLesson.distanceLabels(group,structure,axisResources);
     (structure.polyhedra || []).forEach(environment => {
       const points = environment.neighbors.map(index => structure.atoms[index].positionAngstrom);
       const triangles = polyhedronTriangles(points);
@@ -1389,8 +1390,8 @@
         triangles.flatMap(triangle => triangle.flatMap(index => points[index])), 3));
       geometry.computeVertexNormals();
       const material = new T.MeshStandardMaterial({
-        color: elements[structure.atoms[environment.center].element].color,
-        transparent: true, opacity: 0.20, side: T.DoubleSide, depthWrite: false,
+        color: environment.color || elements[structure.atoms[environment.center].element].color,
+        transparent: true, opacity: environment.opacity ?? 0.20, side: T.DoubleSide, depthWrite: false,
         roughness: 0.65, metalness: 0
       });
       const mesh = new T.Mesh(geometry, material);

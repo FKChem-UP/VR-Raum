@@ -2081,17 +2081,19 @@
         const screen=entrancePanel.querySelector("a-plane");
         // Fünf getrennte Trefferflächen nutzen die bestehende Haltebestätigung.
         room.entrances.forEach(([id,title],i)=>{
-          const target=create("a-plane",{class:"vr-action",position:`0 ${0.34-i*0.24} 0.045`,
-            width:2.75,height:0.21,material:{shader:"flat",src:image((ctx,w,h)=>{
-              ctx.fillStyle="#e3efe5";ctx.fillRect(0,0,w,h);
-              ctx.fillStyle="#203f30";ctx.font="bold 41px Arial";ctx.textAlign="center";
-              ctx.fillText(title,w/2,47,w-40);
-            },768,64)}},entrancePanel);
+          const x=i<3?(i-1)*.94:(i-3.5)*.94;
+          const target=create("a-plane",{class:"vr-action",position:`${x} ${i<3?.16:-.43} 0.045`,
+            width:.88,height:.51,material:{shader:"flat",src:image((ctx,w,h)=>{
+              ctx.fillStyle="#d8e7dd";ctx.fillRect(0,0,w,h);
+              ctx.strokeStyle="#82988a";ctx.lineWidth=5;ctx.strokeRect(3,3,w-6,h-6);
+              ctx.fillStyle="#111111";ctx.font="bold 36px Arial";ctx.textAlign="center";
+              ctx.fillText(title,w/2,103,w-24);
+            },320,170)}},entrancePanel);
           target.dataset.roomId=id;
         });
         screen.setAttribute("material","src",image((ctx,w,h)=>{
-          ctx.fillStyle="#203f30";ctx.fillRect(0,0,w,h);
-          ctx.fillStyle="#ffffff";ctx.font="bold 64px Arial";ctx.textAlign="center";
+          ctx.fillStyle="#fffdf8";ctx.fillRect(0,0,w,h);
+          ctx.fillStyle="#111111";ctx.font="bold 64px Arial";ctx.textAlign="center";
           ctx.fillText("Team A · Versuche",w/2,80);
         }));
       }

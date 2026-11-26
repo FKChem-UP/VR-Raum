@@ -524,7 +524,15 @@
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
-          if (this.hit.el.dataset.fkcStructureTablet === "true") {
+          if (F.MoXray?.activate(this.hit)) return;
+          const lesson = this.hit.el.components["fkc-ybco-lesson"];
+          if (lesson) {
+            if (!F.Menu?.opened && !this.fkcLessonPress) {
+              this.fkcLessonPress = lesson;
+              this.fkcLessonReleased = null;
+              lesson.click(this.hit.uv,{xr:true,now:performance.now()});
+            }
+          } else if (this.hit.el.dataset.fkcStructureTablet === "true") {
             F.StructureRoom.click(this.hit);
           } else if (this.hit.el.dataset.fkcTutorial === "true") {
             if (F.Tutorial) F.Tutorial.click(this.hit);
@@ -551,6 +559,7 @@
             if (!F.Draw || F.Draw.mode !== "paint") {
               if (this.hit.mesh?.userData.fkcEnvironmentId && !F.Measure?.enabled && F.CIF?.clickEnvironment(this.hit)) return;
               if (F.Measure && F.Measure.click(this.hit)) return;
+              if (F.YbcoLesson?.selectAtom(this.hit)) return;
               if (F.AtomLabels && F.AtomLabels.toggle(this.hit)) return;
             }
           }
@@ -578,6 +587,7 @@
         this.updateRay();
 
         if (!this.source) {
+          if(this.fkcLessonPress){this.fkcLessonPress.sampleStroke(null,false);this.fkcLessonPress=null;}
           this.disconnect();
           return;
         }
@@ -602,6 +612,20 @@
         this.updateHit();
 
         const grabber = this.el.components["fkc-grabber"];
+
+        if(this.fkcLessonPress){
+          // Event und Gamepad-Polling können kurz versetzt auslösen. Erst
+          // nach stabiler Freigabe darf dieselbe Hand erneut aktivieren.
+          const held=F.buttonPressed(this.source.gamepad,0) || this.states.trigger;
+          const lesson=this.fkcLessonPress;
+          if(held){
+            this.fkcLessonReleased=null;
+            if(this.hit?.el===lesson.el)lesson.sampleStroke(this.hit.uv,true);
+          }else{
+            this.fkcLessonReleased ??= time;
+            if(time-this.fkcLessonReleased>=100){lesson.sampleStroke(null,false);this.fkcLessonPress=null;}
+          }
+        }
 
         if (grabber && (grabber.grabbed || grabber.pulling)) {
           this.stroke = null;
@@ -788,7 +812,11 @@
         if (!hit) return;
 
         if (hit.type === "action") {
-          if (hit.el.dataset.fkcStructureTablet === "true") {
+          if (F.MoXray?.activate(hit)) return;
+          const lesson=hit.el.components["fkc-ybco-lesson"];
+          if(lesson){
+            if(!F.Menu?.opened)lesson.click(hit.uv,{now:performance.now()});
+          } else if (hit.el.dataset.fkcStructureTablet === "true") {
             F.StructureRoom.click(hit);
           } else if (hit.el.dataset.fkcMenu === "true") {
             F.Menu.click(hit);
@@ -809,6 +837,7 @@
 
         if (hit.type === "model") {
           F.selectModel(hit.el);
+          F.YbcoLesson?.selectAtom(hit);
         }
 
         F.setStatus(
