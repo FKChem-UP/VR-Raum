@@ -9,9 +9,11 @@ const {join} = require("node:path");
 const vm = require("node:vm");
 const AvatarProfile = require("../js/avatar-profile.js");
 
-function testClientOptIn() {
-  const el = {is: () => true, addEventListener() {}};
+async function testClientOptIn() {
+  let inVR = false;
+  const el = {is: () => inVR, addEventListener() {}};
   const ui = new Map();
+  const requests = [];
   const F = {app: {currentId: "welcome"}, AvatarProfile};
   ui.set("multiplayer-name", {value: "  Laborfuchs  ", addEventListener() {}});
   for (const [key, values] of Object.entries(AvatarProfile.choices)) {
@@ -20,7 +22,14 @@ function testClientOptIn() {
   let component;
   vm.runInNewContext(readFileSync(join(__dirname, "../js/multiplayer.js"), "utf8"), {
     window: {FKCVR: F, location: {search: "?multiplayer=https%3A%2F%2Fexample.test"}},
-    URL, URLSearchParams, setInterval: () => 1, document: {getElementById(id) {
+    URL, URLSearchParams, AbortController, setTimeout, clearTimeout, setInterval: () => 1,
+    async fetch(url, options) {
+      const body = JSON.parse(options.body);
+      requests.push({url: String(url), body});
+      if (String(url).endsWith("/access")) return body.code === "test-code"
+        ? {ok: true, json: async () => ({accessToken: "test-session"})} : {ok: false, status: 401};
+      return {ok: true, json: async () => ({available: AvatarProfile.available([])})};
+    }, document: {getElementById(id) {
       if (!ui.has(id)) ui.set(id, {addEventListener() {}});
       return ui.get(id);
     }},
@@ -31,7 +40,21 @@ function testClientOptIn() {
   assert.equal(client.urlInput.value, "https://example.test");
   assert.equal(client.endpoint, undefined, "URL-Parameter ist keine Einwilligung zum Beitritt");
   client.tick(0);
-  client.urlInput.value = "https://example.test";
+  await client.checkAvailability();
+  assert.equal(requests.length, 0, "Kein Zugriff vor Codeprüfung");
+  client.codeInput.value = "falsch";
+  await client.unlock();
+  assert.equal(client.accessToken, undefined);
+  assert.match(client.availability.textContent, /falsch/);
+  client.codeInput.value = "test-code";
+  await client.unlock();
+  assert.equal(client.accessToken, "test-session");
+  assert.equal(client.codeInput.value, "");
+  assert.equal(client.endpoint, undefined, "Codeprüfung allein startet keine Präsenz");
+  client.panel.open = true;
+  await client.checkAvailability();
+  assert.deepEqual(requests.at(-1).body, {room: "welcome", accessToken: "test-session"});
+  inVR = true;
   client.availabilityKey = client.selectionKey();
   client.applyAvailability(AvatarProfile.available([{form: "classic", color: "#31749b", style: "hat"}]));
   assert.equal(client.inputs.form.options[0].disabled, true);
@@ -81,38 +104,59 @@ function testClientOptIn() {
   assert.equal(client.room, null, "Tutorial ist vom Pilot getrennt");
   client.exit();
   assert.equal(client.endpoint, null);
+  assert.equal(client.accessToken, null);
+  assert.equal(requests.at(-1).body.endSession, true);
   assert.equal(client.status.textContent, "Einzelmodus");
 }
 
 async function test() {
-  testClientOptIn();
+  await testClientOptIn();
   const origin = "https://example.test";
-  const server = createServer(origin).listen(0, "127.0.0.1");
+  const code = "test-code";
+  assert.throws(() => createServer(origin), /FKC_ACCESS_CODE/);
+  const server = createServer(origin, code).listen(0, "127.0.0.1");
   try {
     await once(server, "listening");
     const url = `http://127.0.0.1:${server.address().port}/presence`;
     const state = {room: "welcome", head: [0, 1.6, 6, 0, 0, 0, 1], left: null, right: null};
-    const post = (data, from = origin) => fetch(url, {method: "POST",
+    const post = (data, from = origin, route = "presence") => fetch(url.replace(/presence$/, route), {method: "POST",
       headers: {Origin: from, "Content-Type": "application/json"}, body: JSON.stringify(data)});
+    const getAccess = async () => {
+      const response = await post({code}, origin, "access");
+      assert.equal(response.status, 200);
+      return (await response.json()).accessToken;
+    };
+    const clients = new Map();
     const ok = async data => {
-      const response = await post(data);
+      const accessToken = data.token ? clients.get(data.token) : await getAccess();
+      const response = await post({...data, accessToken, endSession: data.leave});
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
-      return response.json();
+      const result = await response.json();
+      if (result.token) clients.set(result.token, accessToken);
+      return result;
     };
     const preflight = await fetch(url, {method: "OPTIONS", headers: {Origin: origin}});
     assert.equal(preflight.status, 204);
+    assert.equal((await fetch(url.replace(/presence$/, "health"))).status, 200);
     assert.equal((await post(state, "https://other.test")).status, 403);
-    assert.equal((await post({...state, head: [0, 0, 0, 0, 0, 0, 0]})).status, 400);
-    assert.equal((await post({...state, hands: "true"})).status, 400);
-    assert.equal((await post({...state, pointing: [0, 1, 6, 26, 1, 6]})).status, 400);
+    assert.equal((await post({code}, "https://other.test", "access")).status, 403);
+    assert.equal((await post({}, origin, "access")).status, 401);
+    assert.equal((await post({code: code.toUpperCase()}, origin, "access")).status, 401);
+    assert.equal((await post(state)).status, 401);
+    assert.equal((await post({...state, accessToken: "unbekannt"})).status, 401);
+    assert.equal((await post({room: "welcome"}, origin, "availability")).status, 401);
+    const accessToken = await getAccess();
+    assert.equal((await post({...state, accessToken, head: [0, 0, 0, 0, 0, 0, 0]})).status, 400);
+    assert.equal((await post({...state, accessToken, hands: "true"})).status, 400);
+    assert.equal((await post({...state, accessToken, pointing: [0, 1, 6, 26, 1, 6]})).status, 400);
     const firstProfile = {form: "classic", color: "#ac406c", style: "hat"};
     const a = await ok({...state, profile: firstProfile});
-    const availability = await fetch(url.replace("/presence", "/availability"), {method: "POST",
-      headers: {Origin: origin, "Content-Type": "application/json"}, body: JSON.stringify({room: "welcome"})});
+    assert.equal((await post({...state, token: a.token, accessToken})).status, 403);
+    const availability = await post({room: "welcome", accessToken}, origin, "availability");
     const {available} = await availability.json();
     for (const key of Object.keys(firstProfile)) assert.ok(!available[key].includes(firstProfile[key]));
-    for (const key of Object.keys(firstProfile)) assert.equal((await post({...state, profile: {[key]: firstProfile[key]}})).status, 409);
+    for (const key of Object.keys(firstProfile)) assert.equal((await post({...state, accessToken, profile: {[key]: firstProfile[key]}})).status, 409);
     const profile = {name: "Laborfuchs", form: "slim", color: "#31749b", style: "monocle"};
     const pointing = [1, 1.2, 6, 0, 1.4, 4];
     const annotations = [{model: "welcome-model-10", variant: "co-complex", mode: "pin", atoms: ["co-heavy-1"]},
@@ -122,6 +166,7 @@ async function test() {
     assert.deepEqual(a.peers, []);
     assert.equal(b.peers.length, 1);
     assert.equal(b.peers[0].token, undefined);
+    assert.equal(b.peers[0].accessToken, undefined);
     assert.deepEqual(b.peers[0].head, state.head);
     assert.equal(b.peers[0].hands, false, "Ältere Clients behalten Controller");
     assert.equal(b.peers[0].pointing, null);
@@ -149,6 +194,7 @@ async function test() {
     }
     await ok({token: moved.token, leave: true});
     await ok({token: b.token, leave: true});
+    assert.equal((await post({...state, accessToken: clients.get(b.token)})).status, 401);
     await wait(80);
     const model = "welcome-model-10";
     const transform = [0, 1.48, 4, 0, 0, 0, 1, 0, 0, 0, 1, 1];
@@ -194,6 +240,8 @@ async function test() {
     assert.equal(activeGrip.models[0].owner, a.self);
     const held = await ok({...state, token: newcomer.token, variantCommand: {model, variant: "co-cell"}});
     assert.equal(held.models[0].variant, "co-coordination", "Fremder Grip sperrt Ansichtswechsel");
+    for (let i = 0; i < 18; i++) assert.equal((await post({code: "falsch"}, origin, "access")).status, 401);
+    assert.equal((await post({code}, origin, "access")).status, 429);
     console.log("Multiplayer: echter lokaler HTTP-Test für Zutritt, Datenübertragung, Raumtrennung und Austritt bestanden.");
   } finally { server.close(); }
 }

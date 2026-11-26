@@ -56,7 +56,7 @@
 
 
   <script defer src="./js/shared-annotations.js?v=3"></script>
-  <script defer src="./js/multiplayer.js?v=11"></script>
+  <script defer src="./js/multiplayer.js?v=12"></script>
   <script defer src="./js/app.js?v=19"></script>
 </head>
 
@@ -179,9 +179,13 @@
 
     <details id="multiplayer-panel">
       <summary>Multiplayer-Pilot</summary>
-      <p>Offener Testraum. Im VR-Modus sehen andere im selben Raum deinen Avatar und deinen Laser, wenn du auf ein Modell zeigst.</p>
+      <p>Gemeinsamer Zugangscode erforderlich. Im VR-Modus sehen andere im selben Raum deinen Avatar und deinen Laser, wenn du auf ein Modell zeigst.</p>
       <label for="multiplayer-url">HTTPS-Adresse des Multiplayer-Servers</label>
       <input id="multiplayer-url" type="url" autocomplete="off">
+      <label for="multiplayer-code">Multiplayer-Zugangscode</label>
+      <input id="multiplayer-code" type="password" maxlength="128" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="multiplayer-code-help">
+      <p id="multiplayer-code-help">Gib den Code nur ein, wenn oben die vereinbarte Serveradresse steht.</p>
+      <button id="multiplayer-unlock" type="button">Zugang prüfen</button>
       <p>Optionales Avatarprofil: Nutze einen Spitznamen. Andere im Raum sehen deine Angaben.</p>
       <label for="multiplayer-name">Anzeigename</label>
       <input id="multiplayer-name" type="text" maxlength="24" autocomplete="off">
@@ -212,7 +216,7 @@
           <button id="multiplayer-preview-turn" type="button">Vorschau drehen</button>
         </div>
       </figure>
-      <p id="multiplayer-availability" role="status">Freie Auswahl wird beim Öffnen für den aktuellen Raum geprüft.</p>
+      <p id="multiplayer-availability" role="status">Zuerst den Multiplayer-Zugang prüfen.</p>
       <button id="multiplayer-toggle" type="button" disabled>Gemeinsam beitreten</button>
       <p id="multiplayer-status" role="status">Einzelmodus</p>
     </details>

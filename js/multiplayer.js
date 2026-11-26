@@ -25,6 +25,8 @@
       this.quaternion = new T.Quaternion();
       this.rigRotation = new T.Quaternion();
       this.urlInput = document.getElementById("multiplayer-url");
+      this.codeInput = document.getElementById("multiplayer-code");
+      this.unlockButton = document.getElementById("multiplayer-unlock");
       this.button = document.getElementById("multiplayer-toggle");
       this.status = document.getElementById("multiplayer-status");
       this.panel = document.getElementById("multiplayer-panel");
@@ -37,15 +39,15 @@
       this.toggle = () => {
         if (this.endpoint) return this.leave();
         try {
-          if (this.button.disabled || this.availabilityKey !== this.selectionKey()) return;
-          this.endpoint = this.serverURL("/presence");
+          if (!this.accessToken || this.button.disabled || this.availabilityKey !== this.selectionKey()) return;
+          this.endpoint = this.accessEndpoint;
           this.profile = this.readProfile();
           this.dice.disabled = true;
           this.button.textContent = "Multiplayer ausschalten";
           this.status.textContent = "Aktiviert. Profil und Positionen werden erst im VR-Modus übertragen.";
         } catch { this.status.textContent = "Bitte eine gültige HTTPS-Serveradresse eingeben."; }
       };
-      this.exit = () => this.leave();
+      this.exit = () => { if (this.endpoint) this.leave(); };
       this.refresh = () => {
         this.availabilityKey = null;
         this.button.disabled = !this.endpoint;
@@ -56,10 +58,15 @@
       this.changed = () => this.drawPreview();
       this.rotatePreview = () => { this.previewBack = !this.previewBack; this.drawPreview(); };
       this.roll = () => this.randomizeAvatar();
+      this.unlock = () => this.checkAccess();
+      this.codeKey = event => { if (event.key === "Enter" && !event.repeat) this.unlock(); };
+      this.serverChanged = () => this.leave();
       this.turn.addEventListener("click", this.rotatePreview);
       this.dice.addEventListener("click", this.roll);
       this.panel.addEventListener("toggle", this.refresh);
-      this.urlInput.addEventListener("input", this.refresh);
+      this.urlInput.addEventListener("input", this.serverChanged);
+      this.unlockButton.addEventListener("click", this.unlock);
+      this.codeInput.addEventListener("keydown", this.codeKey);
       Object.values(this.inputs).forEach(input => input.addEventListener("input", this.changed));
       this.poll = setInterval(() => this.checkAvailability(), 2500);
       this.button.addEventListener("click", this.toggle);
@@ -74,6 +81,47 @@
     },
 
     selectionKey() { return JSON.stringify([this.urlInput.value.trim(), F.app?.currentId]); },
+
+    async checkAccess() {
+      if (this.accessRequest || this.accessToken || this.el.is("vr-mode")) return;
+      const code = this.codeInput.value.trim();
+      if (!code) { this.availability.textContent = "Bitte den Zugangscode eingeben."; return; }
+      const request = new AbortController();
+      const timer = setTimeout(() => request.abort(), 15000);
+      this.accessRequest = request;
+      this.unlockButton.disabled = true;
+      this.availability.textContent = "Zugang wird geprüft …";
+      try {
+        const endpoint = this.serverURL("/presence");
+        const response = await fetch(this.serverURL("/access"), {method: "POST", signal: request.signal,
+          redirect: "error", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code})});
+        if (this.accessRequest !== request) return;
+        if (response.status === 401 || response.status === 429) {
+          this.availability.textContent = response.status === 401 ? "Zugangscode falsch." :
+            "Zu viele Codeversuche. Bitte eine Minute warten.";
+          return;
+        }
+        if (!response.ok) throw new Error();
+        const {accessToken} = await response.json();
+        if (this.accessRequest !== request) return;
+        if (typeof accessToken !== "string" || !accessToken) throw new Error();
+        this.accessToken = accessToken;
+        this.accessEndpoint = endpoint;
+        this.codeInput.value = "";
+        this.codeInput.disabled = true;
+        this.refresh();
+      } catch {
+        if (this.accessRequest === request) {
+          this.availability.textContent = "Zugang konnte nicht geprüft werden. Serveradresse prüfen; Render braucht nach einer Pause ggf. einen Moment.";
+        }
+      } finally {
+        clearTimeout(timer);
+        if (this.accessRequest === request) {
+          this.accessRequest = null;
+          this.unlockButton.disabled = Boolean(this.accessToken);
+        }
+      }
+    },
 
     readProfile() {
       return F.AvatarProfile.normalize(Object.fromEntries(Object.entries(this.inputs).map(([key, input]) => [key, input.value])));
@@ -96,23 +144,29 @@
     },
 
     async checkAvailability() {
-      if (this.endpoint || !this.panel.open || this.el.is("vr-mode") || !F.app?.currentId) return;
+      if (!this.accessToken || this.endpoint || !this.panel.open || this.el.is("vr-mode") || !F.app?.currentId) return;
       const key = this.selectionKey();
-      if (this.availabilityRequest === key) return;
+      const accessToken = this.accessToken;
+      if (this.availabilityRequest?.key === key && this.availabilityRequest.accessToken === accessToken) return;
+      this.availabilityRequest?.abort();
       const request = new AbortController();
-      this.availabilityRequest = key;
+      request.key = key;
+      request.accessToken = accessToken;
+      this.availabilityRequest = request;
       const timer = setTimeout(() => request.abort(), 4500);
       if (this.availabilityKey !== key) this.button.disabled = this.dice.disabled = true;
       try {
-        const response = await fetch(this.serverURL("/availability"), {method: "POST", signal: request.signal,
-          headers: {"Content-Type": "application/json"}, body: JSON.stringify({room: F.app.currentId})});
+        const response = await fetch(new URL("/availability", this.accessEndpoint), {method: "POST", signal: request.signal,
+          redirect: "error", headers: {"Content-Type": "application/json"}, body: JSON.stringify({room: F.app.currentId, accessToken})});
+        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
+        if (response.status === 401) return this.expiredAccess();
         if (!response.ok) throw new Error();
         const {available} = await response.json();
-        if (key !== this.selectionKey() || this.endpoint) return;
+        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
         this.availabilityKey = key;
         this.applyAvailability(available);
       } catch {
-        if (key !== this.selectionKey() || this.endpoint) return;
+        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
         this.button.disabled = true;
         this.dice.disabled = true;
         this.availabilityKey = null;
@@ -120,7 +174,7 @@
         this.drawPreview();
       } finally {
         clearTimeout(timer);
-        if (this.availabilityRequest === key) this.availabilityRequest = null;
+        if (this.availabilityRequest === request) this.availabilityRequest = null;
       }
     },
 
@@ -173,15 +227,15 @@
       this.previewKey = key;
     },
 
-    clearPresence() {
+    clearPresence(endSession = false) {
       this.clearModels();
       this.variantRequests.clear();
       this.appliedVariants = new WeakMap();
       this.request?.abort();
       this.request = null;
-      if (this.endpoint && this.token) {
-        fetch(this.endpoint, {method: "POST", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({token: this.token, leave: true}), keepalive: true}).catch(() => {});
+      if (this.accessEndpoint && this.accessToken && (endSession || this.token)) {
+        fetch(this.accessEndpoint, {method: "POST", redirect: "error", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({accessToken: this.accessToken, token: this.token, leave: true, endSession}), keepalive: true}).catch(() => {});
       }
       this.token = null;
       this.room = null;
@@ -326,11 +380,23 @@
     },
 
     leave() {
-      this.clearPresence();
+      this.accessRequest?.abort(); this.accessRequest = null;
+      this.availabilityRequest?.abort(); this.availabilityRequest = null;
+      this.clearPresence(true);
+      this.accessToken = this.accessEndpoint = null;
+      this.codeInput.value = "";
+      this.codeInput.disabled = this.unlockButton.disabled = false;
       this.endpoint = null;
       this.button.textContent = "Gemeinsam beitreten";
       this.status.textContent = "Einzelmodus";
+      this.availability.textContent = "Zuerst den Multiplayer-Zugang prüfen.";
       this.refresh();
+    },
+
+    expiredAccess() {
+      this.leave();
+      this.status.textContent = "Multiplayer-Zugang abgelaufen. Bitte den Code erneut prüfen.";
+      this.availability.textContent = this.status.textContent;
     },
 
     showPeers(peers) {
@@ -398,7 +464,9 @@
       const timeout = setTimeout(() => request.abort(), 3500);
       try {
         const response = await fetch(this.endpoint, {method: "POST", signal: request.signal,
-          headers: {"Content-Type": "application/json"}, body: JSON.stringify({...data, token: this.token, profile: this.profile})});
+          redirect: "error", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({...data, accessToken: this.accessToken, token: this.token, profile: this.profile})});
+        if (response.status === 401 && this.request === request) return this.expiredAccess();
         if (response.status === 409 && this.request === request) {
           this.leave();
           this.status.textContent = "Avatarwahl dort nicht frei. VR verlassen und im Multiplayer-Menü neu wählen.";
@@ -483,7 +551,9 @@
       clearInterval(this.poll);
       this.leave();
       this.panel.removeEventListener("toggle", this.refresh);
-      this.urlInput.removeEventListener("input", this.refresh);
+      this.urlInput.removeEventListener("input", this.serverChanged);
+      this.unlockButton.removeEventListener("click", this.unlock);
+      this.codeInput.removeEventListener("keydown", this.codeKey);
       this.turn.removeEventListener("click", this.rotatePreview);
       this.dice.removeEventListener("click", this.roll);
       Object.values(this.inputs).forEach(input => input.removeEventListener("input", this.changed));

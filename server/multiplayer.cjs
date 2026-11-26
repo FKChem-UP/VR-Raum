@@ -1,13 +1,23 @@
 "use strict";
 
 const http = require("node:http");
-const {randomUUID} = require("node:crypto");
+const {createHash, randomUUID, timingSafeEqual} = require("node:crypto");
 const {normalize, available, choices} = require("../js/avatar-profile.js");
 const {sharedModels} = require("./shared-models.cjs");
 const {normalize: annotations} = require("../js/shared-annotations.js");
 const validRoom = room => typeof room === "string" && /^(welcome|vorlesung-[1-8]|team-[ab])$/.test(room);
 
-function createServer(origin) {
+const digest = value => createHash("sha256").update(value).digest();
+const accessLifetime = 2 * 60 * 60 * 1000;
+const attemptWindow = 60_000;
+
+function createServer(origin, accessCode) {
+  if (typeof accessCode !== "string" || !accessCode.trim() || accessCode.length > 128) {
+    throw new Error("FKC_ACCESS_CODE muss einen nichtleeren Multiplayer-Zugangscode (max. 128 Zeichen) enthalten.");
+  }
+  const expectedCode = digest(accessCode.trim());
+  const sessions = new Map();
+  let failedAttempts = 0, resetAttemptsAt = 0;
   const peers = new Map();
   const updateModels = sharedModels();
   const reply = (res, status, data) => {
@@ -22,7 +32,7 @@ function createServer(origin) {
 
   return http.createServer({requestTimeout: 5000, headersTimeout: 5000, maxHeaderSize: 8192}, async (req, res) => {
     if (req.url === "/health" && req.method === "GET") return reply(res, 200, {ok: true});
-    if (!["/presence", "/availability"].includes(req.url) || req.headers.origin !== origin) return reply(res, 403, {error: "Nicht zugelassen"});
+    if (!["/access", "/presence", "/availability"].includes(req.url) || req.headers.origin !== origin) return reply(res, 403, {error: "Nicht zugelassen"});
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     if (req.method === "OPTIONS") {
@@ -40,7 +50,25 @@ function createServer(origin) {
       const data = JSON.parse(body);
       if (!data || typeof data !== "object") return reply(res, 400, {error: "Ungültige Nachricht"});
       const now = Date.now();
-      for (const [key, peer] of peers) if (now - peer.time > 5000) peers.delete(key);
+      for (const [key, expires] of sessions) if (expires <= now) sessions.delete(key);
+      for (const [key, peer] of peers) {
+        if (now - peer.time > 5000 || !sessions.has(peer.accessToken)) peers.delete(key);
+      }
+      if (req.url === "/access") {
+        // Gemeinsames Fehlversuchslimit; keine Abhängigkeit von Proxy-IP-Headern.
+        if (now >= resetAttemptsAt) { failedAttempts = 0; resetAttemptsAt = now + attemptWindow; }
+        if (failedAttempts >= 20) return reply(res, 429, {error: "Zu viele Codeversuche"});
+        if (typeof data.code !== "string" || data.code.length > 128 ||
+            !timingSafeEqual(digest(data.code.trim()), expectedCode)) {
+          failedAttempts++;
+          return reply(res, 401, {error: "Ungültiger Zugangscode"});
+        }
+        if (sessions.size >= 128) return reply(res, 503, {error: "Pilot voll"});
+        const accessToken = randomUUID();
+        sessions.set(accessToken, now + accessLifetime);
+        return reply(res, 200, {accessToken});
+      }
+      if (!sessions.has(data.accessToken)) return reply(res, 401, {error: "Multiplayer-Zugang fehlt oder ist abgelaufen"});
       const free = (room, exclude) => available([...peers].filter(([key, peer]) =>
         key !== exclude && peer.room === room).map(([, peer]) => peer.profile));
       if (req.url === "/availability") {
@@ -49,8 +77,13 @@ function createServer(origin) {
       }
       let token = data.token;
       const prior = peers.get(token);
+      if (prior && prior.accessToken !== data.accessToken) return reply(res, 403, {error: "Nicht zugelassen"});
       if (data.leave === true) {
         if (prior) peers.delete(token);
+        if (data.endSession === true) {
+          sessions.delete(data.accessToken);
+          for (const [key, peer] of peers) if (peer.accessToken === data.accessToken) peers.delete(key);
+        }
         updateModels(null, null, null, peers);
         return reply(res, 200, {ok: true});
       }
@@ -75,7 +108,7 @@ function createServer(origin) {
         }
       }
       const self = prior?.id || randomUUID();
-      peers.set(token, {id: self, room: data.room, time: now,
+      peers.set(token, {id: self, room: data.room, time: now, accessToken: data.accessToken,
         head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null,
         annotations: annotations(data.annotations, data.room)});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
@@ -92,7 +125,7 @@ function createServer(origin) {
 if (require.main === module) {
   const origin = process.env.FKC_ORIGIN;
   if (!origin || !/^https?:\/\/[^/]+$/.test(origin)) throw new Error("FKC_ORIGIN muss die Origin der VR-Seite sein.");
-  createServer(origin).listen(Number(process.env.PORT || 8787), process.env.FKC_HOST || "127.0.0.1", () => {
+  createServer(origin, process.env.FKC_ACCESS_CODE).listen(Number(process.env.PORT || 8787), process.env.FKC_HOST || "127.0.0.1", () => {
     console.log("FKC-Multiplayer-Pilot gestartet (HTTP, für Pico hinter HTTPS betreiben).");
   });
 }

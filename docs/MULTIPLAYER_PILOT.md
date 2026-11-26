@@ -1,8 +1,8 @@
 # Multiplayer-Pilot
 
-Die [VR-Seite auf GitHub Pages](https://fkchem-up.github.io/VR-Raum/) bleibt öffentlich und funktioniert im Einzelmodus ohne Server. Im Browserpanel „Multiplayer-Pilot“ ist `https://fkc-vr-multiplayer.onrender.com` vorausgefüllt. Übertragen wird erst nach bewusstem Klick auf „Gemeinsam beitreten“ und im VR-Modus. Alle brauchen denselben Server und dieselbe Raum-ID, nicht dasselbe WLAN.
+Die [VR-Seite auf GitHub Pages](https://fkchem-up.github.io/VR-Raum/) bleibt öffentlich und funktioniert im Einzelmodus ohne Server. Im Browserpanel „Multiplayer-Pilot“ ist `https://fkc-vr-multiplayer.onrender.com` vorausgefüllt. „Zugang prüfen“ sendet den Code per HTTPS an den ausgewählten Server und schaltet die Avatar-Verfügbarkeitsprüfung frei. Profil und Positionen werden erst nach „Gemeinsam beitreten“ im VR-Modus übertragen. Alle brauchen denselben Server, denselben Zugangscode und dieselbe Raum-ID, nicht dasselbe WLAN.
 
-Der Pilot hat keine Konten, keinen Raumcode, keine Adminrolle, kein Audio und keinen dauerhaft gespeicherten Lernfortschritt. Anzeigenamen sind freiwillig; Spitznamen genügen. Avatare und Sitzungszustände werden nur im Arbeitsspeicher gehalten. Der Dienst ist offen; der Origin-Filter ist kein Zugriffsschutz. Der Hosting-Anbieter kann technische Logs einschließlich IP-Adressen führen. Für beaufsichtigte Tests nutzen; die Eignung für den regulären Lehrbetrieb separat klären.
+Der gemeinsame Zugangscode schützt den gesamten Multiplayer-Dienst, nicht einzelne Räume. Es gibt keine Konten, keine Adminrolle, kein Audio und keinen dauerhaft gespeicherten Lernfortschritt. Der Server prüft eine zufällige Sitzungskennung für die Avatar-Verfügbarkeit und alle Präsenzanfragen. Sie ist zwei Stunden gültig und wird im Browser nur im Arbeitsspeicher gehalten. Nach 20 falschen Codeversuchen im laufenden Minutenfenster pausiert die Codeprüfung bis zu dessen Ende; bestehende Sitzungen laufen weiter. Beim Ausschalten oder Verlassen von VR wird die Kennung verworfen. Ein Serverneustart beendet alle Sitzungen. Anzeigenamen sind freiwillig; Spitznamen genügen. Der Hoster kann technische Logs einschließlich IP-Adressen führen. Die Eignung für den regulären Lehrbetrieb separat klären.
 
 ## Was geteilt wird
 
@@ -20,16 +20,17 @@ Auf einem Node-Webdienst mit öffentlicher HTTPS-Adresse dieses Repository als Q
 
 - `FKC_ORIGIN=https://fkchem-up.github.io` (nur Schema und Host, **kein** `/VR-Raum/` und kein abschließender Schrägstrich; bei einer anderen Pages-Adresse entsprechend anpassen).
 - `FKC_HOST=0.0.0.0` (damit der HTTPS-Proxy des Hosts den Dienst erreicht).
+- `FKC_ACCESS_CODE` im Render-Dashboard unter **Environment** setzen. Der Dienst startet ohne Code nicht. Groß-/Kleinschreibung wird beachtet. Den Wert nicht in Git, in der URL oder im Browsercode hinterlegen; nur der Gruppe und nur für den vorgesehenen Server mitteilen. Für besseren Schutz einen längeren, schwer erratbaren Code wählen. Eine Änderung wird beim nächsten Deploy wirksam.
 - `PORT` vom Host übernehmen; Standard ist `8787`.
 
 Der Dienst selbst spricht HTTP; der Hosting-Proxy muss öffentlich **HTTPS** anbieten. [Gesundheitsprüfung](https://fkc-vr-multiplayer.onrender.com/health) soll `{"ok":true}` liefern. Eine einzelne Instanz nutzen. Der Pilot nutzt kurze HTTPS-Anfragen statt WebSockets. Render Free kann schlafen; vor dem Test die Gesundheitsprüfung aufrufen. Bei Änderungen an Server oder gemeinsamem Protokoll sowohl GitHub Pages als auch Render aktualisieren; bei ausbleibendem Auto-Deploy in Render **Manual Deploy → Deploy latest commit** wählen. Anschließend beide Pico-Seiten neu laden.
 
 ## Zwei Pico-Headsets testen
 
-1. Auf beiden Picos dieselbe VR-Seite öffnen, „Multiplayer-Pilot“ ausklappen und dieselbe Serveradresse verwenden. „Gemeinsam beitreten“ wählen, VR starten und das Tutorial überspringen. Ein `?multiplayer=`-Parameter kann die Adresse vorgeben, startet aber keinen Beitritt.
+1. Auf beiden Picos dieselbe VR-Seite und dieselbe vertrauenswürdige Serveradresse verwenden. „Multiplayer-Pilot“ öffnen und mit „Zugang prüfen“ zuerst einen falschen Code (muss abgelehnt werden), dann den vereinbarten Code testen. Avatar wählen, „Gemeinsam beitreten“ klicken, VR starten und das Tutorial überspringen. `?multiplayer=` kann nur die Serveradresse vorgeben; vor der Codeeingabe diese prüfen.
 2. Im Begrüßungsraum am Team-B-Podest testen: auf Co zeigen; Modell greifen, drehen, skalieren und übergeben; Ansicht **Molekül → Koordination → Molekül** umschalten; Label anheften und eine Messung abschließen sowie wieder entfernen. Die zweite Person schaut zunächst nur zu.
 3. Raum wechseln bzw. VR verlassen; fremde Anzeigen müssen aus dem bisherigen Raum verschwinden. Bei Verbindungsabbruch verfallen alte Teilnehmendenpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
 
 ## Nächste Etappen
 
-Nutzerbestätigt auf Pico: Beitritt, gemeinsames Zeigen, gedrehte Modelle sowie geteilte Labels und Messungen. Den gemeinsamen Ansichtswechsel und den Betrieb mit größeren Gruppen bzw. über eduroam separat praktisch prüfen. Sinnvolle spätere Pakete: gemeinsames Markieren nach Nachtest des lokalen Malmodus, gemeinsamer Modellreset und bei Bedarf Raumcode. Keine dieser Erweiterungen gilt bereits als umgesetzt.
+Nutzerbestätigt auf Pico vor Einführung des Zugangscodes: Beitritt, gemeinsames Zeigen, gedrehte Modelle sowie geteilte Labels und Messungen. Zugangscode, gemeinsamen Ansichtswechsel und Betrieb mit größeren Gruppen bzw. über eduroam separat praktisch prüfen. Sinnvolle spätere Pakete: gemeinsames Markieren nach Nachtest des lokalen Malmodus, gemeinsamer Modellreset und bei Bedarf getrennte Gruppensitzungen.
