@@ -500,7 +500,7 @@
             demo.playDirection > 0 ? "Richtung: Salzprobe" : "Richtung: Elementarzelle", () => demo.reverseDirection())], true);
           row([tile(`Wiederholen: ${demo.loop ? "an" : "aus"}`, () => { demo.loop = !demo.loop; }, demo.loop)], true);
         } else {
-          text("Aufnahmemodus · während des Frames stehen beide Achsen");
+          text(demo.scanMode === "rotation" ? "Dauerrotation · Detektor fährt zwischen den Bildern" : "Schrittmodus · während des Frames stehen beide Achsen");
           row(Object.entries(F.XrayDemo.scanModes).map(([id, label]) =>
             tile(label, () => demo.setScanMode(id), demo.scanMode === id)), true);
           row([tile("Nächstes Bild (pausiert)", () => demo.nextFrame()),

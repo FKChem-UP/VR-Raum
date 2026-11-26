@@ -110,7 +110,7 @@
   // und erzeugt im Lehrmodell auffällig gerade Reflexreihen.
   const scanAxis = [0.27, 1, 0.19];
   const detectorAngles = [20, 35, 50, 65, 0];
-  const scanModes = {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"};
+  const scanModes = {rotation: "Dauerrotation", step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"};
   const exposureTime = 4, frameTime = 5;
   // Reproduzierbare Beispielstellungen; im Kristallscan ist auch ein leerer Frame möglich.
   const crystalAngles = {step: [-18.6, 17.3, 17.1, -15.5, -10], crystal: [3, 5, 10, 59, -18.6]};
@@ -137,7 +137,8 @@
     const mix = (a, b) => a + (b - a) * progress ** 2 * (3 - 2 * progress);
     const crystal = crystalAngles[mode];
     const detector = mode === "crystal" ? 20 : mix(detectorAngles[slot], detectorAngles[next]);
-    const omega = (mode === "detector" ? 3 : mix(crystal[slot], crystal[next])) * Math.PI / 180;
+    const omega = mode === "rotation" ? crystalAngles.step[0] * Math.PI / 180 + 0.20 * time :
+      (mode === "detector" ? 3 : mix(crystal[slot], crystal[next])) * Math.PI / 180;
     return {block, slot, moving: progress > 0, omega, detector};
   }
   F.XrayDemo = {
@@ -147,7 +148,7 @@
       const demo = hit.xrayDemo;
       if (!demo || !hit.xrayInfo) return false;
       if (!demo.removed && demo.shown && !F.Tutorial?.active && !F.Menu?.opened && !F.HandMenu?.opened) {
-        if (hit.mesh?.userData?.reflectionPoint) demo.toggleReflection(hit.mesh.userData.reflectionPoint);
+        if (hit.mesh?.userData?.reflectionPoint) demo.toggleReflection(hit.mesh.userData.reflectionPoint, hit.mesh.userData.exposedAt);
         else if (hit.xrayInfo === closeInfo || hit.xrayInfo === demo.selectedInfo) demo.clearInformation();
         else demo.selectInformation(hit.xrayInfo);
       }
@@ -225,11 +226,11 @@
 
     init: function () {
       this.time = 0;
-      this.paused = true;
+      this.paused = false;
       this.shown = true;
       this.explanations = true;
       this.removed = false;
-      this.scanMode = "step";
+      this.scanMode = "rotation";
       this.detectorDistance = 60;
       this.exposure = 1;
       this.lastFrame = -1;
@@ -820,10 +821,15 @@
       if (F.invalidateHits) F.invalidateHits();
     },
 
-    toggleReflection: function (point) {
+    toggleReflection: function (point, exposedAt) {
       if (this.selectedReflection === point) { this.clearReflection(); return; }
       this.clearInformation();
       this.paused = true;
+      // Ein gespeicherter Drehreflex gehört zur Kristalllage bei seinem Auftreffen.
+      if (this.scanMode === "rotation" && Number.isFinite(exposedAt) && exposedAt !== this.time) {
+        this.time = exposedAt;
+        this.updateFrame(true);
+      }
       this.selectedReflection = point;
       this.reflectionDisplays.forEach(ray => { ray.visible = false; });
       this.reflectionParticles.visible = false;
@@ -1006,7 +1012,7 @@
         "Die Hochspannung beschleunigt die Elektronen zur " +
         "Anode (+). Betriebspunkt: 50 kV, 1 mA (50 W elektrische Röhrenleistung). " +
         "Die Elektronen erreichen bis zu 50 keV; der Strom bestimmt den Elektronenfluss. " +
-        "Die türkisfarbenen Kugeln sind schematische Marker.",
+        "Die türkisfarbenen e⁻ sind Elektronen: Sie treffen auf die Anode. Erst dort entsteht die Röntgenstrahlung (Photonen).",
         vec(-2.5, 0.45, 0.38),
         [electronGuide]
       );
@@ -1022,6 +1028,24 @@
       this.electronMesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
       this.electronMesh.frustumCulled = false;
       this.model.add(this.electronMesh);
+
+      // Wenige mitfliegende Ladungszeichen statt 28 überlappender Beschriftungen.
+      const canvas = document.createElement("canvas");
+      canvas.width = 128; canvas.height = 80;
+      const ctx = canvas.getContext("2d");
+      ctx.font = "bold 62px Arial, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 7; ctx.strokeStyle = "#102738"; ctx.fillStyle = "#8eeaff";
+      ctx.strokeText("e⁻", 64, 40); ctx.fillText("e⁻", 64, 40);
+      const texture = new T.CanvasTexture(canvas);
+      this.textures.add(texture);
+      const labelMaterial = this.trackMaterial(new T.SpriteMaterial({map: texture, transparent: true, depthWrite: false, toneMapped: false}));
+      this.electronLabels = new Map();
+      for (const index of [0, 9, 18]) {
+        const label = new T.Sprite(labelMaterial);
+        label.scale.set(0.32, 0.20, 1); label.raycast = () => {};
+        this.model.add(label); this.electronLabels.set(index, label);
+      }
 
       this.electrons = [];
 
@@ -1247,8 +1271,8 @@
       this.addInfo(
         "Rotierender Einkristall",
         "Die Kristallorientierung bestimmt die Beugungsrichtungen. Im Detektorscan bleibt sie fest. " +
-        "Bei Schrittaufnahmen und im Kristallscan ändert sie sich zwischen den Bildern. Reale Drehaufnahmen " +
-        "können auch bei festem Detektor über ein kleines Kristall-Winkelintervall belichten.",
+        "Bei der Dauerrotation dreht sich der Kristall auch während der Belichtung; der Detektor wechselt zwischen den Bildern die Stellung. " +
+        "Bei Schrittaufnahme und Kristallscan ändert sich die Kristalllage nur zwischen den Bildern.",
         this.samplePosition.clone().add(vec(-0.55, 0.65, 0)),
         [this.crystal, sampleSupport]
       );
@@ -1618,6 +1642,7 @@
 
           spot.position.set(point.x, point.y, -0.028);
           spot.userData.reflectionPoint = point;
+          spot.userData.exposedAt = this.time;
           spot.scale.setScalar(style.radius);
           spot.renderOrder = 1;
           this.detector.add(spot);
@@ -1704,15 +1729,19 @@
       this.localPosition.y += 1.55;
       this.detectorInfo.marker.position.copy(this.localPosition);
 
-      if (moving && this.scanMode !== "detector") {
+      const rotating = this.scanMode === "rotation";
+      if (moving && this.scanMode !== "detector" && !rotating) {
         this.reflectionParticles.count = 0;
         this.reflectionDisplays.forEach(ray => { ray.visible = false; });
       } else {
-        if (this.reflectionOmega !== omega) {
+        // Die sichtbare Rotation bleibt flüssig; Ewald-Suche auf ca. 25 Hz Modellzeit begrenzen.
+        const recalculate = this.reflectionOmega !== omega && (!rotating || changed ||
+          this.reflectionOmega == null || Math.abs(this.reflectionOmega - omega) >= 0.008);
+        if (recalculate) {
           this.calculateReflections(omega);
           this.reflectionOmega = omega;
         }
-        if (changed || moving) this.projectReflections(moving);
+        if (changed || recalculate || moving) this.projectReflections(moving);
       }
 
       for (let i = 0; i < this.electrons.length; i++) {
@@ -1728,6 +1757,8 @@
 
         this.dummy.updateMatrix();
         this.electronMesh.setMatrixAt(i, this.dummy.matrix);
+        const label = this.electronLabels.get(i);
+        if (label) { label.position.copy(this.dummy.position); label.position.y += 0.14; }
       }
 
       this.electronMesh.instanceMatrix.needsUpdate = true;

@@ -79,13 +79,18 @@ for (const mode of Object.keys(scanModes)) {
   assert.equal(new Set(frames.map(frame => frame.detector)).size, mode === "crystal" ? 1 : 5);
   assert.equal(frames.at(-1).detector, mode === "crystal" ? 20 : 0);
   frames.forEach((frame, index) => {
-    assert.deepEqual(scanFrame(mode, index * 5 + 3.9), frame, "Belichtung verändert keine Achsen");
+    const end = scanFrame(mode, index * 5 + 3.9);
+    if (mode === "rotation") {
+      assert.ok(end.omega > frame.omega);
+      assert.equal(end.detector, frame.detector, "Drehaufnahme bei festem Detektor");
+    } else assert.deepEqual(end, frame, "Schrittaufnahme verändert keine Achsen während der Belichtung");
     const slew = scanFrame(mode, index * 5 + 4.5);
     assert.ok(slew.moving);
     assert.equal(slew.omega === frame.omega, mode === "detector");
     assert.equal(slew.detector === frame.detector, mode === "crystal");
   });
 }
+assert.equal(Object.keys(scanModes)[0], "rotation");
 const control = {...components["fkc-xray-demo"], shown: true, scanMode: "step", time: 0,
   clearSpots() {}, clearInformation() {}, updateFrame(force) { assert.ok(force); }};
 control.setScanMode("detector");
