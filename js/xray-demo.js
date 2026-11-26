@@ -109,8 +109,23 @@
   // Leicht geneigte Rotationsachse: eine reine y-Rotation konserviert g_y
   // und erzeugt im Lehrmodell auffällig gerade Reflexreihen.
   const scanAxis = [0.27, 1, 0.19];
+  const detectorAngles = [20, 35, 50, 65];
+  const scanModes = {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"};
+  const exposureTime = 4, frameTime = 5;
+  // Reproduzierbare Beispielstellungen; im Kristallscan ist auch ein leerer Frame möglich.
+  const crystalAngles = {step: [3, 23, 27, 10], detector: [3, 3, 3, 3], crystal: [3, 5, 10, 59]};
+  const reflectionTolerance = 0.0035; // Å⁻¹, endliche Ewald-Schale des Lehrmodells.
+  function scanFrame(mode, time) {
+    const block = Math.floor(time / frameTime), slot = block % detectorAngles.length;
+    const next = (slot + 1) % detectorAngles.length;
+    const progress = Math.max(0, (time % frameTime - exposureTime) / (frameTime - exposureTime));
+    const mix = (a, b) => a + (b - a) * progress ** 2 * (3 - 2 * progress);
+    const crystal = crystalAngles[mode];
+    const detector = mode === "crystal" ? 20 : mix(detectorAngles[slot], detectorAngles[next]);
+    return {block, slot, moving: progress > 0, omega: mix(crystal[slot], crystal[next]) * Math.PI / 180, detector};
+  }
   F.XrayDemo = {
-    projectDirection, angleGuides,
+    projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance,
     activate(hit) {
       const demo = hit.xrayDemo;
       if (!demo || !hit.xrayInfo) return false;
@@ -196,8 +211,10 @@
       this.shown = true;
       this.explanations = true;
       this.removed = false;
-      this.lastCalculation = -Infinity;
+      this.scanMode = "step";
       this.lastFrame = -1;
+      this.lastMoving = null;
+      this.reflectionOmega = null;
 
       this.spots = [];
       this.frameHits = new Set();
@@ -780,10 +797,23 @@
       this.time = 0;
       this.paused = true;
       this.lastFrame = -1;
-      this.lastCalculation = -Infinity;
+      this.lastMoving = null;
 
       this.clearSpots();
       this.clearInformation();
+      this.updateFrame(true);
+    },
+
+    setScanMode: function (mode) {
+      if (!Object.hasOwn(scanModes, mode) || mode === this.scanMode) return;
+      this.scanMode = mode;
+      this.restart();
+    },
+
+    nextFrame: function () {
+      if (!this.shown) this.setShown(true);
+      this.paused = true;
+      this.time = ((Math.floor(this.time / frameTime) + 1) % detectorAngles.length) * frameTime;
       this.updateFrame(true);
     },
 
@@ -1137,10 +1167,9 @@
 
       this.addInfo(
         "Rotierender Einkristall",
-        "Die Rotation bringt unterschiedliche Netzebenen " +
-        "in Beugungsstellung. Reflexe entstehen bei erfüllter " +
-        "Beugungsbedingung. Gezeigt wird ein primitives " +
-        "kubisches Modellgitter.",
+        "Die Kristallorientierung bestimmt die Beugungsrichtungen. Im Detektorscan bleibt sie fest. " +
+        "Bei Schrittaufnahmen und im Kristallscan ändert sie sich zwischen den Bildern. Reale Drehaufnahmen " +
+        "können auch bei festem Detektor über ein kleines Kristall-Winkelintervall belichten.",
         this.samplePosition.clone().add(vec(-0.55, 0.65, 0)),
         [this.crystal, sampleSupport]
       );
@@ -1234,9 +1263,8 @@
 
       this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
-        "Der Detektor sammelt Reflexereignisse während eines " +
-        "Rotationsabschnitts. Während seiner Fahrt werden hier " +
-        "keine Ereignisse gesammelt. Die Punkte sind Einkristallreflexe. " +
+        "Hier wird jeder Frame bei feststehenden Achsen belichtet. Beim Verstellen wird kein Bild aufgezeichnet. " +
+        "Im Detektorscan ändert sich nur der erfasste Ausschnitt derselben Beugungsrichtungen. " +
         "Die Gradangaben bezeichnen den jeweiligen Streuwinkel 2θ. Die Bögen verbinden Orte gleichen 2θ " +
         "(Schritte von 5°); sie sind keine Pulverringe. " +
         "Bei einem geneigten Detektor sind diese Bögen keine exakten Kreise.",
@@ -1426,9 +1454,8 @@
       this.detectorLabelTexture.needsUpdate = true;
     },
 
-    calculateReflections: function (omega, moving) {
+    calculateReflections: function (omega) {
       const waveNumber = 1 / this.data.wavelength;
-      const tolerance = 0.010;
 
       this.rotationQ.setFromAxisAngle(this.scanAxis, omega);
       this.reflections.length = 0;
@@ -1442,10 +1469,18 @@
           this.outTemp.length() - waveNumber
         );
 
-        if (mismatch > tolerance) continue;
+        if (mismatch > reflectionTolerance) continue;
 
         point.direction.copy(this.outTemp).normalize();
 
+        point.visibility = 1 - mismatch / reflectionTolerance;
+        this.reflections.push(point);
+      }
+      this.reflections.sort((a, b) => b.visibility - a.visibility);
+    },
+
+    projectReflections: function (moving) {
+      for (const point of this.reflections) {
         if (point.direction.z < 0.15) continue;
 
         point.hit = false;
@@ -1470,8 +1505,6 @@
           if (point.hit) point.distance = distance;
         }
 
-        point.visibility = 1 - mismatch / tolerance;
-        this.reflections.push(point);
 
         if (
           point.hit &&
@@ -1488,11 +1521,6 @@
           this.frameHits.add(point.key);
         }
       }
-
-      this.reflections.sort((a, b) => (
-        Number(b.hit) - Number(a.hit) ||
-        b.visibility - a.visibility
-      ));
 
       const count = Math.min(
         this.reflections.length,
@@ -1529,37 +1557,14 @@
 
     updateFrame: function (force) {
       const t = this.time;
-      const omega = t * 0.20;
+      const {omega, detector: degrees, block, moving} = scanFrame(this.scanMode, t);
+      const changed = force || block !== this.lastFrame || moving !== this.lastMoving;
 
       this.crystal.quaternion.setFromAxisAngle(this.scanAxis, omega);
 
-      const angles = [20, 35, 50, 65];
-      const blockDuration = 5;
-      const moveDuration = 0.7;
-
-      const block = Math.floor(t / blockDuration);
-      const slot = block % angles.length;
-      const within = t % blockDuration;
-      const moving = within > blockDuration - moveDuration;
-
-      let degrees = angles[slot];
-
-      if (moving) {
-        let f = (within - blockDuration + moveDuration) / moveDuration;
-        f = f * f * (3 - 2 * f);
-
-        degrees += (
-          angles[(slot + 1) % angles.length] - angles[slot]
-        ) * f;
-      }
-
-      if (block !== this.lastFrame) {
-        this.clearSpots();
-        this.lastFrame = block;
-        force = true;
-      }
-
-      if (moving && this.spots.length) this.clearSpots();
+      if (changed) this.clearSpots();
+      this.lastFrame = block;
+      this.lastMoving = moving;
 
       const beta = T.MathUtils.degToRad(degrees);
       if (!moving && degrees !== this.guideAngle) {
@@ -1595,7 +1600,16 @@
       this.localPosition.y += 1.55;
       this.detectorInfo.marker.position.copy(this.localPosition);
 
-      if (force) this.calculateReflections(omega, moving);
+      if (moving && this.scanMode !== "detector") {
+        this.reflectionParticles.count = 0;
+        this.reflectionDisplays.forEach(ray => { ray.visible = false; });
+      } else {
+        if (this.reflectionOmega !== omega) {
+          this.calculateReflections(omega);
+          this.reflectionOmega = omega;
+        }
+        if (changed || moving) this.projectReflections(moving);
+      }
 
       for (let i = 0; i < this.electrons.length; i++) {
         const electron = this.electrons[i];
@@ -1660,10 +1674,7 @@
           Math.max((delta || 0) / 1000, 0), 0.05
         ) * this.data.speed;
 
-        const calculate = time - this.lastCalculation >= 40;
-
-        if (calculate) this.lastCalculation = time;
-        this.updateFrame(calculate);
+        this.updateFrame(false);
       }
 
       // Informationen funktionieren auch bei pausierter Animation.
@@ -1926,7 +1937,7 @@
       const index = this.buttons.length;
       this.buttons.push(entry);
       paintButton(this, entry, index, selected);
-      y += 86;
+      y += 82;
     };
 
     if (demo) {
@@ -1937,7 +1948,7 @@
       text(
         (demo.paused ? "Status: pausiert" : "Status: läuft") +
         " · Geschwindigkeit: " + speedLabel +
-        "\nBauteil oder i-Markierung anklicken, um die Erklärung zu öffnen."
+        "\nBelichtung: Beide Achsen stehen."
       );
 
       button(
@@ -1968,6 +1979,21 @@
           notify(this, "Ausgangszustand hergestellt; pausiert.");
         }
       );
+
+      button("Aufnahmemodus: " + scanModes[demo.scanMode] + " – wechseln", () => {
+        const current = getDemo();
+        if (!current) return;
+        const modes = Object.keys(scanModes);
+        current.setScanMode(modes[(modes.indexOf(current.scanMode) + 1) % modes.length]);
+        notify(this, scanModes[current.scanMode] + " · pausiert");
+      });
+
+      button("Nächstes Bild – pausiert", () => {
+        const current = getDemo();
+        if (!current) return;
+        current.nextFrame();
+        notify(this, "Frame " + (scanFrame(current.scanMode, current.time).slot + 1) + " von 4 · pausiert");
+      });
 
       button(
         "Geschwindigkeit: " + speedLabel + " – wechseln",

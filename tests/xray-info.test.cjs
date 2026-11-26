@@ -53,7 +53,26 @@ F.XrayDemo.activate(F.findHit(ray, true));
 assert.equal(demo.selectedInfo, null);
 assert.equal(demo.infoPanel.visible, false, "Klick auf die Karte schließt sie");
 assert.equal(F.XrayDemo.activate({}), false);
-const {projectDirection, angleGuides} = F.XrayDemo;
+const {projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance} = F.XrayDemo;
+assert.ok(reflectionTolerance < 0.01);
+for (const mode of Object.keys(scanModes)) {
+  const frames = [0, 5, 10, 15].map(time => scanFrame(mode, time));
+  assert.equal(new Set(frames.map(frame => frame.omega)).size, mode === "detector" ? 1 : 4);
+  assert.equal(new Set(frames.map(frame => frame.detector)).size, mode === "crystal" ? 1 : 4);
+  frames.forEach((frame, index) => {
+    assert.deepEqual(scanFrame(mode, index * 5 + 3.9), frame, "Belichtung verändert keine Achsen");
+    const slew = scanFrame(mode, index * 5 + 4.5);
+    assert.ok(slew.moving);
+    assert.equal(slew.omega === frame.omega, mode === "detector");
+    assert.equal(slew.detector === frame.detector, mode === "crystal");
+  });
+}
+const control = {...components["fkc-xray-demo"], shown: true, scanMode: "step", time: 0,
+  clearSpots() {}, clearInformation() {}, updateFrame(force) { assert.ok(force); }};
+control.setScanMode("detector");
+assert.equal(control.scanMode, "detector");
+assert.equal(control.paused, true);
+for (const time of [5, 10, 15, 0]) { control.nextFrame(); assert.equal(control.time, time); }
 const radius = 4.7;
 const labels = [];
 for (const beta of [0, 20, 35, 50, 65].map(deg => deg * Math.PI / 180)) {

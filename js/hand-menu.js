@@ -290,7 +290,7 @@
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
         F.Measure && F.Measure.mode, this.el.components["fkc-measurements"]?.saved?.length,
-        !!demo, demo?.paused, demo?.shown, demo?.data.speed, demo?.loop, demo?.playDirection, demo?.explanations,
+        !!demo, demo?.paused, demo?.shown, demo?.data.speed, demo?.loop, demo?.playDirection, demo?.explanations, demo?.scanMode,
         this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness, model.fkcHydrogenThickness, F.StructureAnalysis?.revision,
         environment && environment.enabled, environment && environment.radius,
@@ -499,6 +499,10 @@
             demo.playDirection > 0 ? "Richtung: Salzprobe" : "Richtung: Elementarzelle", () => demo.reverseDirection())], true);
           row([tile(`Wiederholen: ${demo.loop ? "an" : "aus"}`, () => { demo.loop = !demo.loop; }, demo.loop)], true);
         } else {
+          text("Aufnahmemodus · während des Frames stehen beide Achsen");
+          row(Object.entries(F.XrayDemo.scanModes).map(([id, label]) =>
+            tile(label, () => demo.setScanMode(id), demo.scanMode === id)), true);
+          row([tile("Nächstes Bild (pausiert)", () => demo.nextFrame())], true);
           row([tile(demo.explanations ? "i-Markierungen ausblenden" : "i-Markierungen einblenden",
             () => demo.setExplanations(!demo.explanations), demo.explanations), tile("Info schließen", () => demo.clearInformation())], true);
           text("Bauteil oder i anklicken, um die Info zu öffnen.", false);

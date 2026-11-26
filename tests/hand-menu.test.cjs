@@ -246,12 +246,14 @@ assert.equal(inkOf("Animationsmenü"),"#782a2a");
 assert.equal(inkOf("Abspieltempo"),"#782a2a");
 assert.equal(inkOf("Start"),"#191919");
 delete menu.el.components["fkc-tutorial"];
+F.XrayDemo = {scanModes: {step: "Schrittaufnahme", detector: "Nur Detektor", crystal: "Nur Kristall"}};
 for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-demo", "NaCl-Demo"],
   ["fkc-xray-experiment", "fkc-xray-demo", "Röntgendemo"]]) {
   const calls = [];
   const demo = {paused: true, shown: false, data: {speed: 1}, playDirection: 1, loop: false, explanations: true,
     el: {setAttribute(...args) { calls.push(args); }}, setShown(value) { this.shown = value; },
     restart() { this.paused = true; }, nextPhase() { calls.push("phase"); }, reverseDirection() { this.playDirection *= -1; },
+    scanMode: "step", setScanMode(mode) { this.scanMode = mode; }, nextFrame() { calls.push("frame"); },
     clearInformation() { calls.push("close"); }, setExplanations(value) { this.explanations = value; }};
   entities.set(id, {isConnected: true, components: {[component]: demo}});
   menu.model = {id: "room-root", dataset: {}, querySelector: () => null};
@@ -266,6 +268,9 @@ for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-de
     press("Richtung: Salzprobe"); assert.equal(demo.playDirection, -1);
     press("Wiederholen: aus"); assert.equal(demo.loop, true);
   } else {
+    press("Nur Detektor"); assert.equal(demo.scanMode, "detector");
+    press("Nur Kristall"); assert.equal(demo.scanMode, "crystal");
+    press("Nächstes Bild (pausiert)"); assert.equal(calls.at(-1), "frame");
     press("i-Markierungen ausblenden"); assert.equal(demo.explanations, false);
     press("Info schließen"); assert.equal(calls.at(-1), "close");
   }
