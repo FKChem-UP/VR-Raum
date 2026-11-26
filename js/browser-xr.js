@@ -323,13 +323,14 @@
     drawSymbol("#173527", 19);
     drawSymbol("#ffffff", 10);
 
-    ctx.font = "bold 104px Arial, sans-serif";
+    const entryFont = "normal 104px Arial, sans-serif";
+    ctx.font = entryFont;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
 
     ctx.strokeStyle = "#173527";
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 4;
     ctx.strokeText("Betreten", 268, 138);
 
     ctx.fillStyle = "#ffffff";
@@ -354,9 +355,12 @@
       ctx.rect(0, top, canvas.width, canvas.height - top);
       ctx.clip();
       drawSymbol("#000000", 10);
-      ctx.font = "bold 104px Arial, sans-serif";
+      ctx.font = entryFont;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.strokeText("Betreten", 268, 138);
       ctx.fillStyle = "#000000";
       ctx.fillText("Betreten", 268, 138);
       ctx.restore();

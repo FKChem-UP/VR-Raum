@@ -53,6 +53,17 @@ F.XrayDemo.activate(F.findHit(ray, true));
 assert.equal(demo.selectedInfo, null);
 assert.equal(demo.infoPanel.visible, false, "Klick auf die Karte schließt sie");
 assert.equal(F.XrayDemo.activate({}), false);
+const point = {key: "2,1,0"}, rayDisplay = {visible: true};
+let inspected = null;
+Object.assign(demo, {paused:false, reflectionDisplays:[rayDisplay], reflectionParticles:{count:1, visible:true},
+  inspector:{show(p){inspected=p;},hide(){inspected=null;}}});
+const spotHit = {xrayDemo:demo,xrayInfo:point,mesh:{userData:{reflectionPoint:point}}};
+F.XrayDemo.activate(spotHit);
+assert.equal(inspected,point); assert.ok(demo.paused); assert.equal(rayDisplay.visible,false);
+F.XrayDemo.activate(spotHit);
+assert.equal(inspected,null); assert.ok(rayDisplay.visible);
+demo.detectorGuides={};demo.detectorLabels={};demo.setAngleGrid(false);
+assert.equal(demo.detectorGuides.visible,false);assert.equal(demo.detectorLabels.visible,false);
 const {projectDirection, angleGuides, scanFrame, scanModes, reflectionTolerance,
   beamstop, stopEntrance, blockedByBeamstop} = F.XrayDemo;
 assert.ok(reflectionTolerance > 0.0035 && reflectionTolerance < 0.01);

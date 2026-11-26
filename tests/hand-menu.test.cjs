@@ -277,7 +277,7 @@ for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-de
     press("40 mm"); assert.equal(demo.detectorDistance, 40);
     press("0,2 s"); assert.equal(demo.exposure, 0.2);
     press("Nächstes Bild (pausiert)"); assert.equal(calls.at(-1), "frame");
-    press("2θ = 0°"); assert.equal(calls.at(-1), "zero-angle");
+    press("Detektorzentrum auf 0°"); assert.equal(calls.at(-1), "zero-angle");
     press("i-Markierungen ausblenden"); assert.equal(demo.explanations, false);
     press("Info schließen"); assert.equal(calls.at(-1), "close");
   }

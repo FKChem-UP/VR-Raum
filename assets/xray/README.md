@@ -1,0 +1,5 @@
+# Vergleichsframe für Vorlesung 5
+
+Einen einzelnen freigegebenen Detektorframe als **messframe.png** in diesen Ordner legen (PNG-Export, kein umbenannter Instrumenten-Rohdatensatz). Das Bild bleibt unverzerrt und wird nicht nach dem simulierten Detektorabstand oder der simulierten Belichtung verändert. Ohne lesbare PNG bleibt die Platzhaltertafel sichtbar.
+
+Optional in `messframe.json` die tatsächlichen Messparameter als Zahlen eintragen: Detektorabstand in mm, Belichtung in s, Wellenlänge in Å und Drehintervall Δω in Grad (0 bei einer Stillaufnahme). Nicht bekannte Werte auf `null` lassen. Für die drei optionalen Beschriftungen je ein Paar `[x, y]` in relativen Bildkoordinaten angeben (links oben `[0, 0]`, rechts unten `[1, 1]`). Nur tatsächlich identifizierte Merkmale markieren. Den Beamstop-Schatten weglassen, wenn er nicht sichtbar ist. Das Winkelraster der Simulation wird nicht auf den Messframe übertragen.

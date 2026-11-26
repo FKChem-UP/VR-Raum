@@ -5,6 +5,7 @@ const {createHash, randomUUID, timingSafeEqual} = require("node:crypto");
 const {normalize, available, choices} = require("../js/avatar-profile.js");
 const {sharedModels} = require("./shared-models.cjs");
 const {normalize: annotations} = require("../js/shared-annotations.js");
+const {normalize: ink} = require("../js/shared-ink.js");
 const validRoom = room => typeof room === "string" && /^(welcome|vorlesung-[1-8]|team-[ab])$/.test(room);
 
 const digest = value => createHash("sha256").update(value).digest();
@@ -44,7 +45,7 @@ function createServer(origin, accessCode) {
     try {
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 12288) { req.destroy(); return; }
+        if (size > (req.url === "/presence" ? 32768 : 12288)) { req.destroy(); return; }
         body += chunk;
       }
       const data = JSON.parse(body);
@@ -110,10 +111,10 @@ function createServer(origin, accessCode) {
       const self = prior?.id || randomUUID();
       peers.set(token, {id: self, room: data.room, time: now, accessToken: data.accessToken,
         head: data.head, left: data.left, right: data.right, hands: data.hands === true, profile, pointing: data.pointing ?? null,
-        annotations: annotations(data.annotations, data.room)});
+        annotations: annotations(data.annotations, data.room), ink: ink(data.ink,data.room)});
       const nearby = [...peers].filter(([key, peer]) => key !== token && peer.room === data.room)
-        .map(([, {id, head, left, right, hands, profile, pointing, annotations}]) =>
-          ({id, head, left, right, hands, profile, pointing, annotations}));
+        .map(([, {id, head, left, right, hands, profile, pointing, annotations, ink}]) =>
+          ({id, head, left, right, hands, profile, pointing, annotations, ink}));
       const models = updateModels(data.room, self, data.modelCommand, peers, data.variantCommand);
       reply(res, 200, {token, self, profile, peers: nearby, models});
     } catch {

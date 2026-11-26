@@ -127,7 +127,7 @@
     const relativeDistance = distance / 60;
     // Schematically combine a local detector blur with angular divergence.
     // The opacity describes peak brightness, not integrated Bragg intensity.
-    return {radius: Math.hypot(0.24, 0.145 * relativeDistance),
+    return {radius: Math.hypot(0.21, 0.12 * relativeDistance),
       opacity: 1 - Math.exp(-0.9 * exposure / relativeDistance ** 2)};
   }
   function scanFrame(mode, time) {
@@ -147,7 +147,8 @@
       const demo = hit.xrayDemo;
       if (!demo || !hit.xrayInfo) return false;
       if (!demo.removed && demo.shown && !F.Tutorial?.active && !F.Menu?.opened && !F.HandMenu?.opened) {
-        if (hit.xrayInfo === closeInfo || hit.xrayInfo === demo.selectedInfo) demo.clearInformation();
+        if (hit.mesh?.userData?.reflectionPoint) demo.toggleReflection(hit.mesh.userData.reflectionPoint);
+        else if (hit.xrayInfo === closeInfo || hit.xrayInfo === demo.selectedInfo) demo.clearInformation();
         else demo.selectInformation(hit.xrayInfo);
       }
       return true;
@@ -210,7 +211,7 @@
       point: infoHit.point.clone(),
       normal,
       uv: infoHit.uv ? infoHit.uv.clone() : null,
-      xrayInfo: closing ? closeInfo : demo.infoLookup.get(infoHit.object),
+      xrayInfo: closing ? closeInfo : infoHit.object.userData?.reflectionPoint || demo.infoLookup.get(infoHit.object),
       xrayDemo: demo
     };
   };
@@ -292,6 +293,10 @@
       this.buildReciprocalGrid();
       this.buildInformation();
       this.buildInfoPanel();
+      this.angleGrid = true;
+      this.inspector = F.XrayTeaching.selection(this);
+      F.XrayTeaching.spectra(this);
+      F.XrayTeaching.frameBoard(this);
 
       this.updateFrame(true);
 
@@ -516,9 +521,10 @@
         visibleInTree(mesh)
       );
 
-      const hits = raycaster.intersectObjects(targets, false);
+      const hits = raycaster.intersectObjects(targets.concat(this.spots), false);
 
-      return hits.length ? hits[0] : null;
+      return hits.find(hit => !hit.object.userData.reflectionPoint ||
+        hit.uv && Math.hypot(hit.uv.x - 0.5, hit.uv.y - 0.5) <= 0.48) || null;
     },
 
     buildInfoPanel: function () {
@@ -701,6 +707,7 @@
     },
 
     selectInformation: function (entry) {
+      this.clearReflection();
       if (entry !== this.selectedInfo) {
         this.clearInformation();
 
@@ -807,9 +814,33 @@
       if (!this.shown) {
         this.paused = true;
         this.clearInformation();
+        this.clearReflection();
       }
 
       if (F.invalidateHits) F.invalidateHits();
+    },
+
+    toggleReflection: function (point) {
+      if (this.selectedReflection === point) { this.clearReflection(); return; }
+      this.clearInformation();
+      this.paused = true;
+      this.selectedReflection = point;
+      this.reflectionDisplays.forEach(ray => { ray.visible = false; });
+      this.reflectionParticles.visible = false;
+      this.inspector.show(point);
+    },
+
+    clearReflection: function () {
+      if (!this.selectedReflection) return;
+      this.selectedReflection = null;
+      this.inspector.hide();
+      this.reflectionParticles.visible = true;
+      this.reflectionDisplays.forEach((ray,i) => { ray.visible = i < this.reflectionParticles.count; });
+    },
+
+    setAngleGrid: function (visible) {
+      this.angleGrid = visible;
+      this.detectorGuides.visible = this.detectorLabels.visible = visible && !this.lastMoving;
     },
 
     restart: function () {
@@ -1161,6 +1192,7 @@
       this.addStream(
         this.mono, this.samplePosition, this.colors.ka, 28, 0.6
       );
+      this.addStream(this.mono, this.samplePosition, this.colors.brems, 3, 0.57);
     },
 
     buildScattering: function () {
@@ -1311,7 +1343,7 @@
 
       this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
-        "Hier wird jeder Frame bei feststehenden Achsen belichtet. Beim Verstellen wird kein Bild aufgezeichnet. " +
+        "Reflex anklicken: Strahl, Netzebenen und Winkel verfolgen. Erneut klicken zum Abwählen. " +
         "Größerer Abstand: Reflexe liegen weiter auseinander, aber die Fläche erfasst einen kleineren Winkelbereich. " +
         "Helligkeit und Fleckgröße sind schematisch. Belichtungszeit ändert hier nur das Signal, nicht die Abspielzeit. " +
         "Die Gradangaben bezeichnen den jeweiligen Streuwinkel 2θ. Die Bögen verbinden Orte gleichen 2θ " +
@@ -1387,7 +1419,8 @@
       const ctx = spotCanvas.getContext("2d");
       const glow = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
       glow.addColorStop(0, "rgba(255,255,255,1)");
-      glow.addColorStop(0.55, "rgba(255,255,255,0.45)");
+      glow.addColorStop(0.48, "rgba(255,255,255,0.82)");
+      glow.addColorStop(0.82, "rgba(255,255,255,0.08)");
       glow.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, 64, 64);
@@ -1484,6 +1517,7 @@
     },
 
     clearSpots: function () {
+      this.clearReflection();
       this.spots.forEach(spot => {
         if (spot.parent) spot.parent.remove(spot);
       });
@@ -1583,6 +1617,7 @@
           );
 
           spot.position.set(point.x, point.y, -0.028);
+          spot.userData.reflectionPoint = point;
           spot.scale.setScalar(style.radius);
           spot.renderOrder = 1;
           this.detector.add(spot);
@@ -1649,8 +1684,7 @@
         this.guideAngle = degrees;
         this.guideRadius = this.detectorRadius;
       }
-      this.detectorGuides.visible = !moving;
-      this.detectorLabels.visible = !moving;
+      this.detectorGuides.visible = this.detectorLabels.visible = this.angleGrid && !moving;
 
       this.normal.set(Math.sin(beta), 0, Math.cos(beta));
       this.horizontal.set(Math.cos(beta), 0, -Math.sin(beta));
@@ -1740,6 +1774,7 @@
       }
 
       if (!this.paused) {
+        this.clearReflection();
         this.time += Math.min(
           Math.max((delta || 0) / 1000, 0), 0.05
         ) * this.data.speed;
@@ -2007,7 +2042,7 @@
       const index = this.buttons.length;
       this.buttons.push(entry);
       paintButton(this, entry, index, selected);
-      y += 65;
+      y += 60;
     };
 
     if (demo) {
@@ -2018,7 +2053,7 @@
       text(
         (demo.paused ? "Status: pausiert" : "Status: läuft") +
         " · Geschwindigkeit: " + speedLabel +
-        "\nBelichtung: Beide Achsen stehen."
+        "\nReflex anklicken: (hkl), θ und 2θ anzeigen."
       );
 
       button(
@@ -2064,6 +2099,11 @@
         current.nextFrame();
         const frame = scanFrame(current.scanMode, current.time);
         notify(this, `Frame ${frame.slot + 1} von ${detectorAngles.length} · 2θ: ${frame.detector}° · pausiert`);
+      });
+
+      button(`Winkelraster: ${demo.angleGrid ? "an" : "aus"}`, () => {
+        demo.setAngleGrid(!demo.angleGrid);
+        notify(this, demo.angleGrid ? "Winkelraster eingeblendet." : "Winkelraster ausgeblendet.");
       });
 
       button(`Detektorabstand: ${demo.detectorDistance} mm – wechseln`, () => {

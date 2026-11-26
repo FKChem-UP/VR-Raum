@@ -17,6 +17,7 @@
   AFRAME.registerComponent("fkc-multiplayer", {
     init() {
       this.avatars = new Map();
+      this.inkDisplays = new Map();
       this.models = new Map();
       this.grips = new Map();
       this.variantRequests = new Map();
@@ -28,7 +29,6 @@
       this.codeInput = document.getElementById("multiplayer-code");
       this.button = document.getElementById("multiplayer-toggle");
       this.status = document.getElementById("multiplayer-status");
-      this.panel = document.getElementById("multiplayer-panel");
       this.availability = document.getElementById("multiplayer-availability");
       this.turn = document.getElementById("multiplayer-preview-turn");
       this.dice = document.getElementById("multiplayer-randomize");
@@ -48,7 +48,6 @@
       this.serverChanged = () => this.leave();
       this.turn.addEventListener("click", this.rotatePreview);
       this.dice.addEventListener("click", this.roll);
-      this.panel.addEventListener("toggle", this.refresh);
       this.urlInput.addEventListener("input", this.serverChanged);
       this.codeInput.addEventListener("keydown", this.codeKey);
       Object.values(this.inputs).forEach(input => input.addEventListener("input", this.changed));
@@ -161,7 +160,7 @@
     },
 
     drawPreview() {
-      if (!this.panel.open || this.el.is("vr-mode")) return;
+      if (this.el.is("vr-mode")) return;
       const profile = this.readProfile();
       const key = JSON.stringify([profile, this.previewBack]);
       if (key === this.previewKey) return;
@@ -235,6 +234,7 @@
     },
 
     clearModels() {
+      F.SharedInk?.sync(this.inkDisplays, [], this.room);
       this.remoteAnnotations = [];
       this.displayAnnotations();
       if (this.ownedRoot) F.releaseModel(this.ownedRoot);
@@ -453,6 +453,7 @@
         this.showPeers(result.peers);
         this.remoteAnnotations = result.peers.flatMap(peer => F.SharedAnnotations.normalize(peer.annotations, data.room));
         this.receiveModels(result);
+        if (data.room === F.app.currentId && !F.Tutorial?.active) F.SharedInk?.sync(this.inkDisplays,result.peers,data.room);
         this.status.textContent = `✓ Multiplayer erfolgreich betreten · ${result.peers.length} weitere Personen im Raum.`;
       } catch {
         if (this.request !== request) return;
@@ -503,6 +504,7 @@
       const data = {room, head: world(viewer.transform), left: null, right: null,
         hands: F.AvatarModels.showsHands(), pointing: pointing(this.el), modelCommand: this.modelCommand(),
         annotations: F.SharedAnnotations.collect(this.el, room),
+        ink: F.SharedInk.collect(room),
         variantCommand: this.variantRequests.values().next().value};
       for (const hand of ["left", "right"]) {
         const space = F.getSource(this.el, hand)?.gripSpace;
@@ -517,7 +519,6 @@
 
     remove() {
       this.leave();
-      this.panel.removeEventListener("toggle", this.refresh);
       this.urlInput.removeEventListener("input", this.serverChanged);
       this.codeInput.removeEventListener("keydown", this.codeKey);
       this.turn.removeEventListener("click", this.rotatePreview);

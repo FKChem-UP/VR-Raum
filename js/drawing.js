@@ -20,6 +20,8 @@
   const SIDES = 6;
   const CAPACITY = 128;
   const MAX_STROKES = 300;
+  let sequence = 0;
+  const variant = owner => owner.fkcVariantId || "base";
 
   F.Draw = {
     mode: "laser",
@@ -54,7 +56,16 @@
         const edge = candidate.userData.fkcBond;
         return edge && (edge.bondId || edge.id || `${edge.a}:${edge.b}`) === key;
       });
-      const material = new T.MeshBasicMaterial({color:this.color,opacity:this.opacity,transparent:true,depthWrite:false,
+      if(this.strokes.length >= MAX_STROKES)this.remove(this.strokes[0]);
+      const stroke = this.objectOverlay(meshes, this.color, this.opacity);
+      Object.assign(stroke, {owner:hit.el,paintKey:key,paintParent:group, paintKind:atom ? "atom" : "bond",
+        variant:variant(hit.el),color:this.color,opacity:this.opacity, inkId:++sequence});
+      this.strokes.push(stroke);
+      return stroke;
+    },
+
+    objectOverlay(meshes, color, opacity) {
+      const material = new T.MeshBasicMaterial({color,opacity,transparent:true,depthWrite:false,
         polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
       const overlays = meshes.map(target => {
         const overlay = new T.Mesh(target.geometry, material);
@@ -64,10 +75,7 @@
         target.add(overlay);
         return overlay;
       });
-      if(this.strokes.length >= MAX_STROKES)this.remove(this.strokes[0]);
-      const stroke = {owner:hit.el,paintKey:key,paintParent:group,overlays,material};
-      this.strokes.push(stroke);
-      return stroke;
+      return {overlays,material};
     },
 
     remove: function (stroke) {
@@ -102,9 +110,9 @@
     },
 
     createStroke: function (
-      hit, parent, point, radius, color, worldRadius
+      hit, parent, point, radius, color, worldRadius, remote = false, opacity = this.opacity
     ) {
-      while (this.strokes.length >= MAX_STROKES) {
+      while (!remote && this.strokes.length >= MAX_STROKES) {
         this.remove(this.strokes[0]);
       }
 
@@ -114,8 +122,8 @@
 
       const material = new T.MeshBasicMaterial({
         color,
-        transparent: this.opacity < 1,
-        opacity: this.opacity,
+        transparent: opacity < 1,
+        opacity,
         depthWrite: false,
         side: T.DoubleSide
       });
@@ -187,20 +195,23 @@
         radius,
         worldRadius,
         color,
-        opacity: this.opacity,
+        opacity,
+        variant: hit.type === "model" ? variant(hit.el) : null,
+        centers: remote ? null : [],
         count: 0,
         lastLocal: point.clone(),
         lastNormal: hit.normal.clone(),
         removed: false
       };
 
-      this.strokes.push(stroke);
+      if (!remote) { stroke.inkId = ++sequence; this.strokes.push(stroke); }
       this.addRing(stroke, point, new V(0, 1, 0));
 
       return stroke;
     },
 
     addRing: function (stroke, point, direction) {
+      if (stroke.centers) stroke.centers.push(point.clone());
       const axis = direction.clone().normalize();
 
       const helper = Math.abs(axis.y) < 0.9

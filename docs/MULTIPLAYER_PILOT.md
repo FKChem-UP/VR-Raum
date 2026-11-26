@@ -9,7 +9,8 @@ Der gemeinsame Zugangscode schützt den gesamten Multiplayer-Dienst, nicht einze
 | Gemeinsam sichtbar | Bleibt lokal oder ist ausgeschlossen |
 | --- | --- |
 | Avatar mit Vorschau, optionalem Spitznamen, wählbarer Form, Farbe und Stil. Beim Beitritt werden bereits belegte Merkmale durch freie ersetzt und in der Vorschau angezeigt. | Keine Geschlechtsabfrage. Der Server prüft die Auswahl beim tatsächlichen VR-Beitritt erneut. |
-| Kopf und Controller bzw. Zeigehände; virtuelle Augenhöhe 1,60 m. Laser und Treffpunkt, wenn auf ein Modell gezeigt wird. | Haupt- und Handmenü, Steuerhilfe, Laser im Malmodus und Malstriche. |
+| Kopf und Controller bzw. Zeigehände; virtuelle Augenhöhe 1,60 m. Laser und Treffpunkt, wenn auf ein Modell gezeigt wird. | Haupt- und Handmenü, Steuerhilfe und Laser im Malmodus. |
+| Freihandstriche auf Raumflächen und Modellen sowie eingefärbte CIF-Atome und Bindungen. Die aktuelle Auswahl wird je zeichnender Person mit ihrer Präsenz geteilt (max. 24 letzte Strichabschnitte/Markierungen, begrenzte Nachrichtengröße). Eigene Striche zurücknehmen oder löschen aktualisiert die Darstellung bei den anderen. | Kein dauerhaftes gemeinsames Zeichenarchiv. Fremde Zeichnungen verschwinden beim Verlassen des Raums oder bei einem Präsenz-Timeout. |
 | Position, Drehung und Größe gemeinsamer Modelle. Eine Person hat die Greiffreigabe; beim Loslassen, Verlassen oder Timeout kann eine andere übernehmen. | Modellreset und Darstellungsstile wie Polyeder oder Kugel–Stab. |
 | Ansichten wie Molekül, Koordination oder Zelle, auch für später Beitretende. Fremder Griff sperrt den Wechsel. | Tutorial und offener Strukturraum sind Einzelspielerbereiche. |
 | Angeheftete Atomlabels und fertige Distanz-, Winkel- und Torsionsmessungen an derselben Modellvariante. Messwerte werden aus CIF-Koordinaten berechnet. | Flüchtige Laserlabels und noch laufende Messauswahl. Kein dauerhaftes Archiv. |
@@ -27,10 +28,11 @@ Der Dienst selbst spricht HTTP; der Hosting-Proxy muss öffentlich **HTTPS** anb
 
 ## Zwei Pico-Headsets testen
 
-1. Auf beiden Picos dieselbe VR-Seite und dieselbe vertrauenswürdige Serveradresse verwenden. „Multiplayer-Pilot“ öffnen, Avatar wählen und „Gemeinsam beitreten“ mit dem vereinbarten Code klicken. Auf „Zugang bestätigt“ warten, VR starten und das Tutorial überspringen. `?multiplayer=` kann nur die Serveradresse vorgeben; vor der Codeeingabe diese prüfen.
+1. Auf beiden Picos dieselbe VR-Seite und dieselbe vertrauenswürdige Serveradresse verwenden. Im dauerhaft sichtbaren Abschnitt „Gemeinsam im Multiplayer“ Avatar wählen und „Gemeinsam beitreten“ mit dem vereinbarten Code klicken. Auf „Zugang bestätigt“ warten, dann oben „Mit Brille starten“ wählen und das Tutorial überspringen. `?multiplayer=` kann nur die Serveradresse vorgeben; vor der Codeeingabe diese prüfen.
 2. Im Begrüßungsraum am Team-B-Podest testen: auf Co zeigen; Modell greifen, drehen, skalieren und übergeben; Ansicht **Molekül → Koordination → Molekül** umschalten; Label anheften und eine Messung abschließen sowie wieder entfernen. Die zweite Person schaut zunächst nur zu.
-3. Raum wechseln bzw. VR verlassen; fremde Anzeigen müssen aus dem bisherigen Raum verschwinden. Bei Verbindungsabbruch verfallen alte Teilnehmendenpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
+3. Auf eine Raumfläche zeichnen und am gemeinsamen Modell ein Atom oder eine Bindung markieren. Auf dem zweiten Headset Position, Farbe, Mitbewegung und Rücknahme prüfen. Beide Headsets müssen dieselbe Modellvariante zeigen.
+4. Raum wechseln bzw. VR verlassen; fremde Anzeigen müssen aus dem bisherigen Raum verschwinden. Bei Verbindungsabbruch verfallen alte Teilnehmendenpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
 
 ## Nächste Etappen
 
-Nutzerbestätigt auf Pico vor Einführung des Zugangscodes: Beitritt, gemeinsames Zeigen, gedrehte Modelle sowie geteilte Labels und Messungen. Zugangscode, gemeinsamen Ansichtswechsel und Betrieb mit größeren Gruppen bzw. über eduroam separat praktisch prüfen. Sinnvolle spätere Pakete: gemeinsames Markieren nach Nachtest des lokalen Malmodus, gemeinsamer Modellreset und bei Bedarf getrennte Gruppensitzungen.
+Nutzerbestätigt auf Pico vor Einführung des Zugangscodes: Beitritt, gemeinsames Zeigen, gedrehte Modelle sowie geteilte Labels und Messungen. Zugangscode, gemeinsames Zeichnen, Ansichtswechsel und Betrieb mit größeren Gruppen bzw. über eduroam separat praktisch prüfen. Sinnvolle spätere Pakete: gemeinsamer Modellreset und bei Bedarf getrennte Gruppensitzungen.
