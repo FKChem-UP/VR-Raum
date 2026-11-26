@@ -55,8 +55,9 @@ assert.equal(demo.infoPanel.visible, false, "Klick auf die Karte schließt sie")
 assert.equal(F.XrayDemo.activate({}), false);
 const {projectDirection, angleGuides} = F.XrayDemo;
 const radius = 4.7;
+const labels = [];
 for (const beta of [0, 20, 35, 50, 65].map(deg => deg * Math.PI / 180)) {
-  const points = angleGuides(beta, radius, 2.8, 2.3);
+  const points = angleGuides(beta, radius, 2.8, 2.3, labels);
   assert.ok(points.length > 0 && points.length % 6 === 0);
   for (let i = 0; i < points.length; i += 3) {
     const [x, y] = points.slice(i, i + 2);
@@ -64,6 +65,14 @@ for (const beta of [0, 20, 35, 50, 65].map(deg => deg * Math.PI / 180)) {
     const z = radius * Math.cos(beta) - x * Math.sin(beta);
     const degrees = Math.acos(z / Math.hypot(radius, x, y)) * 180 / Math.PI;
     assert.ok(Math.abs(degrees / 5 - Math.round(degrees / 5)) < 1e-8);
+  }
+  assert.ok(labels.length >= 2, "Jede Detektorstellung hat mehrere Beschriftungen");
+  assert.equal(new Set(labels.map(label => label.degrees)).size, labels.length);
+  for (const [index, {degrees, x, y}] of labels.entries()) {
+    const z = radius * Math.cos(beta) - x * Math.sin(beta);
+    assert.ok(Math.abs(Math.acos(z / Math.hypot(radius, x, y)) * 180 / Math.PI - degrees) < 1e-8);
+    assert.ok(Math.abs(x) < 1.21 && y < 0.96);
+    assert.ok(labels.slice(0, index).every(label => Math.abs(label.x - x) >= 0.36 || Math.abs(label.y - y) >= 0.20));
   }
 }
 const [x, y] = projectDirection(Math.sin(0.2), 0, Math.cos(0.2), 0, 1, radius);

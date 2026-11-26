@@ -77,19 +77,31 @@
     return [(x * cos - z * sin) * distance, y * distance];
   }
 
-  function angleGuides(beta, radius, width, height) {
+  function angleGuides(beta, radius, width, height, labels = []) {
     const sin = Math.sin(beta), cos = Math.cos(beta), segments = [];
+    labels.length = 0;
     for (let degrees = 5; degrees <= 85; degrees += 5) {
       const twoTheta = degrees * Math.PI / 180;
       const radial = Math.sin(twoTheta), axial = Math.cos(twoTheta);
-      let previous = null;
+      let previous = null, anchor = null, best = Infinity;
       for (let i = 0; i <= 360; i++) {
         const azimuth = i * Math.PI / 180;
         const p = projectDirection(radial * Math.cos(azimuth), radial * Math.sin(azimuth), axial, sin, cos, radius);
         const inside = p && Math.abs(p[0]) < width / 2 && Math.abs(p[1]) < height / 2;
-        if (inside && previous) segments.push(...previous, -0.018, ...p, -0.018);
+        if (inside && previous) {
+          segments.push(...previous, -0.018, ...p, -0.018);
+          // Einmal pro Bogen, möglichst am oberen Bildrand; Rand und Nachbarlabels freihalten.
+          const [x, y] = p;
+          const score = Math.abs(y - (height / 2 - 0.29));
+          if (Math.abs(x) < width / 2 - 0.19 && y < height / 2 - 0.19 && y > -height / 2 + 0.05 &&
+              score < best && labels.every(label => Math.abs(label.x - x) >= 0.36 || Math.abs(label.y - y) >= 0.20)) {
+            best = score;
+            anchor = {degrees, x, y};
+          }
+        }
         previous = inside ? p : null;
       }
+      if (anchor) labels.push(anchor);
     }
     return segments;
   }
@@ -1201,12 +1213,32 @@
       );
       this.detector.add(this.detectorGuides);
 
+      const labels = document.createElement("canvas");
+      labels.width = 1024; labels.height = 1024;
+      const texture = new T.CanvasTexture(labels);
+      texture.minFilter = T.LinearFilter;
+      texture.generateMipmaps = false;
+      this.textures.add(texture);
+      this.detectorLabelCanvas = labels;
+      this.detectorLabelTexture = texture;
+      this.detectorLabels = new T.Mesh(
+        this.trackGeometry(new T.PlaneGeometry(this.detectorWidth, this.detectorHeight)),
+        this.trackMaterial(new T.MeshBasicMaterial({map: texture, transparent: true, depthWrite: false, toneMapped: false}))
+      );
+      // Die beschriftete Detektorvorderseite schaut zum Kristall (lokal −z).
+      this.detectorLabels.rotation.y = Math.PI;
+      this.detectorLabels.position.z = -0.023;
+      this.detectorLabels.renderOrder = 1;
+      this.detectorLabels.raycast = () => {};
+      this.detector.add(this.detectorLabels);
+
       this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
         "Der Detektor sammelt Reflexereignisse während eines " +
         "Rotationsabschnitts. Während seiner Fahrt werden hier " +
         "keine Ereignisse gesammelt. Die Punkte sind Einkristallreflexe. " +
-        "Die dünnen Bögen verbinden Orte gleichen 2θ (Schritte von 5°); sie sind keine Pulverringe. " +
+        "Die Gradangaben bezeichnen den jeweiligen Streuwinkel 2θ. Die Bögen verbinden Orte gleichen 2θ " +
+        "(Schritte von 5°); sie sind keine Pulverringe. " +
         "Bei einem geneigten Detektor sind diese Bögen keine exakten Kreise.",
         vec(0, 0, 0),
         [housing, face]
@@ -1372,6 +1404,28 @@
       this.frameHits.clear();
     },
 
+    drawDetectorLabels: function (labels) {
+      const canvas = this.detectorLabelCanvas;
+      const ctx = canvas.getContext("2d");
+      const sx = canvas.width / this.detectorWidth, sy = canvas.height / this.detectorHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "bold 38px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const {degrees, x, y} of labels) {
+        const value = `${degrees}°`;
+        const px = canvas.width / 2 - x * sx, py = canvas.height / 2 - y * sy;
+        const width = ctx.measureText(value).width + 22;
+        ctx.fillStyle = "#427298";
+        ctx.fillRect(px - 2, py - 15, 4, 17);
+        ctx.fillStyle = "#102738";
+        ctx.fillRect(px - width / 2, py - 68, width, 56);
+        ctx.fillStyle = "#deefff";
+        ctx.fillText(value, px, py - 39);
+      }
+      this.detectorLabelTexture.needsUpdate = true;
+    },
+
     calculateReflections: function (omega, moving) {
       const waveNumber = 1 / this.data.wavelength;
       const tolerance = 0.010;
@@ -1510,15 +1564,18 @@
       const beta = T.MathUtils.degToRad(degrees);
       if (!moving && degrees !== this.guideAngle) {
         const geometry = this.detectorGuides.geometry;
+        const labels = [];
         // Beim Winkelwechsel darf Three.js den bisherigen GPU-Puffer freigeben.
         geometry.dispose();
         geometry.setAttribute("position", new T.Float32BufferAttribute(
-          angleGuides(beta, this.detectorRadius, this.detectorWidth, this.detectorHeight), 3
+          angleGuides(beta, this.detectorRadius, this.detectorWidth, this.detectorHeight, labels), 3
         ));
         geometry.computeBoundingSphere();
+        this.drawDetectorLabels(labels);
         this.guideAngle = degrees;
       }
       this.detectorGuides.visible = !moving;
+      this.detectorLabels.visible = !moving;
 
       this.normal.set(Math.sin(beta), 0, Math.cos(beta));
       this.horizontal.set(Math.cos(beta), 0, -Math.sin(beta));
