@@ -18,8 +18,8 @@
       if (hand === "left") labels.Y = "Hauptmenü";
       else labels.A = "Modell zurücksetzen";
     }
-    if (tutorialStep === "question") {
-      if (hand === laserHand) labels.trigger = "Trigger: Auswählen";
+    if (tutorialStep === "question" || tutorialStep === "trigger") {
+      if (hand === laserHand) labels.trigger = painting ? "Trigger: Zeichnen / Auswählen" : "Trigger: Auswählen";
     } else if (tutorialStep === 0) {
       labels.joystick = hand === "left" ? "Bewegen" : "Drehen";
     } else if (tutorialStep === 1 || tutorialStep === 2) {
@@ -179,12 +179,13 @@
     }
     return {
       group, controls, showLabels,
-      highlight(names) {
+      highlight(names, tutorialNames = []) {
         const active = new Set(names);
         for (const [name, entry] of controls) {
-          entry.material.color.set(active.has(name) ? "#ff2020" : entry.color);
-          entry.material.emissive.set(active.has(name) ? "#ff0000" : "#000000");
-          entry.material.emissiveIntensity = active.has(name) ? 0.85 : 0;
+          const yellow = tutorialNames.includes(name);
+          entry.material.color.set(yellow ? "#ffdc38" : active.has(name) ? "#ff2020" : entry.color);
+          entry.material.emissive.set(yellow ? "#e0ad00" : active.has(name) ? "#ff0000" : "#000000");
+          entry.material.emissiveIntensity = yellow || active.has(name) ? 0.85 : 0;
         }
       },
       dispose() {
@@ -206,10 +207,13 @@
       return true;
     },
     tutorial(step) {
+      const handWithLaser = F.HandMenu.laserHand();
+      if (step === this.tutorialStep && handWithLaser === this.tutorialLaserHand) return;
       this.tutorialStep = step;
+      this.tutorialLaserHand = handWithLaser;
       const active = step === 0 ? ["joystick"] : step === 1 || step === 2 ? ["grip"] : [];
       for (const hand of ["left", "right"]) {
-        this.setHighlights(hand, step === "question" && hand === F.HandMenu.laserHand() ? ["trigger"] : active);
+        this.setHighlights(hand, (step === "question" || step === "trigger") && hand === handWithLaser ? ["trigger"] : active);
       }
     }
   };
@@ -268,7 +272,7 @@
       this.quaternion.premultiply(this.parentQuaternion.invert());
       this.built.group.position.copy(this.position);
       this.built.group.quaternion.copy(this.quaternion);
-      const showHands = F.AvatarModels.showsHands();
+      const showHands = F.AvatarModels.showsHands() && !F.Tutorial?.active;
       this.built.group.visible = !showHands;
       this.pointingHand.group.visible = showHands;
       if (showHands) {
@@ -278,7 +282,7 @@
       }
       const texts = controlLabels(this.data.hand, models.help, models.tutorialStep,
         F.HandMenu.laserHand(), F.Draw && F.Draw.mode === "paint");
-      this.built.highlight([...models.highlights[this.data.hand], ...Object.keys(texts)]);
+      this.built.highlight(Object.keys(texts), models.highlights[this.data.hand]);
       this.built.showLabels(texts);
     },
     remove: function () {

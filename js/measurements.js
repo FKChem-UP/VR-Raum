@@ -58,6 +58,11 @@
       if (component) component.select(hit);
       return true;
     },
+    undoLast() {
+      const removed = F.getScene().components["fkc-measurements"]?.undoLast();
+      F.setStatus(removed ? "Letzte eigene Messung entfernt." : "Keine eigene Messung zum Rückgängigmachen.");
+      return Boolean(removed);
+    },
     wantsPlane(root) {
       const selection = F.getScene().components["fkc-measurements"];
       return this.mode === "pointPlane" && selection?.root === root && selection.points.length === 1;
@@ -162,6 +167,16 @@
       this.saved = retained;
       if (!root || this.root === root) this.clearSelection();
       else this.syncLabels();
+    },
+    undoLast: function () {
+      const record = this.saved.pop();
+      if (!record) return false;
+      const active = Object.fromEntries(displayFields.map(key => [key, this[key]]));
+      Object.assign(this, record);
+      try { this.disposeDisplay(); }
+      finally { Object.assign(this, active); }
+      this.syncLabels();
+      return true;
     },
     archive: function () {
       if (this.points.length !== counts[this.measurementMode]) return;

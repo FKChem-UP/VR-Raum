@@ -30,22 +30,22 @@
 
   <script defer src="./js/vr-tools.js?v=24"></script>
   <script defer src="./js/atom-labels.js?v=13"></script>
-  <script defer src="./js/measurements.js?v=13"></script>
+  <script defer src="./js/measurements.js?v=14"></script>
   <script defer src="./js/room-entry.js?v=2"></script>
   <script defer src="./js/atom-plane.js?v=6"></script>
   <script defer src="./js/structure-analysis.js?v=2"></script>
-  <script defer src="./js/hand-menu.js?v=50"></script>
+  <script defer src="./js/hand-menu.js?v=51"></script>
   <script defer src="./js/avatar-profile.js?v=2"></script>
   <script defer src="./js/avatar-model.js?v=6"></script>
-  <script defer src="./js/pico-controller-model.js?v=6"></script>
+  <script defer src="./js/pico-controller-model.js?v=7"></script>
   <script defer src="./js/bragg-tutorial.js?v=12"></script>
   <script defer src="./js/mirror-tutorial.js?v=12"></script>
-  <script defer src="./js/tutorial.js?v=25"></script>
+  <script defer src="./js/tutorial.js?v=26"></script>
 
 
 
 
-  <script defer src="./js/xray-demo.js"></script>
+  <script defer src="./js/xray-demo.js?v=2"></script>
   <script defer src="./js/mo-xray-demo.js?v=1"></script>
   <script defer src="./js/welcome-demo.js"></script>
 
@@ -57,7 +57,7 @@
 
   <script defer src="./js/shared-annotations.js?v=3"></script>
   <script defer src="./js/multiplayer.js?v=12"></script>
-  <script defer src="./js/app.js?v=19"></script>
+  <script defer src="./js/app.js?v=20"></script>
 </head>
 
 <body>
@@ -141,6 +141,7 @@
         <button id="model-info" type="button">
           Modellinformationen
         </button>
+        <button id="undo-measurement" type="button">Letzte Messung rückgängig</button>
       </div>
     </section>
 
@@ -298,26 +299,29 @@
     disabled
     style="
       position: fixed;
-      right: 24px;
-      bottom: 24px;
+      right: 16px;
+      bottom: 16px;
       z-index: 10000;
-      width: 72px;
-      height: 56px;
-      padding: 5px;
+      width: clamp(120px, 23vw, 164px);
+      min-height: 92px;
+      padding: 8px;
       display: flex;
+      flex-direction: column;
+      gap: 4px;
       align-items: center;
       justify-content: center;
-      border: 2px solid #ffffff;
+      border: 3px solid #ffffff;
       border-radius: 14px;
-      background: #263f33;
-      color: #ffffff;
+      background: #ffdf58;
+      color: #202d25;
+      font: bold 17px Arial, sans-serif;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
       cursor: pointer;
     "
   >
     <svg
-      width="100%"
-      height="100%"
+      width="64"
+      height="46"
       viewBox="10 15 28 18"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -327,6 +331,7 @@
       <path fill="currentColor" fill-rule="evenodd"
         d="M14 16h20a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-5c-2 0-2.5-5-5-5s-3 5-5 5h-5a3 3 0 0 1-3-3V19a3 3 0 0 1 3-3z M15 23a3 3 0 1 0 6 0a3 3 0 1 0-6 0z M27 23a3 3 0 1 0 6 0a3 3 0 1 0-6 0z"/>
     </svg>
+    <span>VR starten</span>
   </button>
 
   <a-scene

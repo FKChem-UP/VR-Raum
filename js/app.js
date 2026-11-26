@@ -524,6 +524,7 @@
         if (!this.hit) return;
 
         if (this.hit.type === "action") {
+          if (F.XrayDemo?.activate(this.hit)) return;
           if (F.MoXray?.activate(this.hit)) return;
           const lesson = this.hit.el.components["fkc-ybco-lesson"];
           if (lesson) {
@@ -755,6 +756,7 @@
       };
 
       document.getElementById("reset-last").onclick = F.resetLast;
+      document.getElementById("undo-measurement").onclick = () => F.Measure.undoLast();
 
       document.getElementById("open-menu").onclick = () => {
         F.Menu.toggle(null);
@@ -812,6 +814,7 @@
         if (!hit) return;
 
         if (hit.type === "action") {
+          if (F.XrayDemo?.activate(hit)) return;
           if (F.MoXray?.activate(hit)) return;
           const lesson=hit.el.components["fkc-ybco-lesson"];
           if(lesson){

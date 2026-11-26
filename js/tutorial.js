@@ -48,8 +48,18 @@
     menuTarget(scene, root) {
       const chapter = scene.components["fkc-tutorial"];
       if (this.active && chapter?.phase === "bragg" && chapter.selectedAnimation === root && !F.Menu?.opened) {
-        if(chapter.animationStep===7 && chapter.animation?.state.source!=="mo") return "source:mo";
-        if(chapter.animationStep===7 && chapter.animation?.state.sweep) return null;
+        const state = chapter.animation?.state;
+        if (state && chapter.animationStep === 3 && state.running) return null;
+        if (state && chapter.animationStep === 4) {
+          if (!F.Bragg.geometry(state.angle, state.source).matched) return "bragg";
+          if (!state.running) return "play";
+          if (state.speed === 0.5) return null;
+        }
+        if (state && chapter.animationStep === 7) {
+          if (state.source !== "mo") return "source:mo";
+          if (!state.running) return "play";
+          if (state.sweep) return null;
+        }
         return F.Bragg.cues[chapter.animationStep] || null;
       }
       if (!this.allowsModel(root) || F.Menu?.opened || root.fkcPendingVisual) return null;
@@ -59,6 +69,13 @@
       // Nicht zum erneuten Klick auffordern: Er würde den Messmodus abschalten.
       if (F.Measure?.enabled && target === "measure:" + F.Measure.mode) return null;
       return target || null;
+    },
+    controllerCue(phase, step) {
+      if (phase === "question" || phase === "structure-practice") return "trigger";
+      if (phase === "training") return step < 3 ? step : step === 3 ? -1 : "trigger";
+      if (phase === "bragg") return step === 0 ? 0 : step === 2 ? -1 : "trigger";
+      if (phase === "mirror") return step === 0 ? 0 : step === 1 ? 2 : step === 5 ? -1 : "trigger";
+      return -1;
     },
     hasMeasurement(records, root, mode) {
       const visual = root.querySelector(".model-visual");
@@ -151,7 +168,7 @@
       const handMenu = this.el.components["fkc-hand-menu"];
       if (handMenu) handMenu.hide();
       this.phase = phase;
-      if (F.PicoModels) F.PicoModels.tutorial(phase === "training" ? 0 : phase === "question" ? "question" : -1);
+      F.PicoModels?.tutorial(F.Tutorial.controllerCue(phase, 0));
       if (phase === "training") {
         this.step = 0;
         this.target.object3D.position.set(...modelPosition);
@@ -252,10 +269,11 @@
         animation ? [{x: 80, w: 490, title: animationPractice ? "Teil 3: Zeichne den Spiegel" : "Überspringen → Teil 3", action: () => this.beginMirror()},
           {x: 600, w: 340, title: "Tutorial beenden", action: () => this.close()}] :
         [{x: 80, w: 860, title: "Tutorial beenden", action: () => this.close()}];
-      for (const button of this.buttons) {
-        ctx.fillStyle = "#b9dcc4"; ctx.fillRect(button.x, 480, button.w, 100);
+      this.buttons.forEach((button, index) => {
+        const primary = index === 0 && (this.phase === "question" || done);
+        ctx.fillStyle = primary ? "#ffe571" : "#b9dcc4"; ctx.fillRect(button.x, 480, button.w, 100);
         ctx.fillStyle = "#203f30"; ctx.fillText(button.title, button.x + 30, 547, button.w - 60);
-      }
+      });
       this.texture.needsUpdate = true;
     },
     click: function (hit) {
@@ -338,6 +356,8 @@
         return;
       }
       if (!F.Tutorial.active) return;
+      const step = this.phase === "bragg" ? this.animationStep : this.phase === "mirror" ? this.mirror.step : this.step;
+      F.PicoModels?.tutorial(F.Menu.opened ? -1 : F.Tutorial.controllerCue(this.phase, step));
       // Nur die Raum-Demo ausblenden, nicht die Messlabels des Tutorials.
       if (this.phase === "question" && this.room) this.room.object3D.traverse(object => {
         if (!object.isSprite || !object.material || object.material.depthTest !== false) return;
@@ -419,7 +439,6 @@
             });
           if (next !== this.step) {
             this.step = next;
-            if (F.PicoModels) F.PicoModels.tutorial(next);
             if (next === tasks.length) this.phase = "structure-practice";
             this.render();
           }

@@ -8,8 +8,9 @@ const F = {Settings: {laserHand: "right", lasers:{right:"#ff9d38"},laserDiameter
 F.Draw = {mode: "laser", color: "#ffcc33", opacity: 0.35, strokes: [],
   setMode(mode) { this.mode = mode; }, clear() {}, remove() {}};
 const components = {};
+const entities = new Map();
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/hand-menu.js"), "utf8"), {
-  window: {FKCVR: F}, document:{getElementById:()=>null},
+  window: {FKCVR: F}, document:{getElementById:id=>entities.get(id) || null},
   AFRAME: {THREE: {}, registerComponent: (name, component) => { components[name] = component; }}
 });
 const state = {open: false, since: null};
@@ -244,6 +245,34 @@ menu.render(null);
 assert.equal(inkOf("Animationsmenü"),"#782a2a");
 assert.equal(inkOf("Abspieltempo"),"#782a2a");
 assert.equal(inkOf("Start"),"#191919");
+delete menu.el.components["fkc-tutorial"];
+for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-demo", "NaCl-Demo"],
+  ["fkc-xray-experiment", "fkc-xray-demo", "Röntgendemo"]]) {
+  const calls = [];
+  const demo = {paused: true, shown: false, data: {speed: 1}, playDirection: 1, loop: false, explanations: true,
+    el: {setAttribute(...args) { calls.push(args); }}, setShown(value) { this.shown = value; },
+    restart() { this.paused = true; }, nextPhase() { calls.push("phase"); }, reverseDirection() { this.playDirection *= -1; },
+    clearInformation() { calls.push("close"); }, setExplanations(value) { this.explanations = value; }};
+  entities.set(id, {isConnected: true, components: {[component]: demo}});
+  menu.model = {id: "room-root", dataset: {}, querySelector: () => null};
+  menu.page = "model";
+  menu.render(null);
+  press(label); menu.render(null);
+  press("Start / Weiter"); assert.equal(demo.paused, false); assert.equal(demo.shown, true);
+  press("2×"); assert.deepEqual(calls.at(-1), [component, "speed", 2]);
+  press("Zum Anfang (pausiert)"); assert.equal(demo.paused, true);
+  if (label === "NaCl-Demo") {
+    press("Nächste Phase"); assert.equal(calls.at(-1), "phase");
+    press("Richtung: Salzprobe"); assert.equal(demo.playDirection, -1);
+    press("Wiederholen: aus"); assert.equal(demo.loop, true);
+  } else {
+    press("i-Markierungen ausblenden"); assert.equal(demo.explanations, false);
+    press("Info schließen"); assert.equal(calls.at(-1), "close");
+  }
+  assert.ok(menu.buttons.every(b => b.y + b.h <= 900));
+  press("‹ Zurück"); assert.equal(menu.page, "model");
+  entities.delete(id);
+}
 console.log("Handmenü-Logiktest bestanden: Handwahl, Einblendverzögerung, Hysterese und Rücksetzung.");
 console.log("Modellmenütest bestanden: Kacheln, Messmodi, Nachbarmoleküle und gezielte Kontakterweiterung.");
 console.log("Viewerpose-Test bestanden: Augenmittelpunkt, Rig-Transformation, Trackingverlust und Kamera-Rückfall.");

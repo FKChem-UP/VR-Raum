@@ -66,6 +66,10 @@ for (const hand of ["left", "right"]) {
   }
   built.highlight([]);
   assert.ok([...built.controls.values()].every(entry => entry.material.color.value === entry.color));
+  built.highlight(["trigger"], ["trigger", "grip"]);
+  assert.equal(built.controls.get("trigger").material.color.value, "#ffdc38");
+  assert.equal(built.controls.get("grip").material.emissive.value, "#e0ad00");
+  assert.equal(built.controls.get("joystick").material.emissive.value, "#000000");
   built.showLabels({joystick: "Bewegen"});
   const sprite = built.group.children.at(-1);
   const leader = built.group.children.at(-2);
@@ -126,5 +130,12 @@ for (laserHand of ["left", "right"]) {
   assert.equal(controlLabels(laserHand, false, "question", laserHand).trigger, "Trigger: Auswählen");
   assert.equal(controlLabels(otherHand, false, "question", laserHand).trigger, undefined);
 }
+F.PicoModels.tutorial(-1);
+F.PicoModels.tutorial("trigger");
+assert.equal(F.PicoModels.highlights.right[0], "trigger");
+laserHand = "left";
+F.PicoModels.tutorial("trigger");
+assert.equal(F.PicoModels.highlights.left[0], "trigger");
+assert.equal(F.PicoModels.highlights.right.length, 0);
 F.PicoModels.tutorial(-1);
 console.log("Pico-Modelltest bestanden: zwei Modelle, getrennte Tastenmaterialien, unabhängiges Rotlicht und Ressourcenabbau.");

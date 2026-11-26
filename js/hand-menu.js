@@ -33,6 +33,16 @@
       model.classList.contains("interactable") ? model : F.Tutorial?.active ? null : document.getElementById("room-root");
   }
 
+  function roomDemo() {
+    if (F.Tutorial?.active) return null;
+    for (const [id, component, label] of [["fkc-welcome-experiment", "fkc-welcome-demo", "NaCl-Demo"],
+      ["fkc-xray-experiment", "fkc-xray-demo", "Röntgendemo"]]) {
+      const el = document.getElementById(id);
+      if (el?.isConnected && el.components?.[component]) return {demo: el.components[component], component, label};
+    }
+    return null;
+  }
+
   function readViewerHead(scene, rig, position, forward, orientation) {
     const xr = scene.renderer && scene.renderer.xr;
     const reference = xr && xr.getReferenceSpace && xr.getReferenceSpace();
@@ -270,6 +280,8 @@
       const environment = F.CIF.environmentState && F.CIF.environmentState(model);
       const plane = F.AtomPlane?.get(model);
       const mirror = chapter?.phase === "mirror" ? chapter.mirror : null;
+      const demo = roomDemo()?.demo;
+      if (this.page === "demo" && this.demo !== demo) this.page = "model";
       const cue = mirror ? mirror.cue() : F.Draw?.mode !== "paint" ? F.Tutorial?.menuTarget(scene, model) : null;
       // Neun Abstufungen pro langsamem Puls statt Canvas-Uploads pro XR-Frame.
       const pulse = cue ? Math.round(4 + 4 * Math.cos(time * 2 * Math.PI / 1600)) : 0;
@@ -277,7 +289,9 @@
         cue, pulse, mirror?.step, mirror?.drawingMenu, animation?.state.source, animation?.state.angle.toFixed(1), animation?.state.speed, animation?.state.running, animation?.state.sweep,
         model.fkcAtomLabels, model.fkcHideHydrogen, model.fkcShowHydrogenContacts, model.fkcAtomScale, this.page, this.offset, this.infoOffset,
         structure && structure.mode, structure?.contactDepth, model.fkcStyle, F.Measure && F.Measure.enabled,
-        F.Measure && F.Measure.mode, this.hoverIndex, this.pressedIndex,
+        F.Measure && F.Measure.mode, this.el.components["fkc-measurements"]?.saved?.length,
+        !!demo, demo?.paused, demo?.shown, demo?.data.speed, demo?.loop, demo?.playDirection, demo?.explanations,
+        this.hoverIndex, this.pressedIndex,
         F.HandMenu.size, model.fkcBondColorMode, model.fkcBondColor, model.fkcBondThickness, model.fkcHydrogenThickness, F.StructureAnalysis?.revision,
         environment && environment.enabled, environment && environment.radius,
         environment && environment.selected.size, plane?.points.length, !!plane?.mesh,
@@ -321,6 +335,7 @@
       this.buttons = [];
       const chapter = this.el.components["fkc-tutorial"];
       const animation = chapter?.selectedAnimation === model ? chapter.animation : null;
+      const availableDemo = roomDemo();
       const roomDrawing = model.id === "room-root";
       const drawing = ["draw","plane"].includes(this.page) || roomDrawing || painting ||
         this.page === "settings" && this.returnPage === "draw" || chapter?.phase === "mirror" && chapter.mirror.drawingMenu;
@@ -333,7 +348,8 @@
       const menuName = animation ? "Animationsmenü" : drawing ? "Zeichenmenü" : "Modellmenü";
       ctx.fillText(menuName, 28, 48, 510);
       ctx.font = "28px Arial";
-      ctx.fillText(model.dataset.title || (roomDrawing ? "Raum" : "3D-Modell"), 28, 88, 710);
+      ctx.fillText(this.page === "demo" && availableDemo ? availableDemo.label :
+        model.dataset.title || (roomDrawing ? "Raum" : "3D-Modell"), 28, 88, availableDemo ? 496 : 710);
       let y = 115;
       const text = (value, heading = true) => {
         ctx.fillStyle = heading ? headingInk : textInk;
@@ -390,7 +406,7 @@
           const shift = pressed ? 9 : selected ? 5 : 0;
           ctx.fillStyle = "#8c9b92";
           ctx.fillRect(x, y + 5, w, height + 5);
-          ctx.fillStyle = entry.swatch ? entry.color : pressed ? "#e99d9d" : selected ? (animation?"#e8918b":painting?"#edd8a1":"#f3bcbc") : hovered ? "#fff0b8" : animation ? "#f2ccca" : painting ? "#eee7d7" : "#d5e2d9";
+          ctx.fillStyle = entry.swatch ? entry.color : cue && entry.cueId === cue ? "#ffe571" : pressed ? "#e99d9d" : selected ? (animation?"#e8918b":painting?"#edd8a1":"#f3bcbc") : hovered ? "#fff0b8" : animation ? "#f2ccca" : painting ? "#eee7d7" : "#d5e2d9";
           ctx.fillRect(x, y + shift, w, height);
           ctx.strokeStyle = hovered ? "#b57c00" : selected ? "#a34444" : "#82988a";
           ctx.lineWidth = hovered ? 4 : selected ? 3 : 2;
@@ -466,6 +482,43 @@
         y += height + 13;
       };
       const tile = (label, action, selected=false, cueId=null) => ({kind:"plain", label, action, selected, cueId});
+      if (availableDemo && this.page === "demo") {
+        const {demo, component} = availableDemo;
+        const nacl = component === "fkc-welcome-demo";
+        row([tile("‹ Zurück", () => { this.page = this.demoReturn || "model"; })], true);
+        row([tile(demo.paused ? "Start / Weiter" : "Pause", () => {
+          if (!demo.shown) demo.setShown(true);
+          demo.paused = !demo.paused;
+          demo.updateAnimation?.(true);
+        }), tile("Zum Anfang (pausiert)", () => demo.restart())], true);
+        text("Abspieltempo");
+        row([0.5, 1, 2].map(speed => tile(`${String(speed).replace(".", ",")}×`,
+          () => demo.el.setAttribute(component, "speed", speed), demo.data.speed === speed)), true);
+        if (nacl) {
+          row([tile("Nächste Phase", () => demo.nextPhase()), tile(
+            demo.playDirection > 0 ? "Richtung: Salzprobe" : "Richtung: Elementarzelle", () => demo.reverseDirection())], true);
+          row([tile(`Wiederholen: ${demo.loop ? "an" : "aus"}`, () => { demo.loop = !demo.loop; }, demo.loop)], true);
+        } else {
+          row([tile(demo.explanations ? "i-Markierungen ausblenden" : "i-Markierungen einblenden",
+            () => demo.setExplanations(!demo.explanations), demo.explanations), tile("Info schließen", () => demo.clearInformation())], true);
+          text("Bauteil oder i anklicken, um die Info zu öffnen.", false);
+        }
+        row([tile(demo.shown ? "Demo ausblenden" : "Demo einblenden", () => demo.setShown(!demo.shown))], true);
+        this.texture.needsUpdate = true;
+        return;
+      }
+      if (availableDemo && !animation && (this.page === "model" || roomDrawing && this.page !== "settings")) {
+        ctx.fillStyle = "#cddff3";
+        ctx.fillRect(540, 73, 200, 34);
+        ctx.fillStyle = textInk;
+        ctx.font = "bold 24px Arial";
+        ctx.fillText(availableDemo.label, 551, 99, 178);
+        this.buttons.push({x: 540, y: 73, w: 200, h: 34, label: availableDemo.label, action: () => {
+          this.demoReturn = this.page;
+          this.demo = availableDemo.demo;
+          this.page = "demo";
+        }});
+      }
       if(this.page==="analysis" && F.StructureAnalysis?.state){
         const tool=F.StructureAnalysis,state=tool.state;
         text("Struktur analysieren");
@@ -618,9 +671,10 @@
         const neighborPage=hasShell && hasMolecules ? "neighbors" : hasShell ? "shells" : "molecules";
         const targetPage=cue?.startsWith("variant:")?"views":cue?.startsWith("measure:")?"measure":
           cue?.startsWith("environment:")?"molecules":cue==="plane:start"?"tools":"model";
+        const routeToTarget = page === "neighbors" && targetPage === "molecules";
         const contacts=structure?.hydrogenContacts?.length ? structure.hydrogenContacts :
           (structure?.environmentCell || structure?.hydrogenCell || structure?.contactExpansion?.cell)?.hydrogenContacts;
-        if(page!=="model")row([{...link("‹ Modellmenü","model",page!==targetPage?cue:null),enabled:locked}]);
+        if(page!=="model")row([{...link("‹ Modellmenü","model",page!==targetPage && !routeToTarget?cue:null),enabled:locked}]);
         if(page==="views"){
           text("Ansicht wählen");
           grid(variants.map(v=>({...tile(v.title,()=>{if(!model.fkcPendingVisual){F.switchVariant(model,v.id);go("model");}},v.id===model.fkcVariantId,"variant:"+v.id),kind:"variant"})));
@@ -634,7 +688,9 @@
           if(F.AtomPlane?.get(model)?.normalAngstrom)ids.push("pointPlane");
           grid(ids.map(id=>({...tile(F.Measure.titles[id],()=>F.Measure.toggleMode(id),F.Measure.enabled && F.Measure.mode===id,"measure:"+id),
             kind:id==="pointPlane"?"plain":id,count:F.Measure.counts[id]})));
-          row([tile("Messungen zurücksetzen",()=>this.el.components["fkc-measurements"].reset())]);
+          row([{...tile("Letzte Messung rückgängig",()=>F.Measure.undoLast()),
+            disabled: !this.el.components["fkc-measurements"]?.saved?.length},
+            tile("Alle Messungen zurücksetzen",()=>this.el.components["fkc-measurements"].reset())]);
         }else if(page==="tools"){
           text("Weitere Werkzeuge");
           const active=F.AtomPlane?.active, pending=active?.root===model;

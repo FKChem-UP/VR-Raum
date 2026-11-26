@@ -6,7 +6,7 @@
    *
    * Nur Vorlesung 5:
    * - durchgehbare Apparatur auf flacher Bodenmarkierung;
-   * - Informationen beim Anvisieren mit dem vorhandenen Laser;
+   * - Informationen erst per Trigger oder Mausklick öffnen;
    * - keine zweite Kamera oder Controllersteuerung;
    * - Apparatur nicht greifbar oder bemalbar;
    * - bestehende Menü- und Zeichenaktionen bleiben erhalten.
@@ -67,6 +67,19 @@
       : null;
   }
 
+  const closeInfo = Symbol("close-xray-info");
+  F.XrayDemo = {
+    activate(hit) {
+      const demo = hit.xrayDemo;
+      if (!demo || !hit.xrayInfo) return false;
+      if (!demo.removed && demo.shown && !F.Tutorial?.active && !F.Menu?.opened && !F.HandMenu?.opened) {
+        if (hit.xrayInfo === closeInfo || hit.xrayInfo === demo.selectedInfo) demo.clearInformation();
+        else demo.selectInformation(hit.xrayInfo);
+      }
+      return true;
+    }
+  };
+
   /*
    * Ergänzung der vorhandenen Trefferprüfung.
    *
@@ -86,7 +99,7 @@
       this, raycaster, includeSurfaces
     );
 
-    if (F.Menu && F.Menu.opened) return original;
+    if (F.Menu?.opened || F.HandMenu?.opened || F.Tutorial?.active) return original;
 
     const demo = getDemo();
 
@@ -100,7 +113,8 @@
     const infoHit = demo.findInformationHit(raycaster);
     if (!infoHit) return original;
 
-    if (original) {
+    const closing = infoHit.object === demo.infoPanel;
+    if (original && !closing) {
       const originalDistance =
         raycaster.ray.origin.distanceTo(original.point);
 
@@ -122,7 +136,7 @@
       point: infoHit.point.clone(),
       normal,
       uv: infoHit.uv ? infoHit.uv.clone() : null,
-      xrayInfo: demo.infoLookup.get(infoHit.object),
+      xrayInfo: closing ? closeInfo : demo.infoLookup.get(infoHit.object),
       xrayDemo: demo
     };
   };
@@ -157,7 +171,6 @@
       this.infoMeshes = [];
       this.infoLookup = new Map();
       this.selectedInfo = null;
-      this.lastInfoTime = -Infinity;
 
       this.model = new T.Group();
       this.el.setObject3D("xray-demo", this.model);
@@ -390,6 +403,12 @@
     findInformationHit: function (raycaster) {
       if (!visibleInTree(this.model)) return null;
 
+      // Die Infokarte liegt optisch vor der Welt und ist selbst anklickbar.
+      if (this.infoPanel?.visible) {
+        const cardHit = raycaster.intersectObject(this.infoPanel, false)[0];
+        if (cardHit) return cardHit;
+      }
+
       this.el.object3D.updateWorldMatrix(true, true);
 
       const targets = this.infoMeshes.filter(mesh =>
@@ -425,7 +444,7 @@
 
       /*
        * Panel in Weltkoordinaten, nicht mit der Apparatur skaliert.
-       * Es ist kein Trefferziel und keine Zeichenfläche.
+       * Ein Klick auf die Karte schließt sie; keine Zeichenfläche.
        */
       this.infoPanel = new T.Mesh(
         this.trackGeometry(new T.PlaneGeometry(1.05, 0.525)),
@@ -521,7 +540,7 @@
       ctx.fillStyle = "#a9bdd0";
       ctx.font = "24px Arial";
       ctx.fillText(
-        "Laser wegnehmen: Erklärung verschwindet",
+        "Zum Schließen auf diese Karte klicken",
         40, h - 39, w - 80
       );
 
@@ -580,9 +599,7 @@
       this.infoPanel.updateWorldMatrix(true, false);
     },
 
-    selectInformation: function (entry, time) {
-      this.lastInfoTime = time;
-
+    selectInformation: function (entry) {
       if (entry !== this.selectedInfo) {
         this.clearInformation();
 
@@ -632,7 +649,7 @@
       this.highlight.updateMatrixWorld(true);
     },
 
-    updateInformation: function (time) {
+    updateInformation: function () {
       const scene = this.el.sceneEl;
       const camera = scene.camera;
 
@@ -648,61 +665,14 @@
         });
       }
 
-      if (
-        !this.shown ||
-        !scene.is("vr-mode") ||
-        (F.Menu && F.Menu.opened)
-      ) {
+      if (!this.shown || F.Tutorial?.active) {
         this.clearInformation();
         return;
       }
-
-      /*
-       * Die vorhandenen Controller berechnen ihre Treffer.
-       * Keine zusätzlichen Controller und keine eigene
-       * WebXR-Eingabesteuerung.
-       *
-       * Ein Treffer kann abhängig von der Tickreihenfolge
-       * aus dem unmittelbar vorherigen Renderframe stammen.
-       */
-      const candidates = [];
-
-      scene.querySelectorAll("[fkc-controller]").forEach(hand => {
-        const tools = hand.components["fkc-controller"];
-        const grabber = hand.components["fkc-grabber"];
-
-        if (
-          !tools ||
-          !tools.source ||
-          (grabber && grabber.grabbed)
-        ) return;
-
-        const hit = tools.hit;
-
-        if (
-          hit &&
-          hit.xrayDemo === this &&
-          hit.xrayInfo
-        ) {
-          candidates.push(hit.xrayInfo);
-        }
-      });
-
-      /*
-       * Wenn beide Hände verschiedene Teile anvisieren,
-       * bleibt die bereits angezeigte Erklärung bevorzugt.
-       * Ansonsten ist die erste aktive Hand maßgeblich.
-       */
-      const entry = candidates.includes(this.selectedInfo)
-        ? this.selectedInfo
-        : candidates[0];
-
-      if (entry) {
-        this.selectInformation(entry, time);
-        this.updateHighlight();
-      } else if (time - this.lastInfoTime > 350) {
-        this.clearInformation();
-      }
+      const visible = !!this.selectedInfo && !F.Menu?.opened && !F.HandMenu?.opened;
+      this.infoPanel.visible = visible;
+      if (visible) this.updateHighlight();
+      else this.highlight.visible = false;
     },
 
     setExplanations: function (value) {
@@ -1300,9 +1270,9 @@
        */
       this.addInfo(
         "Röntgenröhre → Einkristallbeugung",
-        "Start/Pause und Geschwindigkeit: B/Y-Menü, dann " +
-        "„Röntgendemo & Bedienhilfe“. Bauteile und i-Markierungen " +
-        "mit dem Laser anvisieren. Die Apparatur ist durchgehbar, " +
+        "Start/Pause und Tempo: im Handmenü „Röntgendemo“ öffnen. " +
+        "Für eine Erklärung ein Bauteil oder i mit Trigger oder Maus anklicken. " +
+        "Die Apparatur ist durchgehbar, " +
         "aber nicht greifbar oder bemalbar.",
         vec(-4, -0.25, 4.8),
         []
@@ -1575,7 +1545,7 @@
       }
 
       // Informationen funktionieren auch bei pausierter Animation.
-      this.updateInformation(time);
+      this.updateInformation();
     },
 
     remove: function () {
@@ -1839,7 +1809,7 @@
       text(
         (demo.paused ? "Status: pausiert" : "Status: läuft") +
         " · Geschwindigkeit: " + speedLabel +
-        "\nBauteil oder i-Markierung mit dem Laser anvisieren."
+        "\nBauteil oder i-Markierung anklicken, um die Erklärung zu öffnen."
       );
 
       button(
