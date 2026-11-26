@@ -26,7 +26,6 @@
       this.rigRotation = new T.Quaternion();
       this.urlInput = document.getElementById("multiplayer-url");
       this.codeInput = document.getElementById("multiplayer-code");
-      this.unlockButton = document.getElementById("multiplayer-unlock");
       this.button = document.getElementById("multiplayer-toggle");
       this.status = document.getElementById("multiplayer-status");
       this.panel = document.getElementById("multiplayer-panel");
@@ -36,39 +35,24 @@
       this.inputs = Object.fromEntries(["name", ...fields].map(key => [key, document.getElementById("multiplayer-" + key)]));
       this.urlInput.value = new URLSearchParams(window.location.search).get("multiplayer") ||
         "https://fkc-vr-multiplayer.onrender.com";
-      this.toggle = () => {
-        if (this.endpoint) return this.leave();
-        try {
-          if (!this.accessToken || this.button.disabled || this.availabilityKey !== this.selectionKey()) return;
-          this.endpoint = this.accessEndpoint;
-          this.profile = this.readProfile();
-          this.dice.disabled = true;
-          this.button.textContent = "Multiplayer ausschalten";
-          this.status.textContent = "Aktiviert. Profil und Positionen werden erst im VR-Modus übertragen.";
-        } catch { this.status.textContent = "Bitte eine gültige HTTPS-Serveradresse eingeben."; }
-      };
+      this.toggle = () => this.endpoint ? this.leave() : this.join();
       this.exit = () => { if (this.endpoint) this.leave(); };
       this.refresh = () => {
-        this.availabilityKey = null;
-        this.button.disabled = !this.endpoint;
-        this.dice.disabled = true;
+        this.dice.disabled = Boolean(this.endpoint || this.accessRequest);
         this.drawPreview();
-        this.checkAvailability();
       };
       this.changed = () => this.drawPreview();
       this.rotatePreview = () => { this.previewBack = !this.previewBack; this.drawPreview(); };
       this.roll = () => this.randomizeAvatar();
-      this.unlock = () => this.checkAccess();
-      this.codeKey = event => { if (event.key === "Enter" && !event.repeat) this.unlock(); };
+      this.codeKey = event => { if (event.key === "Enter" && !event.repeat && !this.endpoint) this.join(); };
       this.serverChanged = () => this.leave();
       this.turn.addEventListener("click", this.rotatePreview);
       this.dice.addEventListener("click", this.roll);
       this.panel.addEventListener("toggle", this.refresh);
       this.urlInput.addEventListener("input", this.serverChanged);
-      this.unlockButton.addEventListener("click", this.unlock);
       this.codeInput.addEventListener("keydown", this.codeKey);
       Object.values(this.inputs).forEach(input => input.addEventListener("input", this.changed));
-      this.poll = setInterval(() => this.checkAvailability(), 2500);
+      this.refresh();
       this.button.addEventListener("click", this.toggle);
       this.el.addEventListener("exit-vr", this.exit);
     },
@@ -80,24 +64,31 @@
       return new URL(path, url).href;
     },
 
-    selectionKey() { return JSON.stringify([this.urlInput.value.trim(), F.app?.currentId]); },
-
-    async checkAccess() {
-      if (this.accessRequest || this.accessToken || this.el.is("vr-mode")) return;
+    async join() {
+      if (this.accessRequest || this.endpoint || this.el.is("vr-mode")) return;
       const code = this.codeInput.value.trim();
-      if (!code) { this.availability.textContent = "Bitte den Zugangscode eingeben."; return; }
+      if (!code) { this.status.textContent = "Bitte den Zugangscode eingeben."; return; }
+      let endpoint;
+      try { endpoint = this.serverURL("/presence"); }
+      catch { this.status.textContent = "Bitte eine gültige HTTPS-Serveradresse eingeben."; return; }
+      const room = F.app?.currentId;
+      if (!/^(welcome|vorlesung-[1-8]|team-[ab])$/.test(room || "")) {
+        this.status.textContent = "Bitte zuerst einen gemeinsam nutzbaren Raum auswählen.";
+        return;
+      }
       const request = new AbortController();
-      const timer = setTimeout(() => request.abort(), 15000);
+      const timer = setTimeout(() => request.abort(), 70000); // Render Free kann beim ersten Zugriff aufwachen.
       this.accessRequest = request;
-      this.unlockButton.disabled = true;
-      this.availability.textContent = "Zugang wird geprüft …";
+      this.button.disabled = this.dice.disabled = this.codeInput.disabled = true;
+      this.status.textContent = "Zugang wird geprüft … Falls Render schläft, kann das etwa eine Minute dauern.";
+      let feedback = "Einzelmodus", adjusted = false;
       try {
-        const endpoint = this.serverURL("/presence");
-        const response = await fetch(this.serverURL("/access"), {method: "POST", signal: request.signal,
-          redirect: "error", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code})});
+        const post = (path, data) => fetch(new URL(path, endpoint).href, {method: "POST", signal: request.signal,
+          redirect: "error", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+        const response = await post("/access", {code});
         if (this.accessRequest !== request) return;
         if (response.status === 401 || response.status === 429) {
-          this.availability.textContent = response.status === 401 ? "Zugangscode falsch." :
+          feedback = response.status === 401 ? "Zugangscode falsch." :
             "Zu viele Codeversuche. Bitte eine Minute warten.";
           return;
         }
@@ -108,17 +99,43 @@
         this.accessToken = accessToken;
         this.accessEndpoint = endpoint;
         this.codeInput.value = "";
-        this.codeInput.disabled = true;
-        this.refresh();
-      } catch {
-        if (this.accessRequest === request) {
-          this.availability.textContent = "Zugang konnte nicht geprüft werden. Serveradresse prüfen; Render braucht nach einer Pause ggf. einen Moment.";
+        this.status.textContent = "Zugang bestätigt. Avatar-Auswahl wird geprüft …";
+        const eligible = await post("/availability", {room, accessToken});
+        if (!eligible.ok) throw new Error();
+        const {available} = await eligible.json();
+        if (this.accessRequest !== request) return;
+        if (F.app?.currentId !== room || this.el.is("vr-mode")) {
+          feedback = "Raum oder VR-Modus gewechselt. Bitte den Beitritt im Browser erneut starten.";
+          return;
         }
+        if (!fields.every(key => Array.isArray(available?.[key]))) throw new Error();
+        if (fields.some(key => available[key].length === 0)) {
+          feedback = "Der Raum ist voll. Bitte später erneut beitreten.";
+          return;
+        }
+        for (const key of fields) {
+          const input = this.inputs[key];
+          if (!available[key].includes(input.value)) { input.value = available[key][0]; adjusted = true; }
+        }
+        this.profile = this.readProfile();
+        Object.values(this.inputs).forEach(input => { input.disabled = true; });
+        this.endpoint = endpoint;
+        this.button.textContent = "Multiplayer ausschalten";
+        this.availability.textContent = adjusted ? "Belegte Avatar-Merkmale wurden durch freie ersetzt." : "Dein Avatar ist für den VR-Beitritt ausgewählt.";
+        this.status.textContent = "✓ Zugang bestätigt. Multiplayer aktiviert – jetzt VR starten.";
+        this.drawPreview();
+      } catch {
+        feedback = "Multiplayer nicht erreichbar. Serveradresse und aktuellen Render-Deploy prüfen; dann erneut versuchen.";
       } finally {
         clearTimeout(timer);
         if (this.accessRequest === request) {
           this.accessRequest = null;
-          this.unlockButton.disabled = Boolean(this.accessToken);
+          this.button.disabled = false;
+          if (!this.endpoint) {
+            if (this.accessToken) this.leave();
+            this.codeInput.disabled = this.dice.disabled = false;
+            this.status.textContent = feedback;
+          }
         }
       }
     },
@@ -128,7 +145,7 @@
     },
 
     randomizeAvatar() {
-      if (this.dice.disabled || this.endpoint || this.availabilityKey !== this.selectionKey()) return;
+      if (this.dice.disabled || this.endpoint) return;
       const options = fields.map(key => Array.from(this.inputs[key].options).filter(option => !option.disabled).map(option => option.value));
       if (options.some(values => !values.length)) return;
       const current = fields.map(key => this.inputs[key].value);
@@ -140,55 +157,6 @@
       if (!alternatives.length) return;
       const selected = alternatives[Math.floor(Math.random() * alternatives.length)];
       fields.forEach((key, i) => { this.inputs[key].value = selected[i]; });
-      this.drawPreview();
-    },
-
-    async checkAvailability() {
-      if (!this.accessToken || this.endpoint || !this.panel.open || this.el.is("vr-mode") || !F.app?.currentId) return;
-      const key = this.selectionKey();
-      const accessToken = this.accessToken;
-      if (this.availabilityRequest?.key === key && this.availabilityRequest.accessToken === accessToken) return;
-      this.availabilityRequest?.abort();
-      const request = new AbortController();
-      request.key = key;
-      request.accessToken = accessToken;
-      this.availabilityRequest = request;
-      const timer = setTimeout(() => request.abort(), 4500);
-      if (this.availabilityKey !== key) this.button.disabled = this.dice.disabled = true;
-      try {
-        const response = await fetch(new URL("/availability", this.accessEndpoint), {method: "POST", signal: request.signal,
-          redirect: "error", headers: {"Content-Type": "application/json"}, body: JSON.stringify({room: F.app.currentId, accessToken})});
-        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
-        if (response.status === 401) return this.expiredAccess();
-        if (!response.ok) throw new Error();
-        const {available} = await response.json();
-        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
-        this.availabilityKey = key;
-        this.applyAvailability(available);
-      } catch {
-        if (this.availabilityRequest !== request || key !== this.selectionKey() || this.endpoint) return;
-        this.button.disabled = true;
-        this.dice.disabled = true;
-        this.availabilityKey = null;
-        this.availability.textContent = "Freie Auswahl konnte nicht geprüft werden. Ist der Multiplayer-Server aktuell und erreichbar?";
-        this.drawPreview();
-      } finally {
-        clearTimeout(timer);
-        if (this.availabilityRequest === request) this.availabilityRequest = null;
-      }
-    },
-
-    applyAvailability(available) {
-      for (const key of fields) {
-        const input = this.inputs[key];
-        for (const option of input.options) option.disabled = !available[key].includes(option.value);
-        if (!available[key].includes(input.value)) input.value = available[key][0] || "";
-      }
-      this.button.disabled = fields.some(key => !available[key].length);
-      this.dice.disabled = this.button.disabled || fields.every(key => available[key].length === 1);
-      this.availability.textContent = this.button.disabled ? "Dieser Raum hat derzeit keine freie Avatarwahl." :
-        this.dice.disabled ? "Nur eine Kombination ist noch frei. Die Auswahl wird beim VR-Beitritt reserviert." :
-          "Belegte Formen, Farben und Stile sind ausgegraut. Die Auswahl wird beim VR-Beitritt reserviert.";
       this.drawPreview();
     },
 
@@ -381,21 +349,21 @@
 
     leave() {
       this.accessRequest?.abort(); this.accessRequest = null;
-      this.availabilityRequest?.abort(); this.availabilityRequest = null;
       this.clearPresence(true);
       this.accessToken = this.accessEndpoint = null;
       this.codeInput.value = "";
-      this.codeInput.disabled = this.unlockButton.disabled = false;
+      this.codeInput.disabled = this.button.disabled = false;
+      Object.values(this.inputs).forEach(input => { input.disabled = false; });
       this.endpoint = null;
       this.button.textContent = "Gemeinsam beitreten";
       this.status.textContent = "Einzelmodus";
-      this.availability.textContent = "Zuerst den Multiplayer-Zugang prüfen.";
+      this.availability.textContent = "Avatar wählen und mit dem Zugangscode beitreten.";
       this.refresh();
     },
 
     expiredAccess() {
       this.leave();
-      this.status.textContent = "Multiplayer-Zugang abgelaufen. Bitte den Code erneut prüfen.";
+      this.status.textContent = "Multiplayer-Zugang abgelaufen. Bitte mit dem Code erneut beitreten.";
       this.availability.textContent = this.status.textContent;
     },
 
@@ -485,7 +453,7 @@
         this.showPeers(result.peers);
         this.remoteAnnotations = result.peers.flatMap(peer => F.SharedAnnotations.normalize(peer.annotations, data.room));
         this.receiveModels(result);
-        this.status.textContent = `Multiplayer verbunden · ${result.peers.length} weitere Personen im Raum.`;
+        this.status.textContent = `✓ Multiplayer erfolgreich betreten · ${result.peers.length} weitere Personen im Raum.`;
       } catch {
         if (this.request !== request) return;
         this.clearModels();
@@ -548,11 +516,9 @@
     },
 
     remove() {
-      clearInterval(this.poll);
       this.leave();
       this.panel.removeEventListener("toggle", this.refresh);
       this.urlInput.removeEventListener("input", this.serverChanged);
-      this.unlockButton.removeEventListener("click", this.unlock);
       this.codeInput.removeEventListener("keydown", this.codeKey);
       this.turn.removeEventListener("click", this.rotatePreview);
       this.dice.removeEventListener("click", this.roll);

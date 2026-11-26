@@ -28,7 +28,9 @@ async function testClientOptIn() {
       requests.push({url: String(url), body});
       if (String(url).endsWith("/access")) return body.code === "test-code"
         ? {ok: true, json: async () => ({accessToken: "test-session"})} : {ok: false, status: 401};
-      return {ok: true, json: async () => ({available: AvatarProfile.available([])})};
+      if (String(url).endsWith("/presence")) return {ok: true,
+        json: async () => ({token: "peer-token", self: "self", models: [], peers: []})};
+      return {ok: true, json: async () => ({available: AvatarProfile.available([{form: "classic"}])})};
     }, document: {getElementById(id) {
       if (!ui.has(id)) ui.set(id, {addEventListener() {}});
       return ui.get(id);
@@ -40,25 +42,15 @@ async function testClientOptIn() {
   assert.equal(client.urlInput.value, "https://example.test");
   assert.equal(client.endpoint, undefined, "URL-Parameter ist keine Einwilligung zum Beitritt");
   client.tick(0);
-  await client.checkAvailability();
   assert.equal(requests.length, 0, "Kein Zugriff vor Codeprüfung");
+  client.codeInput.value = "";
+  await client.toggle();
+  assert.match(client.status.textContent, /eingeben/);
   client.codeInput.value = "falsch";
-  await client.unlock();
+  await client.toggle();
   assert.equal(client.accessToken, undefined);
-  assert.match(client.availability.textContent, /falsch/);
-  client.codeInput.value = "test-code";
-  await client.unlock();
-  assert.equal(client.accessToken, "test-session");
-  assert.equal(client.codeInput.value, "");
-  assert.equal(client.endpoint, undefined, "Codeprüfung allein startet keine Präsenz");
-  client.panel.open = true;
-  await client.checkAvailability();
-  assert.deepEqual(requests.at(-1).body, {room: "welcome", accessToken: "test-session"});
-  inVR = true;
-  client.availabilityKey = client.selectionKey();
-  client.applyAvailability(AvatarProfile.available([{form: "classic", color: "#31749b", style: "hat"}]));
-  assert.equal(client.inputs.form.options[0].disabled, true);
-  assert.equal(client.inputs.form.value, "slim");
+  assert.match(client.status.textContent, /falsch/);
+  assert.equal(client.button.disabled, false);
   let previews = 0;
   client.drawPreview = () => { previews++; };
   for (let i = 0; i < 20; i++) {
@@ -67,22 +59,24 @@ async function testClientOptIn() {
     const after = client.readProfile();
     assert.notDeepEqual(after, before, "Erneutes Würfeln zeigt eine andere Kombination");
     assert.equal(after.name, before.name);
-    assert.equal(after.form === "classic" || after.color === "#31749b" || after.style === "hat", false);
   }
   assert.equal(previews, 20);
-  F.app.currentId = "team-a";
-  const last = client.readProfile();
-  client.roll();
-  assert.deepEqual(client.readProfile(), last, "Keine alte Verfügbarkeit für einen anderen Raum verwenden");
-  F.app.currentId = "welcome";
-  client.applyAvailability({form: ["slim"], color: ["#ac406c"], style: ["monocle"]});
-  assert.equal(client.dice.disabled, true, "Einzige verbleibende Kombination braucht keinen Würfel");
-  assert.equal(client.button.disabled, false);
-  client.applyAvailability({form: [], color: ["#ac406c"], style: ["monocle"]});
-  assert.equal(client.dice.disabled, true);
+  client.inputs.form.value = "classic";
+  client.codeInput.value = "test-code";
+  const pending = client.toggle();
   assert.equal(client.button.disabled, true);
-  client.applyAvailability(AvatarProfile.available([]));
-  client.toggle();
+  await client.toggle(); // Doppelklick startet keine zweite Prüfung.
+  await pending;
+  assert.equal(client.accessToken, "test-session");
+  assert.equal(client.codeInput.value, "");
+  assert.deepEqual(requests.at(-1).body, {room: "welcome", accessToken: "test-session"});
+  assert.equal(requests.filter(r => r.url.endsWith("/access")).length, 2);
+  assert.ok(!requests.some(r => r.url.endsWith("/presence")), "Keine Präsenzübertragung vor VR");
+  assert.equal(client.inputs.form.value, "slim");
+  assert.match(client.availability.textContent, /ersetzt/);
+  assert.match(client.status.textContent, /Zugang bestätigt/);
+  assert.equal(client.inputs.form.disabled, true);
+  inVR = true;
   assert.equal(client.endpoint, "https://example.test/presence");
   assert.equal(client.profile.name, "Laborfuchs");
   client.room = "welcome";
@@ -99,12 +93,17 @@ async function testClientOptIn() {
   client.receiveModels(variants);
   client.receiveModels(variants);
   assert.deepEqual(switches, [[model, "co-coordination", true]], "Empfang startet genau einen lokalen Ladevorgang");
+  client.request = new AbortController();
+  await client.update({room: "welcome"}, client.request);
+  assert.match(client.status.textContent, /Multiplayer erfolgreich betreten/);
+  assert.equal(requests.at(-1).body.accessToken, "test-session");
   F.Tutorial = {active: true};
   client.tick(1);
   assert.equal(client.room, null, "Tutorial ist vom Pilot getrennt");
   client.exit();
   assert.equal(client.endpoint, null);
   assert.equal(client.accessToken, null);
+  assert.equal(client.inputs.form.disabled, false);
   assert.equal(requests.at(-1).body.endSession, true);
   assert.equal(client.status.textContent, "Einzelmodus");
 }

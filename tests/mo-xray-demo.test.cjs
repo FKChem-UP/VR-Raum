@@ -17,7 +17,9 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../js/mo-xray-demo.js")
   }}
 });
 
-const {frame, lines, voltage, kEdge, intensity, activate} = F.MoXray;
+const {frame, lines, voltage, current, kEdge, intensity, activate} = F.MoXray;
+assert.equal(voltage, 50);
+assert.equal(current, 1);
 assert.equal(F.RoomBuilder.build({}, {id: "vorlesung-4"}), result);
 assert.equal(created.length, 0);
 const parent = {};

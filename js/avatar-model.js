@@ -88,6 +88,11 @@
     if (feminine) {
       const hair = p.material("#493029");
       p.oval(head, hair, [0, 0.055, depth - 0.043], [faceWidth * 1.04, 0.059, depth * 0.93]);
+      // Gesicht liegt bei −z; die breite hintere Haarpartie muss den Schädel
+      // von der Krone bis zum Nacken auch zwischen den Seitensträhnen abdecken.
+      const back = p.oval(head, hair, [0, -0.026, depth * 1.35 - 0.056],
+        [faceWidth * 1.13, faceHeight * 1.12, depth * 0.85]);
+      back.name = "hair-back";
       for (const side of [-1, 1]) {
         p.oval(head, hair, [side * faceWidth * 0.83, -0.040, depth - 0.021], [0.032, 0.115, 0.064]);
         p.oval(head, dark, [side * (eyes + 0.009), 0.008, -0.054], [0.013, 0.005, 0.005]);

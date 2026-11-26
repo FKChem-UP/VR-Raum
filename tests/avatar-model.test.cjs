@@ -67,6 +67,14 @@ for (const style of ["hat", "monocle", "cape", "glasses", "mohawk", "hair", "cro
 }
 const narrow = models.build("one", {form: "slim", style: "none"});
 const broad = models.build("two", {form: "broad", style: "cape"});
+for (const form of ["slim", "round", "oval", "classic"]) {
+  const model = models.build("rear", {form, style: "none"});
+  const [skull] = model.head.children;
+  const hair = model.head.children.find(mesh => mesh.name === "hair-back");
+  assert.ok(hair && hair.position.values[2] + hair.scale.values[2] > skull.position.values[2] + skull.scale.values[2]);
+  assert.ok(hair.position.values[1] - hair.scale.values[1] < skull.position.values[1] - skull.scale.values[1]);
+  model.dispose();
+}
 assert.ok(broad.head.children[0].scale.values[0] > narrow.head.children[0].scale.values[0] * 1.5);
 assert.ok(broad.body.children[0].scale.values[0] > narrow.body.children[0].scale.values[0] * 1.5);
 assert.notEqual(broad.body.children[0].scale.values[1], narrow.body.children[0].scale.values[1]);

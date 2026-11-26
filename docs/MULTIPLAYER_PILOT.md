@@ -1,6 +1,6 @@
 # Multiplayer-Pilot
 
-Die [VR-Seite auf GitHub Pages](https://fkchem-up.github.io/VR-Raum/) bleibt öffentlich und funktioniert im Einzelmodus ohne Server. Im Browserpanel „Multiplayer-Pilot“ ist `https://fkc-vr-multiplayer.onrender.com` vorausgefüllt. „Zugang prüfen“ sendet den Code per HTTPS an den ausgewählten Server und schaltet die Avatar-Verfügbarkeitsprüfung frei. Profil und Positionen werden erst nach „Gemeinsam beitreten“ im VR-Modus übertragen. Alle brauchen denselben Server, denselben Zugangscode und dieselbe Raum-ID, nicht dasselbe WLAN.
+Die [VR-Seite auf GitHub Pages](https://fkchem-up.github.io/VR-Raum/) bleibt öffentlich und funktioniert im Einzelmodus ohne Server. Im Browserpanel „Multiplayer-Pilot“ ist `https://fkc-vr-multiplayer.onrender.com` vorausgefüllt. Avatar und Code vor dem VR-Start eingeben. „Gemeinsam beitreten“ prüft den Zugang und aktiviert Multiplayer ohne zweiten Klick. Die Bestätigung mit Haken steht direkt unter dem Button. Profil und Positionen werden erst im VR-Modus übertragen. Alle brauchen denselben Server, denselben Zugangscode und dieselbe Raum-ID, nicht dasselbe WLAN.
 
 Der gemeinsame Zugangscode schützt den gesamten Multiplayer-Dienst, nicht einzelne Räume. Es gibt keine Konten, keine Adminrolle, kein Audio und keinen dauerhaft gespeicherten Lernfortschritt. Der Server prüft eine zufällige Sitzungskennung für die Avatar-Verfügbarkeit und alle Präsenzanfragen. Sie ist zwei Stunden gültig und wird im Browser nur im Arbeitsspeicher gehalten. Nach 20 falschen Codeversuchen im laufenden Minutenfenster pausiert die Codeprüfung bis zu dessen Ende; bestehende Sitzungen laufen weiter. Beim Ausschalten oder Verlassen von VR wird die Kennung verworfen. Ein Serverneustart beendet alle Sitzungen. Anzeigenamen sind freiwillig; Spitznamen genügen. Der Hoster kann technische Logs einschließlich IP-Adressen führen. Die Eignung für den regulären Lehrbetrieb separat klären.
 
@@ -8,7 +8,7 @@ Der gemeinsame Zugangscode schützt den gesamten Multiplayer-Dienst, nicht einze
 
 | Gemeinsam sichtbar | Bleibt lokal oder ist ausgeschlossen |
 | --- | --- |
-| Avatar mit Vorschau, optionalem Spitznamen, frei wählbarer Form, Farbe und Stil; belegte Optionen sind pro Raum nicht wählbar. Der Würfel nutzt freie Optionen. | Keine Geschlechtsabfrage. Auswahl im Beitrittsmenü; der Server prüft sie beim VR-Beitritt erneut. |
+| Avatar mit Vorschau, optionalem Spitznamen, wählbarer Form, Farbe und Stil. Beim Beitritt werden bereits belegte Merkmale durch freie ersetzt und in der Vorschau angezeigt. | Keine Geschlechtsabfrage. Der Server prüft die Auswahl beim tatsächlichen VR-Beitritt erneut. |
 | Kopf und Controller bzw. Zeigehände; virtuelle Augenhöhe 1,60 m. Laser und Treffpunkt, wenn auf ein Modell gezeigt wird. | Haupt- und Handmenü, Steuerhilfe, Laser im Malmodus und Malstriche. |
 | Position, Drehung und Größe gemeinsamer Modelle. Eine Person hat die Greiffreigabe; beim Loslassen, Verlassen oder Timeout kann eine andere übernehmen. | Modellreset und Darstellungsstile wie Polyeder oder Kugel–Stab. |
 | Ansichten wie Molekül, Koordination oder Zelle, auch für später Beitretende. Fremder Griff sperrt den Wechsel. | Tutorial und offener Strukturraum sind Einzelspielerbereiche. |
@@ -27,7 +27,7 @@ Der Dienst selbst spricht HTTP; der Hosting-Proxy muss öffentlich **HTTPS** anb
 
 ## Zwei Pico-Headsets testen
 
-1. Auf beiden Picos dieselbe VR-Seite und dieselbe vertrauenswürdige Serveradresse verwenden. „Multiplayer-Pilot“ öffnen und mit „Zugang prüfen“ zuerst einen falschen Code (muss abgelehnt werden), dann den vereinbarten Code testen. Avatar wählen, „Gemeinsam beitreten“ klicken, VR starten und das Tutorial überspringen. `?multiplayer=` kann nur die Serveradresse vorgeben; vor der Codeeingabe diese prüfen.
+1. Auf beiden Picos dieselbe VR-Seite und dieselbe vertrauenswürdige Serveradresse verwenden. „Multiplayer-Pilot“ öffnen, Avatar wählen und „Gemeinsam beitreten“ mit dem vereinbarten Code klicken. Auf „Zugang bestätigt“ warten, VR starten und das Tutorial überspringen. `?multiplayer=` kann nur die Serveradresse vorgeben; vor der Codeeingabe diese prüfen.
 2. Im Begrüßungsraum am Team-B-Podest testen: auf Co zeigen; Modell greifen, drehen, skalieren und übergeben; Ansicht **Molekül → Koordination → Molekül** umschalten; Label anheften und eine Messung abschließen sowie wieder entfernen. Die zweite Person schaut zunächst nur zu.
 3. Raum wechseln bzw. VR verlassen; fremde Anzeigen müssen aus dem bisherigen Raum verschwinden. Bei Verbindungsabbruch verfallen alte Teilnehmendenpositionen nach ungefähr fünf Sekunden. Ohne aktiven Beitritt bleibt die Anwendung im Einzelmodus.
 

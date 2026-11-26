@@ -2,7 +2,7 @@
 
 (function (F) {
   const T = AFRAME.THREE;
-  const voltage = 35; // kV; illustrative, not a setting of the adjacent demo.
+  const voltage = 50, current = 1; // kV / mA; elektrische Röhrenleistung in W = U · I.
   const kEdge = 20.0; // keV, rounded
   const lines = {
     alpha1: {label: "Kα₁", shell: "L₃ (2p₃/₂)", energy: 17.48, color: "#65edcf"},
@@ -10,11 +10,11 @@
   };
   const continuum = "#ffc779", modes = ["alpha1", "alpha2", "brake"], duration = 6000;
   const info = {
-    impact: ["1 · Elektronenstoß", "Ein elektrisches Feld beschleunigt Elektronen zur Mo-Anode. Bei 35 kV können sie bis zu 35 keV erreichen. Ein Stoß kann ein 1s-Elektron auslösen, wenn genug Energie übertragen wird (Mo-K-Kante: ca. 20,0 keV). Zurück bleibt eine K-Lücke."],
+    impact: ["1 · Elektronenstoß", `Bei ${voltage} kV erreichen die Elektronen bis zu ${voltage} keV. Der Röhrenstrom (${current} mA) bestimmt, wie viele Elektronen pro Zeit die Mo-Anode treffen. Ein Stoß mit genügend Energie kann ein 1s-Elektron auslösen (Mo-K-Kante: ca. 20,0 keV). Eine K-Lücke bleibt zurück.`],
     alpha1: ["2 · Kα₁: L₃ → K", "Ein Elektron aus L₃ (2p₃/₂) füllt die K-Lücke (1s). Die Energiedifferenz wird als Röntgenphoton frei: ca. 17,48 keV bzw. 0,709 Å. Kα₁ und Kα₂ sind alternative Wege, nicht zwei Photonen aus derselben K-Lücke."],
     alpha2: ["2 · Kα₂: L₂ → K", "Stattdessen kann ein Elektron aus L₂ (2p₁/₂) die K-Lücke füllen: ca. 17,37 keV bzw. 0,714 Å. Spin-Bahn-Kopplung spaltet das 2p-Niveau. Deshalb liegen die beiden Linien nur etwa 0,11 keV auseinander."],
     brake: ["3 · Bremsstrahlung", "Im elektrischen Feld eines Mo-Kerns ändert das schnelle Elektron Richtung und Geschwindigkeit. Es verliert Energie, die als Röntgenphoton abgegeben werden kann. Unterschiedliche Energieverluste vieler Elektronen ergeben ein Kontinuum; keine K-Lücke ist nötig."],
-    spectrum: ["4 · Spektrum der Mo-Anode", "Das Kontinuum endet bei Eₘₐₓ = eU (hier 35 keV). Darauf liegen die charakteristischen Linien; rechts im Diagramm ist das Kα-Dublett vergrößert. Intensitäten und Linienbreiten sind schematisch. Weitere Linien (z. B. Kβ) und Filterung sind nicht dargestellt."]
+    spectrum: ["4 · Spektrum der Mo-Anode", `Das Kontinuum endet bei Eₘₐₓ = eU (hier ${voltage} keV). Der Strom beeinflusst die Intensität, nicht die Grenzenergie. Rechts ist das Kα₁/Kα₂-Dublett vergrößert. Intensitäten und Linienbreiten sind schematisch; Kβ und Filterung fehlen.`]
   };
   const clamp = t => Math.max(0, Math.min(1, t));
   const mix = (a, b, t) => a + (b - a) * t;
@@ -47,13 +47,13 @@
     const text = (value, x, y, size, color = "#f0f7fb") => {
       ctx.fillStyle = color; ctx.font = `${size}px Arial`; ctx.fillText(value, x, y);
     };
-    text("Mo-Röntgenspektrum · Beispiel: 35 kV", 28, 44, 34);
+    text(`Mo-Röntgenspektrum · ${voltage} kV / ${current} mA`, 28, 44, 34);
     text("Relative Intensität", 55, 90, 24);
     const left = 64, right = 610, base = 454, top = 110;
     const x = e => mix(left, right, e / voltage);
     ctx.strokeStyle = "#ccdbe6"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(left, top); ctx.lineTo(left, base); ctx.lineTo(right, base); ctx.stroke();
-    for (const e of [0, 10, 20, 30, 35]) {
+    for (let e = 0; e <= voltage; e += 10) {
       ctx.fillRect(x(e), base, 2, 7); text(String(e), x(e) - 9, base + 30, 20);
     }
     text("Photonenenergie / keV", 215, 523, 24);
@@ -120,7 +120,7 @@
       this.status = this.panel(950, 104, 2.28, 0.25, [-0.85, -0.33, 0.2]);
       this.controls = this.panel(960, 250, 2.30, 0.60, [-0.85, -0.79, 0.20], true);
       this.explanation = this.panel(840, 370, 1.82, 0.80, [1.23, -0.70, -0.08]);
-      this.paint(this.heading, "Wie entsteht Mo-Röntgenstrahlung?", ["Vergrößerter Blick in die Mo-Anode · Positionen, Zeiten und Wellen schematisch"], "#102738");
+      this.paint(this.heading, "Wie entsteht Mo-Röntgenstrahlung?", [`${voltage} kV · ${current} mA · ${voltage * current} W elektrisch · Atommodell und Zeiten schematisch`], "#102738");
       for (const [label, x, y, color] of [["K (1s)", -1.24, 0.29, "#87b6e0"], ["L₃", -0.46, 0.62, lines.alpha1.color],
         ["L₂", -0.35, -0.14, lines.alpha2.color], ["Mo-Kern", -0.89, -0.12, "#dec7ff"]]) {
         const tag = this.panel(256, 86, 0.27, 0.09, [x, y, 0.22]);
@@ -258,7 +258,7 @@
     }
   });
 
-  F.MoXray = {frame, lines, voltage, kEdge, intensity, activate(hit) {
+  F.MoXray = {frame, lines, voltage, current, kEdge, intensity, activate(hit) {
     const demo = hit.el?.components?.["fkc-mo-xray"];
     if (!demo) return false;
     if (hit.mesh === demo.controls.mesh && !F.Menu?.opened && !F.HandMenu?.opened) demo.click(hit.uv);

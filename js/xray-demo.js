@@ -68,7 +68,37 @@
   }
 
   const closeInfo = Symbol("close-xray-info");
+  // Der Detektor steht senkrecht zur Blickrichtung vom Kristall zum
+  // Detektorzentrum, nicht unbedingt zum einfallenden Strahl (+z).
+  function projectDirection(x, y, z, sin, cos, radius) {
+    const denominator = x * sin + z * cos;
+    if (denominator <= 0) return null;
+    const distance = radius / denominator;
+    return [(x * cos - z * sin) * distance, y * distance];
+  }
+
+  function angleGuides(beta, radius, width, height) {
+    const sin = Math.sin(beta), cos = Math.cos(beta), segments = [];
+    for (let degrees = 5; degrees <= 85; degrees += 5) {
+      const twoTheta = degrees * Math.PI / 180;
+      const radial = Math.sin(twoTheta), axial = Math.cos(twoTheta);
+      let previous = null;
+      for (let i = 0; i <= 360; i++) {
+        const azimuth = i * Math.PI / 180;
+        const p = projectDirection(radial * Math.cos(azimuth), radial * Math.sin(azimuth), axial, sin, cos, radius);
+        const inside = p && Math.abs(p[0]) < width / 2 && Math.abs(p[1]) < height / 2;
+        if (inside && previous) segments.push(...previous, -0.018, ...p, -0.018);
+        previous = inside ? p : null;
+      }
+    }
+    return segments;
+  }
+
+  // Leicht geneigte Rotationsachse: eine reine y-Rotation konserviert g_y
+  // und erzeugt im Lehrmodell auffällig gerade Reflexreihen.
+  const scanAxis = [0.27, 1, 0.19];
   F.XrayDemo = {
+    projectDirection, angleGuides,
     activate(hit) {
       const demo = hit.xrayDemo;
       if (!demo || !hit.xrayInfo) return false;
@@ -193,6 +223,7 @@
       this.bounds = new T.Box3();
       this.partBounds = new T.Box3();
       this.axisY = vec(0, 1, 0);
+      this.scanAxis = vec(...scanAxis).normalize();
       this.dummy = new T.Object3D();
 
       this.colors = {
@@ -215,6 +246,28 @@
       this.buildInfoPanel();
 
       this.updateFrame(true);
+
+      const canvas = this.el.sceneEl.canvas;
+      if (canvas) {
+        const mouse = new T.Vector2(), raycaster = new T.Raycaster();
+        raycaster.far = 30;
+        this.moveInfoPointer = event => {
+          const scene = this.el.sceneEl;
+          if (!scene.camera || scene.is("vr-mode") || scene.is("ar-mode") || event.buttons) return this.clearInfoPointer();
+          const rect = canvas.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          mouse.set(2 * (event.clientX - rect.left) / rect.width - 1, 1 - 2 * (event.clientY - rect.top) / rect.height);
+          scene.camera.updateWorldMatrix(true, false);
+          raycaster.setFromCamera(mouse, scene.camera);
+          this.mouseInfo = this.markerFromHit(F.findHit(raycaster, true));
+        };
+        this.clearInfoPointer = () => { this.mouseInfo = null; };
+        this.infoCanvasTarget = canvas;
+        canvas.addEventListener("pointermove", this.moveInfoPointer);
+        canvas.addEventListener("pointerleave", this.clearInfoPointer);
+        this.el.sceneEl.addEventListener("exit-vr", this.clearInfoPointer);
+        this.el.sceneEl.addEventListener("enter-vr", this.clearInfoPointer);
+      }
 
       if (F.invalidateHits) F.invalidateHits();
     },
@@ -461,7 +514,7 @@
       this.infoTexture = texture;
 
       this.highlight = new T.Box3Helper(
-        this.bounds, 0xb9f3ff
+        this.bounds, 0xffdf66
       );
 
       this.trackGeometry(this.highlight.geometry);
@@ -623,17 +676,21 @@
       if (this.highlight) this.highlight.visible = false;
     },
 
-    updateHighlight: function () {
-      const entry = this.selectedInfo;
+    markerFromHit: function (hit) {
+      const entry = hit?.xrayInfo;
+      return hit?.xrayDemo === this && entry?.marker?.children.includes(hit.mesh) ? entry : null;
+    },
 
-      if (!entry || !entry.targets.length) {
+    updateHighlight: function (entry) {
+      if (!entry) {
         this.highlight.visible = false;
         return;
       }
 
       this.bounds.makeEmpty();
 
-      entry.targets.forEach(object => {
+      const targets = (entry.highlightTargets || entry.targets).filter(visibleInTree);
+      (targets.length ? targets : [entry.marker]).forEach(object => {
         object.updateWorldMatrix(true, true);
         this.partBounds.setFromObject(object);
         this.bounds.union(this.partBounds);
@@ -669,9 +726,15 @@
         this.clearInformation();
         return;
       }
-      const visible = !!this.selectedInfo && !F.Menu?.opened && !F.HandMenu?.opened;
+      const blocked = F.Menu?.opened || F.HandMenu?.opened;
+      const visible = !!this.selectedInfo && !blocked;
       this.infoPanel.visible = visible;
-      if (visible) this.updateHighlight();
+      const xr = scene.is?.("vr-mode") || scene.is?.("ar-mode");
+      const hand = xr && document.getElementById(F.HandMenu?.laserHand?.() + "Hand");
+      const tools = hand?.components?.["fkc-controller"];
+      const hover = xr ? tools?.source && this.markerFromHit(tools.hit) : this.mouseInfo;
+      const entry = !blocked && ((hover?.marker.visible && hover) || this.selectedInfo);
+      if (entry) this.updateHighlight(entry);
       else this.highlight.visible = false;
     },
 
@@ -759,13 +822,14 @@
        * sonst würde sie Kathode und Anode verdecken.
        * Die Röhrenerklärung besitzt einen eigenen Marker.
        */
-      this.addInfo(
+      const tubeInfo = this.addInfo(
         "Evakuierte Röntgenröhre",
         "Das Vakuum ermöglicht einen weitgehend ungestörten " +
         "Elektronenflug von der Kathode zur Anode.",
         vec(-3.1, 1.52, -0.85),
         []
       );
+      tubeInfo.highlightTargets = [tube]; // Hülle markieren, aber nicht als Trefferfläche verwenden.
 
       const coilPoints = [];
 
@@ -820,7 +884,8 @@
       this.addInfo(
         "Beschleunigte Elektronen",
         "Die Hochspannung beschleunigt die Elektronen zur " +
-        "Anode (+). Ihr Energiegewinn beträgt näherungsweise eU. " +
+        "Anode (+). Betriebspunkt: 50 kV, 1 mA (50 W elektrische Röhrenleistung). " +
+        "Die Elektronen erreichen bis zu 50 keV; der Strom bestimmt den Elektronenfluss. " +
         "Die türkisfarbenen Kugeln sind schematische Marker.",
         vec(-2.5, 0.45, 0.38),
         [electronGuide]
@@ -878,8 +943,8 @@
         "Brems- und charakteristische Strahlung",
         "Bremsstrahlung besitzt ein kontinuierliches Spektrum. " +
         "Charakteristische Linien entstehen nach Ionisation " +
-        "innerer Schalen. Bei Mo-Kα wird eine K-Schalenlücke " +
-        "durch einen Übergang aus der L-Schale aufgefüllt.",
+        "innere Schalen. Mo-Kα₁ (L₃ → K) hat 17,48 keV, Mo-Kα₂ (L₂ → K) 17,37 keV. " +
+        "Die Röhre emittiert beide Linien. Ob beide an der Probe ankommen, bestimmt die Optik.",
         vec(0.72, 0.55, 1.85),
         [this.impact]
       );
@@ -927,9 +992,9 @@
       this.addInfo(
         "Graphit-Monochromator",
         "Bragg-Beugung an Graphit-(002)-Ebenen wählt in dieser " +
-        "Darstellung Mo-Kα aus. Der Strahl wird um 2θ abgelenkt. " +
-        "Ein realer Monochromator bewirkt keine perfekte " +
-        "spektrale Reinigung.",
+        "Darstellung Mo-Kα aus. Eine übliche Graphitoptik kann beide Linien durchlassen; " +
+        "eine auf Kα₁ ausgelegte Optik kann Kα₂ unterdrücken. „α₁/α₂-Splitting“ bei der " +
+        "Integration berücksichtigt bei Bedarf beide Wellenlängen – es trennt sie nicht in der Röhre.",
         vec(-0.55, 0.95, 3),
         [graphite]
       );
@@ -1130,37 +1195,24 @@
       face.position.z = -0.012;
       this.detector.add(face);
 
-      for (let i = -6; i <= 6; i++) {
-        const x = i * 2.8 / 14;
-
-        this.line(
-          vec(x, -1.15, -0.017),
-          vec(x, 1.15, -0.017),
-          0x294057, this.detector, 0.35
-        );
-      }
-
-      for (let i = -5; i <= 5; i++) {
-        const y = i * 2.3 / 12;
-
-        this.line(
-          vec(-1.4, y, -0.017),
-          vec(1.4, y, -0.017),
-          0x294057, this.detector, 0.35
-        );
-      }
+      this.detectorGuides = new T.LineSegments(
+        this.trackGeometry(new T.BufferGeometry()),
+        this.trackMaterial(new T.LineBasicMaterial({color: 0x4f7490, transparent: true, opacity: 0.48, depthWrite: false}))
+      );
+      this.detector.add(this.detectorGuides);
 
       this.detectorInfo = this.addInfo(
         "Beweglicher Flächendetektor",
         "Der Detektor sammelt Reflexereignisse während eines " +
         "Rotationsabschnitts. Während seiner Fahrt werden hier " +
-        "keine Ereignisse gesammelt. Die Flecken zeigen " +
-        "geometrische Treffer, keine berechneten Intensitäten.",
+        "keine Ereignisse gesammelt. Die Punkte sind Einkristallreflexe. " +
+        "Die dünnen Bögen verbinden Orte gleichen 2θ (Schritte von 5°); sie sind keine Pulverringe. " +
+        "Bei einem geneigten Detektor sind diese Bögen keine exakten Kreise.",
         vec(0, 0, 0),
         [housing, face]
       );
 
-      this.addInfo(
+      const diffractionInfo = this.addInfo(
         "Gebeugte Strahlung",
         "Die gebeugte Strahlung läuft in diskreten, von der " +
         "Kristallorientierung abhängigen Richtungen. Nur ein " +
@@ -1205,6 +1257,7 @@
         ray.visible = false;
         this.reflectionDisplays.push(ray);
       }
+      diffractionInfo.highlightTargets = this.reflectionDisplays;
 
       this.reflectionParticles = new T.InstancedMesh(
         this.particleGeometry,
@@ -1290,7 +1343,8 @@
 
       this.addInfo(
         "Geometrisches Beugungsmodell",
-        "Mo-Kα: λ = 0,7107 Å; primitives kubisches Modellgitter. " +
+        "Mo-Kα₁: λ ≈ 0,7093 Å; Mo-Kα₂: λ ≈ 0,7136 Å. " +
+        "Das kubische Lehrmodell rechnet vereinfacht mit einer effektiven Wellenlänge von 0,7107 Å. " +
         "Berechnet werden geometrische Reflexpositionen, keine " +
         "Strukturfaktoren oder Intensitäten. Die Ewald-" +
         "Schalentoleranz dient nur der Veranschaulichung.",
@@ -1302,7 +1356,7 @@
         "Farblegende",
         "Türkis: Elektronen. Orange: Bremsstrahlung. " +
         "Violett: andere charakteristische Linien. " +
-        "Grün: Mo-Kα. Blau: gebeugte Strahlung. " +
+        "Grün: Mo-Kα₁ und Mo-Kα₂ gemeinsam dargestellt. Blau: gebeugte Strahlung. " +
         "Die Farben stellen keine sichtbaren Strahlungsfarben dar.",
         vec(-2.8, -0.25, 8.7),
         []
@@ -1322,7 +1376,7 @@
       const waveNumber = 1 / this.data.wavelength;
       const tolerance = 0.010;
 
-      this.rotationQ.setFromAxisAngle(this.axisY, omega);
+      this.rotationQ.setFromAxisAngle(this.scanAxis, omega);
       this.reflections.length = 0;
 
       for (const point of this.reciprocalPoints) {
@@ -1423,7 +1477,7 @@
       const t = this.time;
       const omega = t * 0.20;
 
-      this.crystal.rotation.y = omega;
+      this.crystal.quaternion.setFromAxisAngle(this.scanAxis, omega);
 
       const angles = [20, 35, 50, 65];
       const blockDuration = 5;
@@ -1454,6 +1508,17 @@
       if (moving && this.spots.length) this.clearSpots();
 
       const beta = T.MathUtils.degToRad(degrees);
+      if (!moving && degrees !== this.guideAngle) {
+        const geometry = this.detectorGuides.geometry;
+        // Beim Winkelwechsel darf Three.js den bisherigen GPU-Puffer freigeben.
+        geometry.dispose();
+        geometry.setAttribute("position", new T.Float32BufferAttribute(
+          angleGuides(beta, this.detectorRadius, this.detectorWidth, this.detectorHeight), 3
+        ));
+        geometry.computeBoundingSphere();
+        this.guideAngle = degrees;
+      }
+      this.detectorGuides.visible = !moving;
 
       this.normal.set(Math.sin(beta), 0, Math.cos(beta));
       this.horizontal.set(Math.cos(beta), 0, -Math.sin(beta));
@@ -1550,6 +1615,12 @@
 
     remove: function () {
       this.removed = true;
+      if (this.infoCanvasTarget) {
+        this.infoCanvasTarget.removeEventListener("pointermove", this.moveInfoPointer);
+        this.infoCanvasTarget.removeEventListener("pointerleave", this.clearInfoPointer);
+        this.el.sceneEl.removeEventListener("exit-vr", this.clearInfoPointer);
+        this.el.sceneEl.removeEventListener("enter-vr", this.clearInfoPointer);
+      }
       this.clearInformation();
 
       if (this.spots) this.clearSpots();
